@@ -1,0 +1,16 @@
+{
+     "tabs": 4,
+     "jumpscroll": true,
+     "showLineNumbers": true,
+	 "colorizeSyntax": true,
+     "colors": {
+         "statusBarTextColor":"BRIGHT_WHITE",
+         "statusBarBackgroundColor":"102,102,255",
+         "commentTextColor":"224,224,224",
+         "includeTextColor":"208,208,208",
+         "lineNumberTextColor":"BRIGHT_BLACK",
+         "cppLanguageMethodDefinitionTextColor":"255,136,73",
+         "cppLanguageTypesTextColor":"61,183,228",
+         "cppLanguageElementsTextColor":"105,190,40"
+     }
+}

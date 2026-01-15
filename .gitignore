@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# build outputs / artifacts (common)
+build/
+dist/
+out/
+bin/
+obj/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# dependency / tool junk
+*.log
+*.tmp
+*.swp
+*.swo
+
+# IDE/editor
+.vscode/
+.idea/
+*.xcworkspace/
+*.xcodeproj/
+
+# Build Directories
+# Platform-specific build output directories
+**/darwin*/
+**/linux*/
+**/sunos*/
+**/irix*/
+**/netbsd*/
+**/nextstep*/
+**/_*/
+**/*.tar/
+

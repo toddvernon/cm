@@ -1,0 +1,96 @@
+// Cm is an editor C and C++ development
+//-----------------------------------------------------------------------
+-
+
+
+// Overview
+//-----------------------------------------------------------------------
+
+
+Cm is full screen editor that based on the spirit of uEmacs sharing many 
+similar command sequences and behavior.  Cm started as more of thought 
+exercise on how to write a text editor. As time went on more features 
+were added included syntax coloring and the ability to define projects.
+
+// Modes of operation
+//-----------------------------------------------------------------------
+
+
+Cm is always in insert text mode.  Actions are initiated by either typing 
+ESC and a command, or CNTL and one or more keystrokes.  Commands are 
+typical things that require an argument to be entered.  ESC puts the 
+cursor on the command line.  At this point a when a key is pressed Cm 
+checks to see if it's the first character of quick access command.  For 
+instance, ESC then f results in the “find:” being placed on the command 
+line.  The user can then type “foo” ENTER and the cursor will jump to the 
+first occurrence of “foo” past the current cursor position.
+
+Commands entered by holding the CNTL key and pressing another key 
+performs an immediate action.  For instance, CNTL-V performs a page down 
+action.  In the same way, CNTL-f will repeat the last ESC-f find command 
+using the same argument as the first find command was entered.
+
+// Command Actions
+//-----------------------------------------------------------------------
+-
+
+
+
+
+
+// Control Actions 
+-------------------------------------------------------------------------
+-
+
+
+// Control X control functions
+Control X, Control S: Save File
+Control X, Control C: Quit
+Control X, Control J: Toggle Jump Scroll
+
+// Cut and paste
+Control k: Cut to end of line
+Control w: Cut text between mark and cursor to cut buffer
+Control y: Paste cut buffer
+
+// Cursor movement
+Control v: Page Down
+Control z: Page Up
+
+// Find and Replace
+ESC f: find initial
+ESC r: replace initial
+Control f: find again
+Control r: replace again
+
+
+// command sequences asking for input
+
+ESC, ESC: enter command
+
+ESC s: Save file
+ESC c: Cut to mark
+ESC q: q
+ESC g: goto line
+
+ESC SPACE: set mark
+ESC m: set mark
+ESC p: paste text
+
+// misc
+Control l: toggle line numbers
+Control n: next buffer
+Control p: preveous buffer
+
+
+
+ESC n: asks for name of file, existing or not, creates a new buffer, sets 
+it as current buffer and loads the file
+       if applicable into it.
+
+Control <SPACE>: change to next buffer
+
+Control c : get the name of the current edit buffer, if its a .c or .cpp 
+file change to .h version.  If its the .h version
+            load the .cpp or .c version of the file
+
