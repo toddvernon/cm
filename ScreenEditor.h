@@ -108,6 +108,21 @@ class ScreenEditor {
     void CMD_NewBuffer( CxString commandLine );
     void CMD_ListProjectFiles( CxString commandLine );
 
+    // Control key command handlers (called from dispatch table)
+    void CTRL_Cut(void);
+    void CTRL_Paste(void);
+    void CTRL_CutToEndOfLine(void);
+    void CTRL_PageDown(void);
+    void CTRL_PageUp(void);
+    void CTRL_NextBuffer(void);
+    void CTRL_ProjectList(void);
+    void CTRL_UpdateScreen(void);
+    void CTRL_Help(void);
+
+    // Control-X subcommand handlers
+    void CTRLX_Save(void);
+    void CTRLX_Quit(void);
+
     ProgramMode programMode;
 
     ProgramDefaults *programDefaults;
@@ -129,6 +144,19 @@ class ScreenEditor {
     
     CxString _findString;
     CxString _replaceString;
+
+private:
+    // Dispatch table entry for control commands
+    struct ControlCmd {
+        const char* tag;
+        void (ScreenEditor::*handler)(void);
+        const char* message;  // NULL if handler sets its own message
+    };
+
+    static ControlCmd _controlCommands[];
+    static ControlCmd _ctrlXCommands[];
+
+    int dispatchControlX(void);
 };
 
 

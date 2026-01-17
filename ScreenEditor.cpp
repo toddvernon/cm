@@ -19,6 +19,36 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// Dispatch tables for control commands
+//
+// Each entry maps a control key tag to a handler method and optional message.
+// The table is terminated by a NULL tag entry.
+//-------------------------------------------------------------------------------------------------
+ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
+    { "J",    &ScreenEditor::CONTROL_ToggleJumpScroll,  NULL },
+    { "F",    &ScreenEditor::CONTROL_FindAgain,         NULL },
+    { "R",    &ScreenEditor::CONTROL_ReplaceAgain,      NULL },
+    { "L",    &ScreenEditor::CONTROL_ToggleLineNumbers, NULL },
+    { "W",    &ScreenEditor::CTRL_Cut,                  "(text cut)" },
+    { "V",    &ScreenEditor::CTRL_PageDown,             "(paged down)" },
+    { "Z",    &ScreenEditor::CTRL_PageUp,               "(paged up)" },
+    { "K",    &ScreenEditor::CTRL_CutToEndOfLine,       "(text cut to end of line)" },
+    { "Y",    &ScreenEditor::CTRL_Paste,                "(text pasted)" },
+    { "N",    &ScreenEditor::CTRL_NextBuffer,           "(next buffer)" },
+    { "P",    &ScreenEditor::CTRL_ProjectList,          "(Project List)" },
+    { "U",    &ScreenEditor::CTRL_UpdateScreen,         "(Update Screen)" },
+    { "<US>", &ScreenEditor::CTRL_Help,                 "(Help)" },
+    { NULL,   NULL,                                      NULL }
+};
+
+ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
+    { "S",    &ScreenEditor::CTRLX_Save,  NULL },
+    { "C",    &ScreenEditor::CTRLX_Quit,  NULL },
+    { NULL,   NULL,                        NULL }
+};
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::ScreenEditor (constructor)
 //
 // Creates all the important parts of the program, the editview, the commandline, they keyboard
@@ -265,10 +295,17 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 
                 // check if this buffer has been loaded into memory
                 if (!editBuffer->isInMemory()) {
-                    
-                    // if not then load the text
+
+                    // show loading status and flush immediately
+                    setMessage(CxString("(Loading ") + filePath + "...)");
+                    commandLineView->updateScreen();
+                    screen->flush();
+
+                    // load the text
                     editBuffer->loadText( filePath, TRUE );
-                    
+
+                    // show completion
+                    setMessage(CxString("(Loaded ") + filePath + ")");
                 }
                 
                 // set the edit buffer in the edit view
@@ -285,10 +322,18 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 
                 // create a new edit buffer
                 editBuffer = new CxEditBuffer( );
-                
+
+                // show loading status and flush immediately
+                setMessage(CxString("(Loading ") + filePath + "...)");
+                commandLineView->updateScreen();
+                screen->flush();
+
                 // load the text into it
                 editBuffer->loadText( filePath, preload );
-                
+
+                // show completion
+                setMessage(CxString("(Loaded ") + filePath + ")");
+
                 // add it to the list of edit buffers
                 editBufferList->add( editBuffer );
                 
@@ -1368,220 +1413,157 @@ ScreenEditor::CMD_Replace(CxString commandLine)
 
 
 //-------------------------------------------------------------------------------------------------
+// Control command handlers - small focused methods called from dispatch table
+//-------------------------------------------------------------------------------------------------
+
+void ScreenEditor::CTRL_Cut(void)
+{
+    _cutBuffer = editView->cutToMark();
+}
+
+void ScreenEditor::CTRL_Paste(void)
+{
+    editView->pasteText(_cutBuffer);
+}
+
+void ScreenEditor::CTRL_CutToEndOfLine(void)
+{
+    _cutBuffer = editView->cutTextToEndOfLine();
+}
+
+void ScreenEditor::CTRL_PageDown(void)
+{
+    editView->pageDown();
+}
+
+void ScreenEditor::CTRL_PageUp(void)
+{
+    editView->pageUp();
+}
+
+void ScreenEditor::CTRL_NextBuffer(void)
+{
+    nextBuffer();
+}
+
+void ScreenEditor::CTRL_ProjectList(void)
+{
+    fileListView->recalcScreenPlacements();
+    fileListView->redraw();
+    programMode = FILELIST;
+}
+
+void ScreenEditor::CTRL_UpdateScreen(void)
+{
+    editView->updateScreen();
+}
+
+void ScreenEditor::CTRL_Help(void)
+{
+    helpTextView->recalcScreenPlacements();
+    helpTextView->redraw();
+    programMode = HELPVIEW;
+}
+
+void ScreenEditor::CTRLX_Save(void)
+{
+    CxEditBuffer *editBuffer = editBufferList->current();
+    CxString filePath = editBuffer->getFilePath();
+
+    if (filePath.length()) {
+        CMD_SaveFile(filePath);
+    } else {
+        setMessage("(there is no current filename, use ESC s)");
+    }
+}
+
+void ScreenEditor::CTRLX_Quit(void)
+{
+    setMessage("(quit)");
+    saveCurrentEditBufferOnSwitch();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::dispatchControlX
+//
+// Handle Control-X prefix commands (two-key sequences)
+//-------------------------------------------------------------------------------------------------
+int
+ScreenEditor::dispatchControlX(void)
+{
+    CxKeyAction secondAction = keyboard->getAction();
+
+    // Control-X, Enter - toggle jump scroll
+    if (secondAction.actionType() == CxKeyAction::NEWLINE) {
+        CONTROL_ToggleJumpScroll();
+        editView->placeCursor();
+        screen->flush();
+        return 0;
+    }
+
+    // Must be a control key for other Control-X commands
+    if (secondAction.actionType() != CxKeyAction::CONTROL) {
+        return 0;
+    }
+
+    // Look up in Control-X dispatch table
+    for (int i = 0; _ctrlXCommands[i].tag != NULL; i++) {
+        if (secondAction.tag() == _ctrlXCommands[i].tag) {
+            if (_ctrlXCommands[i].message != NULL) {
+                setMessage(_ctrlXCommands[i].message);
+            }
+            (this->*_ctrlXCommands[i].handler)();
+            editView->placeCursor();
+            screen->flush();
+
+            // Special case: Control-X Control-C (quit) returns 1
+            if (secondAction.tag() == "C") {
+                return 1;
+            }
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::handleControl
 //
-// this method performs a control key actions.  Some sequences are a single key other multiple key
-// actions
+// Dispatch control key commands using lookup tables.
+// Control-X prefix commands are handled by dispatchControlX().
 //
 //-------------------------------------------------------------------------------------------------
 int
 ScreenEditor::handleControl( CxKeyAction keyAction )
 {
-    //---------------------------------------------------------------------------------------------
-    // Control X - starts a execute command
-    //---------------------------------------------------------------------------------------------
+    // Control-X prefix - two-key command sequence
     if (keyAction.tag() == "X") {
-
-        // get the next key
-        CxKeyAction secondAction = keyboard->getAction();
-
-        //-----------------------------------------------------------------------------------------
-        // Control X, Control S - Save
-        //-----------------------------------------------------------------------------------------
-        if (secondAction.actionType() == CxKeyAction::CONTROL) {
-            if (secondAction.tag() == "S") {
-                
-                CxEditBuffer *editBuffer = editBufferList->current();
-                CxString filePath = editBuffer->getFilePath();
-                
-                if (filePath.length()) {
-                    CMD_SaveFile( filePath );
-                } else {
-                    setMessage("(there is not current filename, use ESC s)");
-                }
-                editView->placeCursor();
-                screen->flush();
-            }
-        }
-
-        //-----------------------------------------------------------------------------------------
-        // Control X, Control C - Quit
-        //-----------------------------------------------------------------------------------------
-        if (secondAction.actionType() == CxKeyAction::CONTROL) {
-            if (secondAction.tag() == "C") {
-                setMessage("(quit)");
-                saveCurrentEditBufferOnSwitch();
-                return(1);
-            }
-        }
-        
-        //-----------------------------------------------------------------------------------------
-        // Control X, Control J - Quit
-        //-----------------------------------------------------------------------------------------
-        if (secondAction.actionType() == CxKeyAction::NEWLINE) {
-            CONTROL_ToggleJumpScroll();
-            editView->placeCursor();
-            screen->flush();
-        }
+        return dispatchControlX();
     }
 
-    //---------------------------------------------------------------------------------------------
-    // Control J - toggle jump scroll
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() =="J") {
-        CONTROL_ToggleJumpScroll();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control F - Find again
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() =="F") {
-        CONTROL_FindAgain();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control R - Replace again
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() =="R") {
-        CONTROL_ReplaceAgain();
-        editView->placeCursor();
-        screen->flush();
-    }
-    
-    //---------------------------------------------------------------------------------------------
-    // Control L - Toggle Line Numbers
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "L") {
-        CONTROL_ToggleLineNumbers();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control W - Cut to mark
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "W") {
-        setMessage("(text cut)");
-        _cutBuffer = editView->cutToMark();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control V - Page Down
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "V" ) {
-        setMessage("(paged down)");
-        editView->pageDown();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control Z - Page Up
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "Z" ) {
-        setMessage("(paged up)");
-        editView->pageUp();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control K - Cut to end of line
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "K") {
-        setMessage("(text cut to end of line)");
-        _cutBuffer = editView->cutTextToEndOfLine();
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control Y - Paste from Buffer
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "Y") {
-        setMessage("(text pasted)");
-        editView->pasteText( _cutBuffer );
-        editView->placeCursor();
-        screen->flush();
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // Control H - backspace or delete on some machines
-    //---------------------------------------------------------------------------------------------
+    // Control-H (backspace) - special case, routes directly to editView
     if (keyAction.tag() == "H") {
         editView->routeKeyAction(keyAction);
-    }
-    
-    //---------------------------------------------------------------------------------------------
-    // Control N - Next Buffer
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "N") {
-        setMessage("(next buffer)");
-        nextBuffer();
-        
-        editView->placeCursor();
-        screen->flush();
-    }
-    
-    //---------------------------------------------------------------------------------------------
-    // Control P - Preveous Buffer
-    //---------------------------------------------------------------------------------------------
-   /*
-    if (keyAction.tag() == "P") {
-        setMessage("(previous buffer)");
-        previousBuffer();
-
-        editView->placeCursor();
-        screen->flush();
-    }
-    */
-    //---------------------------------------------------------------------------------------------
-    // Control P - Show Project List
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "P") {
-        setMessage("(Project List)");
-        
-        fileListView->recalcScreenPlacements();
-        fileListView->redraw();
-        
-        programMode = FILELIST;
-        
-        screen->flush();
+        return 0;
     }
 
-    //---------------------------------------------------------------------------------------------
-    // Control U - Update Screen
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "U") {
-
-        setMessage("(Update Screem)");
-        
-		editView->updateScreen();
-		editView->placeCursor();	
-	        
-        screen->flush();
+    // Look up in dispatch table
+    for (int i = 0; _controlCommands[i].tag != NULL; i++) {
+        if (keyAction.tag() == _controlCommands[i].tag) {
+            if (_controlCommands[i].message != NULL) {
+                setMessage(_controlCommands[i].message);
+            }
+            (this->*_controlCommands[i].handler)();
+            editView->placeCursor();
+            screen->flush();
+            return 0;
+        }
     }
 
-    //---------------------------------------------------------------------------------------------
-    // Control ? - Preveous Buffer
-    //---------------------------------------------------------------------------------------------
-    if (keyAction.tag() == "<US>") {
-
-        setMessage("(Help)");
-        
-        helpTextView->recalcScreenPlacements();
-        helpTextView->redraw();
-        
-        programMode = HELPVIEW;
-        
-        screen->flush();
-    }
-    
-    return( 0 );
+    return 0;
 }
 
 
