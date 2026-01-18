@@ -22,7 +22,6 @@
 #include <cx/editbuffer/stringutils.h>
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
-#include <cx/commandline/commandline.h>
 #include <cx/functor/defercall.h>
 #include <cx/base/tokenizer.h>
 #include <cx/base/fileaccess.h>

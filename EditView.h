@@ -26,7 +26,6 @@
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
 #include <cx/screen/cursor.h>
-#include <cx/commandline/commandline.h>
 #include <cx/functor/defercall.h>
 
 #include "ProgramDefaults.h"
