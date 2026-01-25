@@ -23,13 +23,49 @@
 #define _MarkUp_h_
 
 //---------------------------------------------------------------------------------------------------------
-//
-//
+// Language mode enumeration - used to select syntax highlighting rules
+//---------------------------------------------------------------------------------------------------------
+enum LanguageMode {
+    LANG_NONE = 0,
+    LANG_C,
+    LANG_CPP,
+    LANG_SWIFT,
+    LANG_PYTHON,
+    LANG_JAVASCRIPT,
+    LANG_GO,
+    LANG_RUST,
+    LANG_JAVA,
+    LANG_SHELL,
+    LANG_MAKEFILE,
+    LANG_HTML,
+    LANG_CSS,
+    LANG_JSON,
+    LANG_MARKDOWN
+};
+
+//---------------------------------------------------------------------------------------------------------
+// LanguageSyntax - defines syntax rules for a language
+//---------------------------------------------------------------------------------------------------------
+struct LanguageSyntax {
+    const char* name;               // display name
+    const char* suffixes;           // file suffixes ".c.h.cpp"
+    const char* lineComment;        // "//" or "#" or NULL
+    const char* blockCommentStart;  // "/*" or NULL
+    const char* blockCommentEnd;    // "*/" or NULL
+    const char* multiStringDelim;   // "\"\"\"" or "`" or NULL
+    int nestedBlockComments;        // 1 if block comments can nest (Swift, Rust)
+    const char* keywords;           // comma-separated control keywords
+    const char* types;              // comma-separated type keywords
+    const char* constants;          // comma-separated constants (true, false, nil, etc.)
+};
+
+//---------------------------------------------------------------------------------------------------------
+// MarkUp class - handles syntax colorization
 //---------------------------------------------------------------------------------------------------------
 class MarkUp
 {
   public:
-    
+
     MarkUp( ProgramDefaults *pd, CxScreen *screenPtr );
     // constructor
     
@@ -59,19 +95,37 @@ class MarkUp
 
     CxString
     colorizeText( CxString fullText, CxString visibleText );
-    // given a string, colorize it according to the program defaults for C++ attributes
+    // given a string, colorize it according to the current language mode
 
     CxString
     colorizeHelpText( CxString fullText, CxString visibleText );
     // perform some colorization with help text
-    
+
+    void
+    setLanguageFromFilePath( CxString filePath );
+    // determine language mode from file suffix
+
+    LanguageMode
+    getLanguageMode( void );
+    // return current language mode
+
 private:
-    
+
+    CxString
+    colorizeKeywords( CxString line, const char* keywords, CxString colorStart, CxString colorEnd );
+    // colorize all matching keywords in line
+
     ProgramDefaults *programDefaults;
     // pointer to the startup defaults class
 
     CxScreen *screen;
     // pointer to the screen object
+
+    LanguageMode _languageMode;
+    // current language mode for syntax highlighting
+
+    const LanguageSyntax* _currentSyntax;
+    // pointer to current language syntax rules
 
 };
 

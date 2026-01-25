@@ -75,7 +75,10 @@ EditView::setEditBuffer( CxEditBuffer *eb)
     
     // change the edit buffer
     editBuffer = eb;
-    
+
+    // detect language mode from file path for syntax highlighting
+    markUp->setLanguageFromFilePath( editBuffer->getFilePath() );
+
     // recalc some information
     _windowTooSmall = false;
 
@@ -1216,6 +1219,8 @@ EditView::formatEditorLine(unsigned long bufferRow )
     //
     //---------------------------------------------------------------------------------------------
     if (programDefaults->colorizeSyntax() ) {
+        // use simple colorization without block comment state scanning
+        // (block comment state tracking is done in formatMultipleEditorLines for efficiency)
         visibleText = markUp->colorizeText( fullText, visibleText );
     }
     

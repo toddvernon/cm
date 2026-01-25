@@ -20,6 +20,25 @@
 #include <cx/screen/color.h>
 
 //-------------------------------------------------------------------------------------------------
+// Number of supported languages (must match LanguageMode enum in MarkUp.h)
+//-------------------------------------------------------------------------------------------------
+#define LANG_COUNT 15
+
+//-------------------------------------------------------------------------------------------------
+// SyntaxColorSet - holds syntax highlighting colors for a language
+//-------------------------------------------------------------------------------------------------
+struct SyntaxColorSet
+{
+    CxColor *commentTextColor;
+    CxColor *includeTextColor;
+    CxColor *keywordTextColor;
+    CxColor *typeTextColor;
+    CxColor *constantTextColor;
+    CxColor *stringTextColor;
+    CxColor *methodDefinitionTextColor;
+};
+
+//-------------------------------------------------------------------------------------------------
 // Class ProgramDefaults
 //
 //-------------------------------------------------------------------------------------------------
@@ -27,29 +46,39 @@
 class ProgramDefaults
 {
 public:
-    
+
     ProgramDefaults( void );
     // constructor
-    
+
     int loadDefaults( CxString fname );
     // load defaults from file
-    
+
     int getTabSize(void);
     // get the tabsize
 
 	int inColor(void);
 	// is the UI in color
-    
+
     CxColor *statusBarTextColor(void);
     CxColor *statusBarBackgroundColor(void);
-    CxColor *commentTextColor(void);
-    CxColor *includeTextColor(void);
     CxColor *lineNumberTextColor(void);
 	CxColor *commandLineMessageTextColor(void);
-    
+
+    // legacy color accessors (use default language colors)
+    CxColor *commentTextColor(void);
+    CxColor *includeTextColor(void);
     CxColor *cppLanguageMethodDefinitionTextColor(void);
     CxColor *cppLanguageElementsTextColor(void);
     CxColor *cppLanguageTypesTextColor(void);
+
+    // per-language syntax color accessors (lang parameter is LanguageMode value)
+    CxColor *keywordTextColor( int lang );
+    CxColor *typeTextColor( int lang );
+    CxColor *constantTextColor( int lang );
+    CxColor *stringTextColor( int lang );
+    CxColor *methodDefinitionTextColor( int lang );
+    CxColor *commentTextColor( int lang );
+    CxColor *includeTextColor( int lang );
     
     CxString getStatusBarForegroundColor(void);
     // get the status bar foreground color
@@ -97,23 +126,32 @@ private:
     int parseCppLanguageTypesTextColor( CxJSONObject *object );
     int parseCppLanguageElementsTextColor( CxJSONObject *object );
     int parseCppLanguageMethodDefinitionTextColor( CxJSONObject *object );
-    
-    
+
+    int parseSyntaxColors( CxJSONObject *object );
+    int parseSyntaxColorSet( CxJSONObject *colorSet, int langIndex );
+
+    void initSyntaxColorSet( SyntaxColorSet *colorSet );
+    void copySyntaxColorSet( SyntaxColorSet *dest, SyntaxColorSet *src );
+
     static CxColor *parseForegroundColor( CxString colorName );
     static CxColor *parseBackgroundColor( CxString colorName );
-    
+
     CxString _data;
-        
+
     CxColor *_statusBarTextColor;
     CxColor *_statusBarBackgroundColor;
-    CxColor *_commentTextColor;
-    CxColor *_includeTextColor;
     CxColor *_lineNumberTextColor;
 	CxColor *_commandLineMessageTextColor;
 
+    // legacy colors (for backward compatibility with old config format)
     CxColor *_cppLanguageMethodDefinitionTextColor;
     CxColor *_cppLanguageElementsTextColor;
     CxColor *_cppLanguageTypesTextColor;
+    CxColor *_commentTextColor;
+    CxColor *_includeTextColor;
+
+    // per-language syntax color sets
+    SyntaxColorSet _syntaxColors[LANG_COUNT];
 
 	int _showLineNumbers;
     int _jumpscroll;

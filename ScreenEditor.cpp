@@ -62,15 +62,27 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     programMode = ScreenEditor::EDIT;
     
     //---------------------------------------------------------------------------------------------
-    // load the default setting file
+    // load the default setting file - check current directory first, then home directory
     //
     //---------------------------------------------------------------------------------------------
     programDefaults = new ProgramDefaults();
-    
-    CxString homeDir = getenv("HOME");
-    if (homeDir.length()) {
-        homeDir += "/.cmrc";
-        programDefaults->loadDefaults(homeDir);
+
+    CxString configPath = ".cmrc";
+    CxFile testFile;
+
+    // try current directory first
+    if (!testFile.open(configPath, "r")) {
+        // fall back to home directory
+        CxString homeDir = getenv("HOME");
+        if (homeDir.length()) {
+            configPath = homeDir + "/.cmrc";
+        }
+    } else {
+        testFile.close();
+    }
+
+    if (configPath.length()) {
+        programDefaults->loadDefaults(configPath);
     }
     
     //---------------------------------------------------------------------------------------------

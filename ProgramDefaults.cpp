@@ -44,14 +44,20 @@ ProgramDefaults::ProgramDefaults(void)
 {
     _statusBarTextColor          = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _statusBarBackgroundColor    = new CxAnsiBackgroundColor( CxAnsiForegroundColor::NONE );
-    _commentTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
-    _includeTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _lineNumberTextColor         = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
 	_commandLineMessageTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
-    
+
+    // legacy colors for backward compatibility
+    _commentTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    _includeTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _cppLanguageMethodDefinitionTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _cppLanguageElementsTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _cppLanguageTypesTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+
+    // initialize per-language syntax color sets
+    for (int i = 0; i < LANG_COUNT; i++) {
+        initSyntaxColorSet( &_syntaxColors[i] );
+    }
 }
 
 
@@ -221,6 +227,12 @@ ProgramDefaults::loadDefaults( CxString fname )
 
                 }
             }
+
+            //-------------------------------------------------------------------------------------
+            // parse syntaxColors section (new format)
+            //
+            //-------------------------------------------------------------------------------------
+            parseSyntaxColors( object );
         }
     }
 
@@ -938,7 +950,230 @@ int
 ProgramDefaults::autoSaveOnBufferChange(void)
 {
     return( _autoSaveOnBufferChange );
-    
+
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProgramDefaults::initSyntaxColorSet
+//
+// Initialize a syntax color set to NONE colors
+//-------------------------------------------------------------------------------------------------
+void
+ProgramDefaults::initSyntaxColorSet( SyntaxColorSet *colorSet )
+{
+    colorSet->commentTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->includeTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->keywordTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->typeTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->constantTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->stringTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->methodDefinitionTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProgramDefaults::copySyntaxColorSet
+//
+// Copy colors from one set to another (for inheriting from default)
+//-------------------------------------------------------------------------------------------------
+void
+ProgramDefaults::copySyntaxColorSet( SyntaxColorSet *dest, SyntaxColorSet *src )
+{
+    dest->commentTextColor = src->commentTextColor;
+    dest->includeTextColor = src->includeTextColor;
+    dest->keywordTextColor = src->keywordTextColor;
+    dest->typeTextColor = src->typeTextColor;
+    dest->constantTextColor = src->constantTextColor;
+    dest->stringTextColor = src->stringTextColor;
+    dest->methodDefinitionTextColor = src->methodDefinitionTextColor;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProgramDefaults::parseSyntaxColors
+//
+// Parse the syntaxColors section with language-specific color sets
+//-------------------------------------------------------------------------------------------------
+int
+ProgramDefaults::parseSyntaxColors( CxJSONObject *object )
+{
+    CxJSONMember *syntaxColorsMember = object->find("syntaxColors");
+    if (syntaxColorsMember == NULL) {
+        return( FALSE );
+    }
+
+    if (syntaxColorsMember->object()->type() != CxJSONBase::OBJECT) {
+        return( FALSE );
+    }
+
+    CxJSONObject *syntaxColorsObject = (CxJSONObject *) syntaxColorsMember->object();
+
+    // parse "default" color set first (index 0 = LANG_NONE used as default)
+    CxJSONMember *defaultMember = syntaxColorsObject->find("default");
+    if (defaultMember != NULL && defaultMember->object()->type() == CxJSONBase::OBJECT) {
+        CxJSONObject *defaultColors = (CxJSONObject *) defaultMember->object();
+        parseSyntaxColorSet( defaultColors, 0 );
+    }
+
+    // copy default colors to all language slots
+    for (int i = 1; i < LANG_COUNT; i++) {
+        copySyntaxColorSet( &_syntaxColors[i], &_syntaxColors[0] );
+    }
+
+    // parse language-specific overrides
+    // language indices must match LanguageMode enum in MarkUp.h:
+    // 1=C, 2=CPP, 3=SWIFT, 4=PYTHON, 5=JAVASCRIPT, 6=GO, 7=RUST, 8=JAVA, 9=SHELL, etc.
+
+    struct { const char *name; int index; } langMap[] = {
+        { "c",          1 },
+        { "cpp",        2 },
+        { "swift",      3 },
+        { "python",     4 },
+        { "javascript", 5 },
+        { "go",         6 },
+        { "rust",       7 },
+        { "java",       8 },
+        { "shell",      9 },
+        { "makefile",  10 },
+        { "html",      11 },
+        { "css",       12 },
+        { "json",      13 },
+        { "markdown",  14 },
+        { NULL,         0 }
+    };
+
+    for (int i = 0; langMap[i].name != NULL; i++) {
+        CxJSONMember *langMember = syntaxColorsObject->find( langMap[i].name );
+        if (langMember != NULL && langMember->object()->type() == CxJSONBase::OBJECT) {
+            CxJSONObject *langColors = (CxJSONObject *) langMember->object();
+            parseSyntaxColorSet( langColors, langMap[i].index );
+        }
+    }
+
+    return( TRUE );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProgramDefaults::parseSyntaxColorSet
+//
+// Parse a single color set into the specified language index
+//-------------------------------------------------------------------------------------------------
+int
+ProgramDefaults::parseSyntaxColorSet( CxJSONObject *colorSet, int langIndex )
+{
+    if (langIndex < 0 || langIndex >= LANG_COUNT) {
+        return( FALSE );
+    }
+
+    SyntaxColorSet *colors = &_syntaxColors[langIndex];
+    CxJSONMember *member;
+    CxJSONString *value;
+
+    // commentTextColor
+    member = colorSet->find("commentTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->commentTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // includeTextColor
+    member = colorSet->find("includeTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->includeTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // keywordTextColor
+    member = colorSet->find("keywordTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->keywordTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // typeTextColor
+    member = colorSet->find("typeTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->typeTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // constantTextColor
+    member = colorSet->find("constantTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->constantTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // methodDefinitionTextColor
+    member = colorSet->find("methodDefinitionTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->methodDefinitionTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    // stringTextColor
+    member = colorSet->find("stringTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->stringTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
+    return( TRUE );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Per-language syntax color accessors
+//-------------------------------------------------------------------------------------------------
+CxColor *
+ProgramDefaults::keywordTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].keywordTextColor );
+}
+
+CxColor *
+ProgramDefaults::typeTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].typeTextColor );
+}
+
+CxColor *
+ProgramDefaults::constantTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].constantTextColor );
+}
+
+CxColor *
+ProgramDefaults::stringTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].stringTextColor );
+}
+
+CxColor *
+ProgramDefaults::methodDefinitionTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].methodDefinitionTextColor );
+}
+
+CxColor *
+ProgramDefaults::commentTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].commentTextColor );
+}
+
+CxColor *
+ProgramDefaults::includeTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].includeTextColor );
 }
 
 

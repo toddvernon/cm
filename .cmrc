@@ -1,75 +1,52 @@
-# .cmrc defaults file
-# --------------------------------------------------------------------------------
-# tabs:
-#    sets the number positions in a tabstop
-#
-# jumpscroll:
-#    if true the cursoring off screen vertically jumps
-#     the screen up or down half a page.  If false then
-#     the screen scrolls line-by-line
-#
-# showLineNumbers: 
-#     if true then line numbers are displayed by default
-#     on the left margin.
-#
-# statusBarTextColor:
-#     selects the color to be used for text in the
-#     in the status bar
-#
-# statusBarBackgroundColor:
-#     selects the color to be used for the text
-#     background in the status bar
-#
-# commentTextColor:
-#     selects the text color to be used for lines that begin
-#     with the "" 
-#
-# includeTextColor:
-#     selects the color used for line beginning with "#"
-#
-# lineNumberTextColor:
-#     selects the color used for the file line numbers
-#
-# Tips on colors#
-# Colors can be either be known ANSI color name or a comma seperated rgb value.
-# Older systems/terminal emulators like xterm may not understand rgb values and only
-# color names will work. On some systems such as the SGI Irix 6.5 winterm seem
-# to understand the low intensity ANSI values but not the high intensity values
-# such as BRITE_WHITE. In addition the colors NONE and REVERSE are understood
-# by the program.  NONE sends no ANSI color information and REVERSE will send
-# the ansi reverse video escape sequence.
-#
-# ANSI color names are:
-#     NONE,REVERSE,
-#     BLACK,RED,GREEN,YELLOW,BLUE,MAGENTA,CYAN,WHITE
-#     BRIGHT_BLACK,BRIGHT_RED,BRIGHT_GREEN,BRIGHT_YELLOW,BRIGHT_BLUE,BRIGHT_MAGENTA,BRIGHT_CYAN,BRIGHT_WHITE
-#
-# RGB color values should be a comma seperated list of decimal numbers where
-#     the values are between 0-255 and in the R G B ordering.
-#
-# Examples: "statusBarTextColor": "BLUE"
-#           "statusBarTextColor": "255,255,255"
-#           "statusBarTextColor": "NONE"
-#           "statusBarTextColor": "REVERSE"
-#
+# .cmrc defaults file: see README for more details
+# color syntax is ANSI:<name>, XTERM256:<name>, RGB:<R>,<G>,<B>
+# not all color modes work on all systems - older xterms only support ANSI
 # --------------------------------------------------------------------------------
 
 {
     "tabs": 4,
-    "jumpscroll": false,
+    "jumpscroll": true,
     "showLineNumbers": true,
-	"autoSaveOnBufferChange":true,
-	"colorizeSyntax": true,
-	"liveStatusLine": true,
+    "colorizeSyntax": true,
+    "liveStatusLines": true,
+
     "colors": {
-        "statusBarTextColor":"ANSI:BRIGHT_WHITE",
-        "statusBarBackgroundColor":"RGB:102,102,255",
-        "commentTextColor":"RGB:224,224,224",
-        "includeTextColor":"RGB:208,208,208",
-        "lineNumberTextColor":"ANSI:BRIGHT_BLACK",
-		"commandLineMessageTextColor":"RGB:255,255,51",
-		"cppLanguageMethodDefinitionTextColor":"RGB:255,136,73",
-		"cppLanguageTypesTextColor":"RGB:61,183,228",
-		"cppLanguageElementsTextColor":"RGB:200,212,221"
+        "statusBarTextColor": "ANSI:BRIGHT_WHITE",
+        "statusBarBackgroundColor": "ANSI:BLUE",
+        "lineNumberTextColor": "ANSI:BRIGHT_BLACK",
+        "commandLineMessageTextColor": "ANSI:MAGENTA"
+    },
+
+    "syntaxColors": {
+        "default": {
+            "commentTextColor": "ANSI:WHITE",
+            "includeTextColor": "ANSI:MAGENTA",
+            "keywordTextColor": "ANSI:BRIGHT_YELLOW",
+            "typeTextColor": "ANSI:BRIGHT_BLUE",
+            "constantTextColor": "ANSI:BRIGHT_CYAN",
+            "methodDefinitionTextColor": "ANSI:MAGENTA",
+            "stringTextColor": "ANSI:GREEN"
+        },
+        "c": {
+        },
+        "cpp": {
+        },
+        "swift": {
+            "keywordTextColor": "RGB:255,128,128",
+            "typeTextColor": "RGB:128,200,255",
+            "constantTextColor": "RGB:255,200,100"
+        },
+        "python": {
+        },
+        "javascript": {
+        },
+        "go": {
+        },
+        "rust": {
+        },
+        "java": {
+        },
+        "shell": {
+        }
     }
 }
