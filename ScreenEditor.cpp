@@ -1350,9 +1350,10 @@ ScreenEditor::CMD_Find( CxString commandLine )
     _findString = commandLine;
     _findString = _findString.stripLeading(" \t\n\r");
     _findString = _findString.stripTrailing(" \t\n\r");
-    
+    _findString.replaceAll( CxString("/n"), CxString("\n") );
+
     char buffer[200];
-    
+
     if(    editView->findString( _findString ) == TRUE ) {
         
         CxEditBufferPosition loc = editView->cursorPosition();
@@ -1388,9 +1389,10 @@ ScreenEditor::CMD_Replace(CxString commandLine)
 
     _replaceString = _replaceString.stripLeading(" \t\n\r");
     _replaceString = _replaceString.stripTrailing(" \t\n\r");
-    
+    _replaceString.replaceAll( CxString("/n"), CxString("\n") );
+
     char buffer[200];
-    
+
     if( editView->replaceString( _findString, _replaceString ) == TRUE ) {
         
         CxEditBufferPosition loc = editView->cursorPosition();

@@ -373,13 +373,16 @@ EditView::replaceString( CxString findString, CxString replaceString )
     
     // call replace
     int result = editBuffer->replaceString( findString, replaceString );
-        
-  	// update the remembered line.  The cursor was moved as a result of the replacement
-  	// to the next find location
-        
-    CxString line = formatEditorLine( loc.row );
-	line = CxStringUtils::replaceTabExtensionsWithSpaces( line );
-    screen->writeText( line );
+
+  	// update the screen after replacement
+    if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
+        reframe();
+        updateScreen();
+    } else {
+        CxString line = formatEditorLine( loc.row );
+        line = CxStringUtils::replaceTabExtensionsWithSpaces( line );
+        screen->writeText( line );
+    }
 
 /*
 	if (!result) {
@@ -421,11 +424,16 @@ EditView::replaceAgain( CxString findString, CxString replaceString )
 
     // replace the string again, if its at the cursor
     int result = editBuffer->replaceAgain( findString, replaceString );
-    
-	// update the line on the screen
-    CxString line = formatEditorLine( loc.row );
-	line = CxStringUtils::replaceTabExtensionsWithSpaces( line );
-    screen->writeText( line );
+
+	// update the screen after replacement
+    if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
+        reframe();
+        updateScreen();
+    } else {
+        CxString line = formatEditorLine( loc.row );
+        line = CxStringUtils::replaceTabExtensionsWithSpaces( line );
+        screen->writeText( line );
+    }
 
 /*
 	if (!result) {
