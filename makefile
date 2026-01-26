@@ -98,7 +98,8 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/Project.o				 \
 	$(APP_OBJECT_DIR)/FileListView.o		 \
 	$(APP_OBJECT_DIR)/HelpTextView.o		 \
-	$(APP_OBJECT_DIR)/MarkUp.o
+	$(APP_OBJECT_DIR)/MarkUp.o               \
+	$(APP_OBJECT_DIR)/CommandRegistry.o
 
 ## Targets ####################################################
 
@@ -143,6 +144,7 @@ $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/FileListView.o	: FileListView.cpp
 $(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
+$(APP_OBJECT_DIR)/CommandRegistry.o	: CommandRegistry.cpp
 
 
 .PRECIOUS: $(CX_LIBS)

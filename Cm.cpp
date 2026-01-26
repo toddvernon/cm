@@ -66,6 +66,7 @@ int main(int argc, char **argv)
     ScreenEditor screenEditor( screen, keyboard, filePath );
     screenEditor.run();
 
+	fflush(stdout);
 	CxScreen::clearScreen();
 
 	// switch back to the main screen
@@ -73,10 +74,15 @@ int main(int argc, char **argv)
 
 	// place the cursor where it was when started
 	CxScreen::placeCursor(row, col);
-//	printf("row=%d; col=%d\n", row, col);
 
-	// restore the cursor position
-//	CxScreen::restoreCursorPosition();
+	// restore terminal settings by deleting keyboard (calls teardownTerminalFeatures)
+	delete keyboard;
+	delete screen;
+
+	// output newline to prevent zsh from showing inverse %
+	printf("\n");
+
+	return 0;
 }
 
 

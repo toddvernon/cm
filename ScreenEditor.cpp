@@ -10,6 +10,7 @@
 //-------------------------------------------------------------------------------------------------
 
 #include <stdio.h>
+#include <signal.h>
 #include <sys/types.h>
 
 #include "EditView.h"
@@ -57,15 +58,45 @@ ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 {
+    // DEBUG: open log file for startup diagnostics
+    FILE *dbg = fopen("/tmp/cm_debug.log", "w");
+    if (dbg) { fprintf(dbg, "1: constructor start\n"); fflush(dbg); }
+
+    // Block SIGWINCH during construction to prevent callbacks on partially-constructed objects
+    sigset_t blockSet, oldSet;
+    sigemptyset(&blockSet);
+    sigaddset(&blockSet, SIGWINCH);
+    sigprocmask(SIG_BLOCK, &blockSet, &oldSet);
+
+    if (dbg) { fprintf(dbg, "2: signals blocked\n"); fflush(dbg); }
+
+    // initialize command input state FIRST to ensure it's IDLE during all initialization
+    _cmdInputState = CMD_INPUT_IDLE;
+
+    // initialize all pointers to NULL first to avoid undefined behavior
+    programDefaults = NULL;
+    screen = NULL;
+    keyboard = NULL;
+    editView = NULL;
+    commandLineView = NULL;
     editBufferList = NULL;
-    
+    fileListView = NULL;
+    helpTextView = NULL;
+    project = NULL;
+    _commandRegistry = NULL;
+    _currentCommand = NULL;
+    _quitRequested = FALSE;
+
     programMode = ScreenEditor::EDIT;
-    
+
+    if (dbg) { fprintf(dbg, "3: pointers initialized\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // load the default setting file - check current directory first, then home directory
     //
     //---------------------------------------------------------------------------------------------
     programDefaults = new ProgramDefaults();
+    if (dbg) { fprintf(dbg, "4: ProgramDefaults created\n"); fflush(dbg); }
 
     CxString configPath = ".cmrc";
     CxFile testFile;
@@ -92,8 +123,21 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _cutBuffer = "";
     _findString = "";
     _replaceString = "";
-    
+
+    //---------------------------------------------------------------------------------------------
+    // init the command registry and command input state
+    //
+    //---------------------------------------------------------------------------------------------
+    _commandRegistry = new CommandRegistry();
+    _cmdInputState = CMD_INPUT_IDLE;
+    _cmdBuffer = "";
+    _argBuffer = "";
+    _currentCommand = NULL;
+
+    if (dbg) { fprintf(dbg, "5: CommandRegistry created\n"); fflush(dbg); }
+
     editBufferList = new CxEditBufferList();
+    if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
     
     //---------------------------------------------------------------------------------------------
     // create a screen object
@@ -107,6 +151,8 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //------------------------------------------------------------------------------
     keyboard = key;
     
+    if (dbg) { fprintf(dbg, "7: about to create CommandLineView\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // make a command line view where prompts and messages appear
     //
@@ -118,25 +164,31 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
                                           screen->rows()-1,
                                           1,
                                           screen->cols()-1);
-    
+
+    if (dbg) { fprintf(dbg, "8: CommandLineView created\n"); fflush(dbg); }
+
     commandLineView->setPrompt("");
-    
-   
-    
+
+
+
     screen->clearScreen();
-    
-    
+
+    if (dbg) { fprintf(dbg, "9: screen cleared\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // make an edit window where the editing happens
     //
     //---------------------------------------------------------------------------------------------
     editView = new EditView( programDefaults, screen );
-    
+
+    if (dbg) { fprintf(dbg, "10: EditView created\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // create a project object (regardless if there is a project)
     //
     //---------------------------------------------------------------------------------------------
     project = new Project();
+    if (dbg) { fprintf(dbg, "11: Project created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // Check to see if we are loading a project, if the filename ends in .project then its a
@@ -180,25 +232,32 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
         setMessage( buffer );
  
     } else {
-        
+
+        if (dbg) { fprintf(dbg, "12: about to loadNewFile\n"); fflush(dbg); }
+
         //-----------------------------------------------------------------------------------------
         // not a project file so just load the referenced file
         //
         //-----------------------------------------------------------------------------------------
         loadNewFile( filePath, TRUE );
+
+        if (dbg) { fprintf(dbg, "13: loadNewFile complete\n"); fflush(dbg); }
     }
-    
+
+    if (dbg) { fprintf(dbg, "14: about to create FileListView\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // create a file list view for the project
     //
     //---------------------------------------------------------------------------------------------
-    
+
     fileListView = new FileListView(programDefaults,
                                     editBufferList,
                                     project,
                                     screen
                                     );
 
+    if (dbg) { fprintf(dbg, "15: FileListView created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a help view for editor help
@@ -208,16 +267,32 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
   	helpTextView = new HelpTextView(programDefaults,
 									project,
 									screen);
-    
+
+    if (dbg) { fprintf(dbg, "16: HelpTextView created\n"); fflush(dbg); }
+
     helpTextView->loadHelpText("./cm.txt");
 
-    
+    if (dbg) { fprintf(dbg, "17: help text loaded\n"); fflush(dbg); }
+
     //---------------------------------------------------------------------------------------------
     // update the screen and place the cursor
     //
     //---------------------------------------------------------------------------------------------
+    if (dbg) { fprintf(dbg, "17a: editView ptr = %p\n", (void*)editView); fflush(dbg); }
+    if (dbg) { fprintf(dbg, "17b: about to call editView->updateScreen()\n"); fflush(dbg); }
+
 	editView->updateScreen();
+
+    if (dbg) { fprintf(dbg, "18: editView->updateScreen complete\n"); fflush(dbg); }
+
     editView->placeCursor();
+
+    if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
+
+    // Unblock SIGWINCH now that construction is complete
+    sigprocmask(SIG_SETMASK, &oldSet, NULL);
+
+    if (dbg) { fprintf(dbg, "20: constructor complete, signals unblocked\n"); fclose(dbg); }
 }
 
 
@@ -230,10 +305,9 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 ScreenEditor::~ScreenEditor(void)
 {
     delete programDefaults;
-    delete screen;
-    delete keyboard;
     delete commandLineView;
     delete editView;
+    // Note: screen and keyboard are owned by main(), not deleted here
 }
 
 
@@ -698,9 +772,11 @@ ScreenEditor::run(void)
                 focusHelpView( keyAction );
             }
             break;
+        }
 
-
-
+        // check if quit was requested via ESC command
+        if (_quitRequested) {
+            return;
         }
     }
 }
@@ -720,7 +796,7 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
-        // handle escape key
+        // handle escape key - enter new command input mode
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
         {
@@ -728,46 +804,10 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
             programMode = ScreenEditor::COMMANDLINE;
 
             //-------------------------------------------------------------------------------------
-            // focus is now on the command line
+            // enter the new command input mode with tab completion
             //-------------------------------------------------------------------------------------
-            commandLineView->updateScreen();
+            enterCommandMode();
             commandLineView->placeCursor();
-            
-            //-------------------------------------------------------------------------
-            // place a hint command on the command line, some commands are immediate
-            // meaning we should go ahead and execute immediately without a
-            // confirmation keystroke, if gatherhint returns 1 then the command
-            // should be executed and mode put back into edit mode.
-            //-------------------------------------------------------------------------
-            if (gatherHint() == 1) {
-                
-                //---------------------------------------------------------------------
-                // immediate command, so the get the command line and process it
-                //---------------------------------------------------------------------
-                CxString commandLine = commandLineView->getText();
-                
-                //---------------------------------------------------------------------
-                // execute the command
-                //---------------------------------------------------------------------
-                if (executeCommand( commandLine )) {
-                    
-                    //-----------------------------------------------------------------
-                    // command was quit, so we are all done
-                    //-----------------------------------------------------------------
-                    editView->placeCursor();
-                    return(1);
-                }
-                
-                //---------------------------------------------------------------------
-                // clear the commandline and place the cursor in the edit view
-                //---------------------------------------------------------------------
-                commandLineView->setText("");
-                editView->placeCursor();
-                screen->flush();
-                
-                programMode = ScreenEditor::EDIT;
-
-            }
         }
         break;
             
@@ -811,6 +851,18 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
 void
 ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
 {
+    //---------------------------------------------------------------------------------------------
+    // if in new command input mode, use the new handler
+    //---------------------------------------------------------------------------------------------
+    if (_cmdInputState == CMD_INPUT_COMMAND || _cmdInputState == CMD_INPUT_ARGUMENT) {
+        handleCommandInput( keyAction );
+        // cursor is positioned by updateCommandDisplay() or transitionToArgument()
+        return;
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // legacy command line handling (for backward compatibility during transition)
+    //---------------------------------------------------------------------------------------------
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
@@ -822,22 +874,22 @@ ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
             // handle escape like its a return
             CxString commandLine = commandLineView->getText();
             commandLineView->setText("");
-            
+
             programMode = ScreenEditor::EDIT;
             editView->placeCursor();
-            
+
             int result = executeCommand( commandLine );
             if (result) {
                 return;
             }
-            
+
             commandLineView->setText("");
             editView->placeCursor();
             screen->flush();
 
         }
         break;
-            
+
         //-----------------------------------------------------------------------------------------
         // handle all other keys
         //-----------------------------------------------------------------------------------------
@@ -1121,6 +1173,576 @@ ScreenEditor::gatherHint( void )
 }
 
 
+//-------------------------------------------------------------------------------------------------
+//
+// ESC COMMAND INPUT SYSTEM
+//
+// Overview:
+//   When the user presses ESC, the editor enters a command input mode that provides
+//   fuzzy command completion similar to modern IDE command palettes. The user types
+//   a command name, optionally followed by an argument, and the system provides
+//   real-time completion hints.
+//
+// User Experience:
+//   1. Press ESC to enter command mode - shows "command> " prompt
+//   2. Type characters - matching commands appear as hints (e.g., "f  | find | find-all")
+//   3. Press TAB to complete the common prefix
+//   4. Press ENTER to execute when a unique match exists
+//   5. Press SPACE to transition to argument input if command takes arguments
+//   6. Press ESC again to cancel and return to editing
+//
+// Smart Completion Behavior:
+//   - Single match: auto-completes the command name
+//   - Commands with arguments: automatically shows argument prompt
+//   - Commands without arguments: completes name, waits for ENTER to execute
+//   - Exact match hides redundant completion hint (typing "quit" shows "quit", not "quit | quit")
+//
+// State Machine:
+//   CMD_INPUT_IDLE ──(ESC)──> CMD_INPUT_COMMAND ──(match+args)──> CMD_INPUT_ARGUMENT
+//        ^                          │                                    │
+//        │                          │ (ESC or error)                     │ (ESC)
+//        └──────────────────────────┴────────────────────────────────────┘
+//        │                          │
+//        │                          │ (ENTER on no-arg command)
+//        └──────────────────────────┘
+//
+// Key State Variables:
+//   _cmdInputState  - current state (IDLE, COMMAND, or ARGUMENT)
+//   _cmdBuffer      - command name being typed
+//   _argBuffer      - argument being typed (in ARGUMENT state)
+//   _currentCommand - selected CommandEntry (set when transitioning to ARGUMENT or executing)
+//
+// Key Functions:
+//   enterCommandMode()      - entry point from ESC key
+//   handleCommandInput()    - dispatcher based on current state
+//   handleCommandModeInput()   - handles typing command name
+//   handleArgumentModeInput()  - handles typing argument
+//   selectCommand()         - handles matched command (args -> prompt, no args -> complete)
+//   cancelCommandInput()    - cleanup and return to edit mode
+//   executeCurrentCommand() - run the command handler
+//
+// Command Registry:
+//   Commands are defined in CommandRegistry.cpp. Each entry has:
+//   - name: the command name (e.g., "find", "goto-line")
+//   - argHint: hint text for argument (e.g., "<pattern>", "<line>")
+//   - description: help text
+//   - flags: CMD_FLAG_NEEDS_ARG, CMD_FLAG_OPTIONAL_ARG
+//   - handler: function pointer to ScreenEditor method
+//
+//   The registry provides fuzzy prefix matching that ignores hyphens, so typing
+//   "gl" matches "goto-line" and "fa" matches "find-all".
+//
+//-------------------------------------------------------------------------------------------------
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::enterCommandMode
+//
+// Entry point for ESC command input. Called when user presses ESC in edit mode.
+//
+// Initializes all command input state variables and displays the "command> " prompt
+// with a list of all available commands as completion hints.
+//
+// State transition: any state -> CMD_INPUT_COMMAND
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::enterCommandMode( void )
+{
+    _cmdInputState = CMD_INPUT_COMMAND;
+    _cmdBuffer = "";
+    _argBuffer = "";
+    _currentCommand = NULL;
+
+    updateCommandDisplay();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::cancelCommandInput
+//
+// Cancels command input and returns to edit mode. This is the single cleanup point
+// for all exit paths from command input (ESC pressed, error conditions, etc.).
+//
+// Resets all state variables:
+//   _cmdInputState  -> CMD_INPUT_IDLE
+//   _cmdBuffer      -> ""
+//   _argBuffer      -> ""
+//   _currentCommand -> NULL
+//   programMode     -> EDIT
+//
+// Also clears the command line display and restores cursor to edit view.
+//
+// State transition: CMD_INPUT_COMMAND or CMD_INPUT_ARGUMENT -> CMD_INPUT_IDLE
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::cancelCommandInput( void )
+{
+    _cmdInputState = CMD_INPUT_IDLE;
+    _cmdBuffer = "";
+    _argBuffer = "";
+    _currentCommand = NULL;
+    programMode = ScreenEditor::EDIT;
+
+    commandLineView->setText("");
+    commandLineView->setPrompt("");
+    commandLineView->updateScreen();
+    editView->placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::selectCommand
+//
+// Handles a matched command during typing or TAB completion. This function determines
+// what to do based on whether the command takes arguments:
+//
+//   Command takes arguments (CMD_FLAG_NEEDS_ARG or CMD_FLAG_OPTIONAL_ARG):
+//     -> Transition to CMD_INPUT_ARGUMENT state
+//     -> Show argument prompt: "command-name <hint>: "
+//     -> Set _currentCommand so executeCurrentCommand knows what to run
+//
+//   Command takes NO arguments:
+//     -> Stay in CMD_INPUT_COMMAND state
+//     -> Auto-complete the command name in _cmdBuffer
+//     -> User must press ENTER to execute (prevents accidental execution)
+//
+// Note: This function is called from typing/TAB/SPACE, NOT from ENTER.
+// The ENTER handler calls executeCurrentCommand() directly for no-arg commands.
+//
+// State transition:
+//   - With args: CMD_INPUT_COMMAND -> CMD_INPUT_ARGUMENT
+//   - Without args: stays in CMD_INPUT_COMMAND (name completed, awaiting ENTER)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::selectCommand( CommandEntry *cmd )
+{
+    int takesArgument = (cmd->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG));
+
+    if (takesArgument) {
+        // go to argument input mode
+        _currentCommand = cmd;
+        _cmdInputState = CMD_INPUT_ARGUMENT;
+        _argBuffer = "";
+        updateArgumentDisplay();
+    }
+    else {
+        // complete the name but wait for ENTER to execute
+        _cmdBuffer = cmd->name;
+        updateCommandDisplay();
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::updateCommandDisplay
+//
+// Renders the command line during CMD_INPUT_COMMAND state. Shows the typed text
+// followed by matching command hints.
+//
+// Display format:
+//   "command> typed  | match1 <arg> | match2 <arg> | ..."
+//
+// Examples:
+//   Empty input:    "command>   | find <pattern> | find-all <pattern> | goto-line <line> | ..."
+//   Partial input:  "command> f  | find <pattern> | find-all <pattern>"
+//   Exact match:    "command> quit" (no hints shown when typed text equals command name)
+//
+// The cursor is positioned after the typed text (not after the hints), so the user
+// can continue typing naturally.
+//
+// Called whenever _cmdBuffer changes during command name input.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::updateCommandDisplay( void )
+{
+    CommandEntry *matches[16];
+    int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+
+    // build display: typed text + completions
+    CxString display = _cmdBuffer;
+
+    // don't show completion hint if typed text exactly matches a command
+    int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+
+    if (count > 0 && !isExactMatch) {
+        display += "  ";
+        for (int i = 0; i < count && i < 8; i++) {
+            display += "| ";
+            display += matches[i]->name;
+            if (matches[i]->argHint != NULL) {
+                display += " ";
+                display += matches[i]->argHint;
+            }
+            display += " ";
+        }
+        if (count > 8) {
+            display += "...";
+        }
+    }
+
+    CxString fullLine = "command> ";
+    fullLine += display;
+
+    // pad to screen width
+    unsigned long targetWidth = screen->cols();
+    if (targetWidth > 2) targetWidth -= 2;
+    while (fullLine.length() < targetWidth) {
+        fullLine += " ";
+    }
+
+    screen->resetColors();
+    screen->writeTextAt( screen->rows() - 1, 1, fullLine, true );
+
+    // cursor after typed text
+    unsigned long cursorCol = 1 + 9 + _cmdBuffer.length();
+    screen->placeCursor( screen->rows() - 1, cursorCol );
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::handleCommandInput
+//
+// Main dispatcher for command input mode. Routes keystrokes to the appropriate
+// handler based on the current state:
+//
+//   CMD_INPUT_COMMAND  -> handleCommandModeInput()  (typing command name)
+//   CMD_INPUT_ARGUMENT -> handleArgumentModeInput() (typing argument)
+//
+// Called from the main event loop when programMode indicates command input is active.
+// This simple dispatcher keeps the state machine logic clean and each handler focused.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::handleCommandInput( CxKeyAction keyAction )
+{
+    if (_cmdInputState == CMD_INPUT_COMMAND) {
+        handleCommandModeInput( keyAction );
+    }
+    else if (_cmdInputState == CMD_INPUT_ARGUMENT) {
+        handleArgumentModeInput( keyAction );
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::handleCommandModeInput
+//
+// Handles keystrokes while in CMD_INPUT_COMMAND state (typing the command name).
+//
+// Key behaviors:
+//
+//   ESC       - Cancel command input, return to edit mode
+//
+//   BACKSPACE - Delete last character from _cmdBuffer, update display
+//
+//   ENTER     - Execute if there's a match:
+//               * Exact match preferred (e.g., "find" matches "find" not "find-all")
+//               * Unique prefix match accepted (e.g., "qui" matches "quit")
+//               * Ambiguous -> error message, cancel
+//               * No match -> error message, cancel
+//               * For commands with args: transition to argument input
+//               * For commands without args: execute immediately
+//
+//   TAB       - Complete the common prefix among matches:
+//               * Single match -> complete name, then selectCommand()
+//               * Multiple matches -> complete common prefix, show hints
+//               * No matches -> error message
+//
+//   SPACE     - If typed text is an exact command match, transition to argument input
+//               (allows "find " to go to argument mode even with "find-all" existing)
+//
+//   Printable - Add character to _cmdBuffer:
+//               * Single match -> call selectCommand() (may auto-transition)
+//               * Multiple/no matches -> update display with hints
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
+{
+    // ESCAPE - cancel
+    if (keyAction.actionType() == CxKeyAction::COMMAND) {
+        cancelCommandInput();
+        return;
+    }
+
+    // BACKSPACE - delete last character
+    if (keyAction.actionType() == CxKeyAction::BACKSPACE) {
+        if (_cmdBuffer.length() > 0) {
+            _cmdBuffer = _cmdBuffer.subString( 0, _cmdBuffer.length() - 1 );
+            updateCommandDisplay();
+        }
+        return;
+    }
+
+    // RETURN - execute if we have a match
+    if (keyAction.actionType() == CxKeyAction::NEWLINE) {
+        // prefer exact match (e.g., "find" when "find" and "find-all" both exist)
+        CommandEntry *exact = _commandRegistry->findExact( _cmdBuffer );
+        if (exact != NULL) {
+            _currentCommand = exact;
+            if (exact->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
+                selectCommand( exact );
+            } else {
+                executeCurrentCommand();
+            }
+            return;
+        }
+
+        // otherwise try unique prefix match
+        CommandEntry *matches[16];
+        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+
+        if (count == 1) {
+            _currentCommand = matches[0];
+            if (matches[0]->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
+                selectCommand( matches[0] );
+            } else {
+                executeCurrentCommand();
+            }
+        }
+        else if (count > 1) {
+            setMessage( "(ambiguous command)" );
+            cancelCommandInput();
+        }
+        else {
+            setMessage( "(unknown command)" );
+            cancelCommandInput();
+        }
+        return;
+    }
+
+    // TAB - complete prefix
+    if (keyAction.actionType() == CxKeyAction::TAB) {
+        CommandEntry *matches[16];
+        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+
+        if (count == 1) {
+            _cmdBuffer = matches[0]->name;
+            selectCommand( matches[0] );
+        }
+        else if (count > 1) {
+            CxString common = _commandRegistry->completePrefix( _cmdBuffer );
+            if (common.length() > _cmdBuffer.length()) {
+                _cmdBuffer = common;
+            }
+            updateCommandDisplay();
+        }
+        else {
+            setMessage( "(no match)" );
+        }
+        return;
+    }
+
+    // SPACE - transition to argument if exact match
+    if (keyAction.tag() == ' ') {
+        CommandEntry *exact = _commandRegistry->findExact( _cmdBuffer );
+        if (exact != NULL) {
+            selectCommand( exact );
+        }
+        return;
+    }
+
+    // Printable character - add to buffer
+    if (keyAction.actionType() == CxKeyAction::LOWERCASE_ALPHA ||
+        keyAction.actionType() == CxKeyAction::UPPERCASE_ALPHA ||
+        keyAction.actionType() == CxKeyAction::NUMBER ||
+        keyAction.actionType() == CxKeyAction::SYMBOL) {
+
+        _cmdBuffer += keyAction.tag();
+
+        CommandEntry *matches[16];
+        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+
+        if (count == 1) {
+            selectCommand( matches[0] );
+        }
+        else {
+            updateCommandDisplay();
+        }
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::handleArgumentModeInput
+//
+// Handles keystrokes while in CMD_INPUT_ARGUMENT state (typing the command argument).
+// At this point, _currentCommand is set to the selected command.
+//
+// Key behaviors:
+//
+//   ENTER     - Execute the command with _argBuffer as the argument.
+//               For optional arguments, empty _argBuffer is valid.
+//
+//   ESC       - Cancel command input, return to edit mode without executing.
+//
+//   BACKSPACE - Delete last character from _argBuffer, update display.
+//
+//   Printable - Add character to _argBuffer, update display.
+//
+// The display shows: "command-name <hint>: argument-text"
+// For example: "find <pattern>: hello"
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::handleArgumentModeInput( CxKeyAction keyAction )
+{
+    // RETURN - execute command
+    if (keyAction.actionType() == CxKeyAction::NEWLINE) {
+        executeCurrentCommand();
+        return;
+    }
+
+    // ESCAPE - cancel
+    if (keyAction.actionType() == CxKeyAction::COMMAND) {
+        cancelCommandInput();
+        return;
+    }
+
+    // BACKSPACE - delete last character
+    if (keyAction.actionType() == CxKeyAction::BACKSPACE) {
+        if (_argBuffer.length() > 0) {
+            _argBuffer = _argBuffer.subString( 0, _argBuffer.length() - 1 );
+            updateArgumentDisplay();
+        }
+        return;
+    }
+
+    // Printable character - add to argument
+    if (keyAction.actionType() == CxKeyAction::LOWERCASE_ALPHA ||
+        keyAction.actionType() == CxKeyAction::UPPERCASE_ALPHA ||
+        keyAction.actionType() == CxKeyAction::NUMBER ||
+        keyAction.actionType() == CxKeyAction::SYMBOL) {
+
+        _argBuffer += keyAction.tag();
+        updateArgumentDisplay();
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::updateArgumentDisplay
+//
+// Renders the command line during CMD_INPUT_ARGUMENT state. Shows the command name,
+// argument hint, and typed argument text.
+//
+// Display format:
+//   "command-name <hint>: typed-argument"
+//
+// Examples:
+//   "find <pattern>: "           (no argument typed yet)
+//   "find <pattern>: hello"      (user typed "hello")
+//   "goto-line <line>: 42"       (user typed "42")
+//   "save [filename]: "          (optional argument, hint shows brackets)
+//
+// The cursor is positioned after the typed argument text.
+//
+// Called whenever _argBuffer changes during argument input.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::updateArgumentDisplay( void )
+{
+    // build prompt: "command <hint>: argument"
+    CxString fullLine = _currentCommand->name;
+    if (_currentCommand->argHint != NULL) {
+        fullLine += " ";
+        fullLine += _currentCommand->argHint;
+    }
+    fullLine += ": ";
+
+    unsigned long promptLen = fullLine.length();
+    fullLine += _argBuffer;
+
+    // pad to screen width to clear old content
+    unsigned long targetWidth = screen->cols();
+    if (targetWidth > 2) targetWidth -= 2;
+    while (fullLine.length() < targetWidth) {
+        fullLine += " ";
+    }
+
+    // use default colors (not magenta)
+    screen->resetColors();
+    screen->writeTextAt( screen->rows() - 1, 1, fullLine, true );
+
+    // position cursor after the argument text
+    unsigned long cursorCol = 1 + promptLen + _argBuffer.length();
+    screen->placeCursor( screen->rows() - 1, cursorCol );
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::executeCurrentCommand
+//
+// Executes the currently selected command (_currentCommand) with _argBuffer as
+// the argument. This is the final step in the command input flow.
+//
+// Preconditions:
+//   - _currentCommand must be set to a valid CommandEntry
+//   - _argBuffer contains the argument (may be empty for no-arg or optional-arg commands)
+//
+// Execution flow:
+//   1. Validate _currentCommand is not NULL
+//   2. Check if handler is implemented (handler != NULL)
+//   3. Call the handler method via function pointer: (this->*handler)(_argBuffer)
+//   4. Reset all command input state
+//   5. Return to EDIT mode with cursor in edit view
+//
+// If the command handler is NULL (not implemented), displays "(command not implemented)"
+// and returns to edit mode without executing.
+//
+// State transition: CMD_INPUT_COMMAND or CMD_INPUT_ARGUMENT -> CMD_INPUT_IDLE
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::executeCurrentCommand( void )
+{
+    if (_currentCommand == NULL) {
+        setMessage( "(no command)" );
+        _cmdInputState = CMD_INPUT_IDLE;
+        programMode = ScreenEditor::EDIT;
+        return;
+    }
+
+    // check if handler exists
+    if (_currentCommand->handler == NULL) {
+        setMessage( "(command not implemented)" );
+        _cmdInputState = CMD_INPUT_IDLE;
+        _currentCommand = NULL;
+        _cmdBuffer = "";
+        _argBuffer = "";
+        programMode = ScreenEditor::EDIT;
+        editView->placeCursor();
+        screen->flush();
+        return;
+    }
+
+    // call the handler
+    CommandHandler handler = _currentCommand->handler;
+    (this->*handler)( _argBuffer );
+
+    // clear internal command input state
+    _cmdInputState = CMD_INPUT_IDLE;
+    _currentCommand = NULL;
+    _cmdBuffer = "";
+    _argBuffer = "";
+
+    // only return to edit mode if handler didn't switch to a different mode
+    // (e.g., CMD_Help switches to HELPVIEW, CMD_BufferList switches to FILELIST)
+    if (programMode == ScreenEditor::COMMANDLINE) {
+        programMode = ScreenEditor::EDIT;
+        editView->placeCursor();
+        screen->flush();
+    }
+}
+
 
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::executeCommand
@@ -1350,6 +1972,87 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_BufferNext:
+//
+// Switch to next buffer (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_BufferNext( CxString commandLine )
+{
+    nextBuffer();
+    setMessage("(next buffer)");
+    editView->updateScreen();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_BufferPrev:
+//
+// Switch to previous buffer (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_BufferPrev( CxString commandLine )
+{
+    previousBuffer();
+    setMessage("(previous buffer)");
+    editView->updateScreen();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_BufferList:
+//
+// Show project/buffer list (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_BufferList( CxString commandLine )
+{
+    fileListView->recalcScreenPlacements();
+    fileListView->redraw();
+    programMode = ScreenEditor::FILELIST;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Quit:
+//
+// Quit editor (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Quit( CxString commandLine )
+{
+    setMessage("(quit)");
+    saveCurrentEditBufferOnSwitch();
+
+    // ensure screen is in clean state before exit
+    screen->resetColors();
+    screen->flush();
+    fflush(stdout);
+
+    _quitRequested = TRUE;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Help
+//
+// Show help view (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Help( CxString commandLine )
+{
+    helpTextView->recalcScreenPlacements();
+    helpTextView->redraw();
+    programMode = HELPVIEW;
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Find:
 //
 // Find a string in the buffer beyond the current current position
@@ -1376,13 +2079,7 @@ ScreenEditor::CMD_Find( CxString commandLine )
         setMessage(locBuffer);
         
     } else {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-        
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(not found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
+        setMessage("(not found)");
     }
 }
 

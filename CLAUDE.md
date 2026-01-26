@@ -68,3 +68,60 @@ make
   1) which files you changed,
   2) why it is portable across targets,
   3) what repo-local libraries you used.
+
+## Current Work (2026-01-25)
+
+**New ESC command system with tab completion - NOT YET COMMITTED**
+
+### What's Done
+- Created `CommandRegistry.h/cpp` - command table with fuzzy prefix matching
+- Modified `ScreenEditor.h/cpp` - command input state machine, tab completion
+- ESC → "command> " prompt → type partial command → TAB completes → ENTER executes
+- `goto-line` command tested and working via new system
+
+### What Needs Testing
+- `find` command via new system (ESC → "fi" → TAB → pattern → ENTER)
+- `replace` command
+- `save`, `load`, `mark`, `cut`, `paste` commands
+
+### Commands with NULL handlers (show "not implemented")
+- `find-all`, `buffer-next`, `buffer-prev`, `buffer-list`, `quit`, `help`
+
+### Files changed (uncommitted)
+- `CommandRegistry.h` (new)
+- `CommandRegistry.cpp` (new)
+- `ScreenEditor.h`
+- `ScreenEditor.cpp`
+- `Makefile`
+- `Cm.cpp` (terminal cleanup on exit)
+
+## ACTIVE DEBUGGING: Intermittent Startup Crash
+
+**Status**: Debug logging enabled, signal blocking disabled to reproduce crash
+
+### The Problem
+- Intermittent crash (~20% of the time) at startup after "(Loaded ...)" message
+- "trace trap" error, doesn't reproduce in debugger
+- Was "fixed" by blocking SIGWINCH during construction, but root cause unknown
+
+### Current Debug Setup (ScreenEditor.cpp constructor)
+- Writes to `/tmp/cm_debug.log` with numbered steps (1-20)
+- Each step is fflush'd immediately
+- SIGWINCH blocking is COMMENTED OUT to try to reproduce crash
+- When crash occurs, check `cat /tmp/cm_debug.log` for last successful step
+
+### To Re-enable the Fix
+In `ScreenEditor.cpp` constructor, uncomment:
+```cpp
+sigset_t blockSet, oldSet;
+sigemptyset(&blockSet);
+sigaddset(&blockSet, SIGWINCH);
+sigprocmask(SIG_BLOCK, &blockSet, &oldSet);
+```
+And at end of constructor:
+```cpp
+sigprocmask(SIG_SETMASK, &oldSet, NULL);
+```
+
+### To Remove Debug Logging
+Remove all `if (dbg) { fprintf(...); fflush(dbg); }` lines and the `FILE *dbg = fopen(...)` line

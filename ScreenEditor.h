@@ -32,6 +32,7 @@
 #include "Project.h"
 #include "FileListView.h"
 #include "HelpTextView.h"
+#include "CommandRegistry.h"
 
 #ifndef _ScreenEditor_h_
 #define _ScreenEditor_h_
@@ -53,6 +54,12 @@ class ScreenEditor {
         FILELIST,
 		HELPVIEW
     };
+
+    enum CommandInputState {
+        CMD_INPUT_IDLE,         // not in command input mode
+        CMD_INPUT_COMMAND,      // entering command name
+        CMD_INPUT_ARGUMENT      // entering command argument
+    };
     
      
 
@@ -71,6 +78,19 @@ class ScreenEditor {
     
     int executeCommand( CxString commandline );
     int gatherHint( void );
+
+    // command input methods
+    void enterCommandMode( void );
+    void handleCommandInput( CxKeyAction keyAction );
+    void updateCommandDisplay( void );
+    void updateArgumentDisplay( void );
+    void executeCurrentCommand( void );
+
+    // command input helpers (private implementation)
+    void selectCommand( CommandEntry *cmd );
+    void cancelCommandInput( void );
+    void handleCommandModeInput( CxKeyAction keyAction );
+    void handleArgumentModeInput( CxKeyAction keyAction );
 
     void resetPrompt(void);
     void setMessage(CxString message);
@@ -106,6 +126,11 @@ class ScreenEditor {
 	void CMD_CommentBlock( CxString commandLine );
     void CMD_NewBuffer( CxString commandLine );
     void CMD_ListProjectFiles( CxString commandLine );
+    void CMD_BufferNext( CxString commandLine );
+    void CMD_BufferPrev( CxString commandLine );
+    void CMD_BufferList( CxString commandLine );
+    void CMD_Quit( CxString commandLine );
+    void CMD_Help( CxString commandLine );
 
     // Control key command handlers (called from dispatch table)
     void CTRL_Cut(void);
@@ -156,6 +181,14 @@ private:
     static ControlCmd _ctrlXCommands[];
 
     int dispatchControlX(void);
+
+    // command input state
+    CommandRegistry *_commandRegistry;
+    CommandInputState _cmdInputState;
+    CxString _cmdBuffer;            // command name being typed
+    CxString _argBuffer;            // argument being typed
+    CommandEntry *_currentCommand;  // selected command (after completion)
+    int _quitRequested;             // set by CMD_Quit to signal exit
 };
 
 

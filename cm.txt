@@ -21,9 +21,9 @@ ESC and a command, or CNTL and one or more keystrokes.  Commands are
 typical things that require an argument to be entered.  ESC puts the 
 cursor on the command line.  At this point a when a key is pressed Cm 
 checks to see if it's the first character of quick access command.  For 
-instance, ESC then f results in the “find:” being placed on the command 
-line.  The user can then type “foo” ENTER and the cursor will jump to the 
-first occurrence of “foo” past the current cursor position.
+instance, ESC then f results in the "find:" being placed on the command 
+line.  The user can then type "foo" ENTER and the cursor will jump to the 
+first occurrence of "foo" past the current cursor position.
 
 Commands entered by holding the CNTL key and pressing another key 
 performs an immediate action.  For instance, CNTL-V performs a page down 

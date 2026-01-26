@@ -29,19 +29,30 @@
 //-------------------------------------------------------------------------------------------------
 HelpTextView::HelpTextView( ProgramDefaults *pd, Project *proj, CxScreen *screenPtr )
 {
+    FILE *dbg = fopen("/tmp/cm_debug.log", "a");
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: start\n"); fflush(dbg); }
+
     programDefaults = pd;
     screen  = screenPtr;
     project = proj;
     markUp  = new MarkUp( pd, screenPtr );
-    
+
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: markUp created\n"); fflush(dbg); }
+
     // initially the help text is not loaded
     eb = new CxEditBuffer();
-    
+
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: eb created\n"); fflush(dbg); }
+
     // setup the resize callback
     screen->addScreenSizeCallback( CxDeferCall( this, &HelpTextView::screenResizeCallback ));
-    
+
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: callback added\n"); fflush(dbg); }
+
     // recalc where everything should disolay
     recalcScreenPlacements();
+
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: done\n"); fflush(dbg); fclose(dbg); }
 }
 
 
@@ -54,19 +65,29 @@ HelpTextView::HelpTextView( ProgramDefaults *pd, Project *proj, CxScreen *screen
 int
 HelpTextView::loadHelpText(CxString filePath)
 {
+    FILE *dbg = fopen("/tmp/cm_debug.log", "a");
+    if (dbg) { fprintf(dbg, "  loadHelpText: entered\n"); fflush(dbg); }
+
     filePath = filePath.stripLeading(" \t\r\n");
     filePath = filePath.stripTrailing(" \t\r\n");
-    
+
+    if (dbg) { fprintf(dbg, "  loadHelpText: filePath='%s'\n", filePath.data()); fflush(dbg); }
+
     // if the file path is actually some text
     if (filePath.length()) {
-                                         
+        if (dbg) { fprintf(dbg, "  loadHelpText: about to call eb->loadText\n"); fflush(dbg); }
+
         // load the text into it
-        eb->loadText( filePath, TRUE );   
+        eb->loadText( filePath, TRUE );
+
+        if (dbg) { fprintf(dbg, "  loadHelpText: eb->loadText complete\n"); fflush(dbg); fclose(dbg); }
         return( TRUE );
     }
-    
+
+    if (dbg) { fprintf(dbg, "  loadHelpText: calling recalcScreenPlacements\n"); fflush(dbg); }
     recalcScreenPlacements();
-    
+
+    if (dbg) { fprintf(dbg, "  loadHelpText: done\n"); fflush(dbg); fclose(dbg); }
     return( FALSE );
 }
 
