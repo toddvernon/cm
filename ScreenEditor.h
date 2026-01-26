@@ -133,6 +133,8 @@ class ScreenEditor {
     void CMD_Quit( CxString commandLine );
     void CMD_Help( CxString commandLine );
     void CMD_Count( CxString commandLine );
+    void CMD_Entab( CxString commandLine );
+    void CMD_Detab( CxString commandLine );
 
     // Control key command handlers (called from dispatch table)
     void CTRL_Cut(void);

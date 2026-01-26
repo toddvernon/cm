@@ -2075,6 +2075,38 @@ ScreenEditor::CMD_Count( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Entab
+//
+// Convert leading spaces to tabs in entire buffer
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Entab( CxString commandLine )
+{
+    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    editBuffer->entab();
+    editView->reframeAndUpdateScreen();
+    setMessage("(entab complete)");
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Detab
+//
+// Convert tabs to spaces in entire buffer
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Detab( CxString commandLine )
+{
+    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    editBuffer->detab();
+    editView->reframeAndUpdateScreen();
+    setMessage("(detab complete)");
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Find:
 //
 // Find a string in the buffer beyond the current current position

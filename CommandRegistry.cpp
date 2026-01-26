@@ -39,6 +39,21 @@ CommandEntry CommandRegistry::_commands[] = {
       &ScreenEditor::CMD_Count },
 
     //---------------------------------------------------------------------------------------------
+    // Tab conversion commands
+    //---------------------------------------------------------------------------------------------
+    { "entab",
+      NULL,
+      "Convert leading spaces to tabs",
+      0,
+      &ScreenEditor::CMD_Entab },
+
+    { "detab",
+      NULL,
+      "Convert tabs to spaces",
+      0,
+      &ScreenEditor::CMD_Detab },
+
+    //---------------------------------------------------------------------------------------------
     // Replace commands
     //---------------------------------------------------------------------------------------------
     { "replace",
