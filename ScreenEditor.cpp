@@ -2026,7 +2026,9 @@ void
 ScreenEditor::CMD_Quit( CxString commandLine )
 {
     setMessage("(quit)");
-    saveCurrentEditBufferOnSwitch();
+    if (programDefaults->autoSaveOnBufferChange()) {
+        saveCurrentEditBufferOnSwitch();
+    }
 
     // ensure screen is in clean state before exit
     screen->resetColors();
@@ -2049,6 +2051,26 @@ ScreenEditor::CMD_Help( CxString commandLine )
     helpTextView->recalcScreenPlacements();
     helpTextView->redraw();
     programMode = HELPVIEW;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Count
+//
+// Count lines and characters in the current buffer
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Count( CxString commandLine )
+{
+    CxEditBuffer *editBuffer = editView->getEditBuffer();
+
+    unsigned long lineCount = editBuffer->numberOfLines();
+    unsigned long charCount = editBuffer->characterCount();
+
+    char buffer[200];
+    sprintf(buffer, "(%lu lines, %lu characters)", lineCount, charCount);
+    setMessage(buffer);
 }
 
 
@@ -2124,6 +2146,56 @@ ScreenEditor::CMD_Replace(CxString commandLine)
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ReplaceAll
+//
+// Replace all occurrences of the previous find string with the replacement string.
+// User must have done a find (ESC f) first to set the find pattern.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ReplaceAll(CxString commandLine)
+{
+    // check if we have a find pattern
+    if (_findString.length() == 0) {
+        setMessage("(no find pattern - use ESC f first)");
+        return;
+    }
+
+    // parse and store the replacement string
+    _replaceString = commandLine;
+    _replaceString = _replaceString.stripLeading(" \t\n\r");
+    _replaceString = _replaceString.stripTrailing(" \t\n\r");
+    _replaceString.replaceAll( CxString("/n"), CxString("\n") );
+
+    // get direct access to editBuffer to avoid per-replacement screen updates
+    CxEditBuffer *editBuffer = editView->getEditBuffer();
+
+    // move cursor to beginning of buffer
+    editBuffer->cursorGotoRequest(0, 0);
+
+    // replace all occurrences - call editBuffer directly to skip screen updates
+    int count = 0;
+    while (editBuffer->replaceAgain(_findString, _replaceString) == TRUE) {
+        count++;
+    }
+
+    // single screen refresh after all replacements
+    editView->reframeAndUpdateScreen();
+
+    // report results
+    char buffer[200];
+    if (count == 0) {
+        sprintf(buffer, "(no occurrences of '%s' found)", _findString.data());
+    } else if (count == 1) {
+        sprintf(buffer, "(1 replacement)");
+    } else {
+        sprintf(buffer, "(%d replacements)", count);
+    }
+    setMessage(buffer);
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // Control command handlers - small focused methods called from dispatch table
 //-------------------------------------------------------------------------------------------------
 
@@ -2191,7 +2263,9 @@ void ScreenEditor::CTRLX_Save(void)
 void ScreenEditor::CTRLX_Quit(void)
 {
     setMessage("(quit)");
-    saveCurrentEditBufferOnSwitch();
+    if (programDefaults->autoSaveOnBufferChange()) {
+        saveCurrentEditBufferOnSwitch();
+    }
 }
 
 

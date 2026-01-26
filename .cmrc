@@ -9,6 +9,7 @@
     "showLineNumbers": true,
     "colorizeSyntax": true,
     "liveStatusLines": true,
+    "autoSaveOnBufferChange": false,
 
     "colors": {
         "statusBarTextColor": "ANSI:BRIGHT_WHITE",

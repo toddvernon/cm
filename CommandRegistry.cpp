@@ -29,20 +29,29 @@ CommandEntry CommandRegistry::_commands[] = {
       CMD_FLAG_NEEDS_ARG,
       &ScreenEditor::CMD_Find },
 
-    { "find-all",
-      "<pattern>",
-      "Find and highlight all occurrences",
-      CMD_FLAG_NEEDS_ARG,
-      NULL },  // TODO: implement
+    //---------------------------------------------------------------------------------------------
+    // Buffer info commands
+    //---------------------------------------------------------------------------------------------
+    { "count",
+      NULL,
+      "Count lines and characters in buffer",
+      0,
+      &ScreenEditor::CMD_Count },
 
     //---------------------------------------------------------------------------------------------
     // Replace commands
     //---------------------------------------------------------------------------------------------
     { "replace",
-      "<pattern>",
-      "Replace text (uses last find)",
+      "<replacement>",
+      "Replace next occurrence (uses last find)",
       CMD_FLAG_NEEDS_ARG,
       &ScreenEditor::CMD_Replace },
+
+    { "replace-all",
+      "<replacement>",
+      "Replace all occurrences (uses last find)",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_ReplaceAll },
 
     //---------------------------------------------------------------------------------------------
     // Navigation commands

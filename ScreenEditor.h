@@ -112,6 +112,7 @@ class ScreenEditor {
     void CONTROL_FindAgain( void );
 
     void CMD_Replace(CxString commandLine);
+    void CMD_ReplaceAll(CxString commandLine);
     void CONTROL_ReplaceAgain( void );
     
     void CONTROL_ToggleLineNumbers( void );
@@ -131,6 +132,7 @@ class ScreenEditor {
     void CMD_BufferList( CxString commandLine );
     void CMD_Quit( CxString commandLine );
     void CMD_Help( CxString commandLine );
+    void CMD_Count( CxString commandLine );
 
     // Control key command handlers (called from dispatch table)
     void CTRL_Cut(void);

@@ -4,7 +4,7 @@
 //  cmacs
 //
 //  Created by Todd Vernon on 9/15/23.
-//  Copyright © 2022 Todd Vernon. All rights reserved.
+//  Copyright    2022 Todd Vernon. All rights reserved.
 //
 //
 //-------------------------------------------------------------------------------------------------
