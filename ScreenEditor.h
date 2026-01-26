@@ -124,6 +124,7 @@ class ScreenEditor {
     void CMD_GotoLine( CxString commandLine );
     void CMD_CutToMark( CxString commandLine );
     void CMD_PasteText( CxString commandLine );
+    void CMD_SystemPaste( CxString commandLine );
 	void CMD_CommentBlock( CxString commandLine );
     void CMD_NewBuffer( CxString commandLine );
     void CMD_ListProjectFiles( CxString commandLine );

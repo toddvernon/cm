@@ -20,6 +20,61 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// copyToSystemClipboard (macOS and Linux)
+//
+// Copies text to the system clipboard so it can be pasted into other applications.
+// Uses pbcopy on macOS, xclip on Linux.
+//
+//-------------------------------------------------------------------------------------------------
+#if defined(_OSX_) || defined(_LINUX_)
+static void copyToSystemClipboard( CxString text )
+{
+    if (text.length() == 0) return;
+
+#ifdef _OSX_
+    FILE *pipe = popen("pbcopy", "w");
+#else
+    FILE *pipe = popen("xclip -selection clipboard", "w");
+#endif
+    if (pipe) {
+        fwrite(text.data(), 1, text.length(), pipe);
+        pclose(pipe);
+    }
+}
+#endif
+
+
+//-------------------------------------------------------------------------------------------------
+// pasteFromSystemClipboard (macOS and Linux)
+//
+// Reads text from the system clipboard.
+// Uses pbpaste on macOS, xclip on Linux.
+//
+//-------------------------------------------------------------------------------------------------
+#if defined(_OSX_) || defined(_LINUX_)
+static CxString pasteFromSystemClipboard( void )
+{
+    CxString result = "";
+
+#ifdef _OSX_
+    FILE *pipe = popen("pbpaste", "r");
+#else
+    FILE *pipe = popen("xclip -selection clipboard -o", "r");
+#endif
+    if (pipe) {
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+            result += buffer;
+        }
+        pclose(pipe);
+    }
+
+    return result;
+}
+#endif
+
+
+//-------------------------------------------------------------------------------------------------
 // Dispatch tables for control commands
 //
 // Each entry maps a control key tag to a handler method and optional message.
@@ -1554,6 +1609,15 @@ ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
         keyAction.actionType() == CxKeyAction::NUMBER ||
         keyAction.actionType() == CxKeyAction::SYMBOL) {
 
+        // Check if we already have an exact match with no args - if so, ignore input
+        // This prevents "cut" from becoming "cutt" when user continues typing
+        CommandEntry *existingExact = _commandRegistry->findExact( _cmdBuffer );
+        if (existingExact != NULL &&
+            !(existingExact->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG))) {
+            // Command complete, no args needed - ignore further characters
+            return;
+        }
+
         _cmdBuffer += keyAction.tag();
 
         CommandEntry *matches[16];
@@ -1874,6 +1938,29 @@ ScreenEditor::CMD_PasteText( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_SystemPaste:
+//
+// Paste text from the system clipboard (macOS/Linux only)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_SystemPaste( CxString commandLine )
+{
+#if defined(_OSX_) || defined(_LINUX_)
+    CxString clipboardText = pasteFromSystemClipboard();
+    if (clipboardText.length() > 0) {
+        editView->pasteText( clipboardText );
+        setMessage("(pasted from system clipboard)");
+    } else {
+        setMessage("(system clipboard empty)");
+    }
+#else
+    setMessage("(system clipboard not available on this platform)");
+#endif
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_CutToMark:
 //
 // Cuts text from the cursor position to the current mark (if there is one)
@@ -1885,6 +1972,9 @@ ScreenEditor::CMD_CutToMark( CxString commandLine )
     commandLineView->setText("");
     commandLineView->setPrompt("(text cut)");
     _cutBuffer = editView->cutToMark();
+#if defined(_OSX_) || defined(_LINUX_)
+    copyToSystemClipboard(_cutBuffer);
+#endif
 }
 
 
@@ -2234,6 +2324,9 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
 void ScreenEditor::CTRL_Cut(void)
 {
     _cutBuffer = editView->cutToMark();
+#if defined(_OSX_) || defined(_LINUX_)
+    copyToSystemClipboard(_cutBuffer);
+#endif
 }
 
 void ScreenEditor::CTRL_Paste(void)
@@ -2244,6 +2337,9 @@ void ScreenEditor::CTRL_Paste(void)
 void ScreenEditor::CTRL_CutToEndOfLine(void)
 {
     _cutBuffer = editView->cutTextToEndOfLine();
+#if defined(_OSX_) || defined(_LINUX_)
+    copyToSystemClipboard(_cutBuffer);
+#endif
 }
 
 void ScreenEditor::CTRL_PageDown(void)

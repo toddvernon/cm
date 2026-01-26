@@ -32,7 +32,7 @@ CommandEntry CommandRegistry::_commands[] = {
     //---------------------------------------------------------------------------------------------
     // Buffer info commands
     //---------------------------------------------------------------------------------------------
-    { "count",
+    { "wc",
       NULL,
       "Count lines and characters in buffer",
       0,
@@ -145,6 +145,12 @@ CommandEntry CommandRegistry::_commands[] = {
       "Paste from cut buffer",
       0,
       &ScreenEditor::CMD_PasteText },
+
+    { "system-paste",
+      NULL,
+      "Paste from system clipboard",
+      0,
+      &ScreenEditor::CMD_SystemPaste },
 
     //---------------------------------------------------------------------------------------------
     // Application commands
