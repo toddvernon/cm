@@ -19,9 +19,9 @@
 #include <cx/base/star.h>
 #include <cx/base/hashmap.h>
 
-#include <cx/editbuffer/editbuffer.h>
-
 #include <cx/keyboard/keyboard.h>
+
+#include "CmTypes.h"
 #include <cx/screen/screen.h>
 #include <cx/functor/defercall.h>
 
@@ -99,7 +99,7 @@ class HelpTextView
     MarkUp *markUp;
     // point to the text markup stuff
     
-    CxEditBuffer *eb;
+    CmEditBuffer *eb;
 
 };
 

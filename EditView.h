@@ -19,10 +19,10 @@
 #include <cx/base/star.h>
 #include <cx/base/hashmap.h>
 
-#include <cx/editbuffer/editbuffer.h>
-#include <cx/editbuffer/editbufferlist.h>
 #include <cx/editbuffer/edithint.h>
 #include <cx/editbuffer/stringutils.h>
+
+#include "CmTypes.h"
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
 #include <cx/screen/cursor.h>
@@ -122,10 +122,10 @@ class EditView
 	void insertCommentBlock( unsigned long lastCol );
     // insert a comment block in the text
     
-    CxEditBuffer *getEditBuffer(void);
-    // get a pointer to the current edit buffer    
+    CmEditBuffer *getEditBuffer(void);
+    // get a pointer to the current edit buffer
 
-    void setEditBuffer( CxEditBuffer *eb);
+    void setEditBuffer( CmEditBuffer *eb);
     // install a new edit buffer into the editview
     
     void toggleLineNumbers( void );
@@ -236,7 +236,7 @@ class EditView
     CxScreen *screen;
     // pointer to the screen object
 
-    CxEditBuffer *editBuffer;
+    CmEditBuffer *editBuffer;
     // pointer to the edit buffer object
     
     MarkUp *markUp;

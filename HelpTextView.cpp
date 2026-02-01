@@ -40,7 +40,7 @@ HelpTextView::HelpTextView( ProgramDefaults *pd, Project *proj, CxScreen *screen
     if (dbg) { fprintf(dbg, "  HelpTextView ctor: markUp created\n"); fflush(dbg); }
 
     // initially the help text is not loaded
-    eb = new CxEditBuffer();
+    eb = new CmEditBuffer();
 
     if (dbg) { fprintf(dbg, "  HelpTextView ctor: eb created\n"); fflush(dbg); }
 
@@ -196,7 +196,11 @@ HelpTextView::redraw( void )
 		//-----------------------------------------------------------------------------------------
         if (logicalItem < eb->numberOfLines()) {
 
+#ifdef CM_UTF8_SUPPORT
+            helpTextLine = leftBuffer + eb->line(logicalItem)->toBytesExpanded();
+#else
             helpTextLine = leftBuffer + *(eb->line(logicalItem));
+#endif
             
             helpTextLine = markUp->colorizeHelpText( helpTextLine, helpTextLine );
             

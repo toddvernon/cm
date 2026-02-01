@@ -1,0 +1,77 @@
+UTF-8 Test File for CM Editor
+==============================
+
+--- ASCII (baseline) ---
+Hello World
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+0123456789
+
+--- Tabs mixed with text ---
+col0	col8	col16	col24
+A	B	C	D
+
+--- Box Drawing Characters ---
+┌────────────────────────────┐
+│  Box drawing test          │
+│  ├── nested item           │
+│  └── last item             │
+└────────────────────────────┘
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  Double-line box           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+--- CJK Characters (double-width) ---
+中文测试 Chinese test
+日本語テスト Japanese test
+한국어 테스트 Korean test
+你好世界
+
+--- Mixed CJK and ASCII ---
+Price: ¥1000 (约$150)
+File: 文档.txt
+Path: /home/用户/文件夹/
+
+--- Emoji (double-width) ---
+Hello 👋 World 🌍
+Status: ✅ Done
+Warning: ⚠️ Alert
+Stars: ⭐⭐⭐⭐⭐
+
+--- European Accented Characters ---
+café résumé naïve
+über größe
+señor años
+Ñoño
+
+--- Combining Characters (diacriticals) ---
+café (precomposed: é)
+cafe + combining acute: é (if different)
+ñ = n + combining tilde
+
+--- Greek Letters ---
+α β γ δ ε ζ η θ
+ΑΒΓΔΕΖΗΘ
+π ≈ 3.14159
+
+--- Math Symbols ---
+∑ ∏ ∫ ∂ ∇ ∞
+√2 ≈ 1.414
+x² + y² = r²
+∀x ∈ ℝ: x² ≥ 0
+
+--- Currency Symbols ---
+$ € £ ¥ ₹ ₽ ₿
+
+--- Arrows and Symbols ---
+← ↑ → ↓ ↔ ↕
+◀ ▲ ▶ ▼
+● ○ ■ □ ▪ ▫
+
+--- Line with tabs and UTF-8 ---
+	中文	tab	日本語	end
+
+--- Long line for horizontal scroll test ---
+This is a very long line that should require horizontal scrolling to see the end: 这是一行很长的中文和English混合的文本，用于测试水平滚动功能。The end is here →
+
+--- End of test file ---

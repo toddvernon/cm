@@ -50,7 +50,7 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
     editBuffer = NULL;
 
     // create a new edit buffer (placeholder until real file is loaded)
-    setEditBuffer( new CxEditBuffer( pd->getTabSize() ));
+    setEditBuffer( new CmEditBuffer( pd->getTabSize() ));
 
     // NOTE: Don't call reframeAndUpdateScreen() here - the caller will do it
     // after loading the actual file content. This avoids a wasted screen draw
@@ -65,7 +65,7 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::setEditBuffer( CxEditBuffer *eb)
+EditView::setEditBuffer( CmEditBuffer *eb)
 {
     if (editBuffer != NULL) {
         // remember the first visual line in the current edit buffer before changing edit buffers
@@ -1088,8 +1088,15 @@ EditView::bufferRowToScreenRow(unsigned long bufferRow)
 unsigned long
 EditView::bufferColToScreenCol(unsigned long bufferCol)
 {
-    // get the physical screen line (zero based)
+#ifdef CM_UTF8_SUPPORT
+    // For UTF-8, characters can have different display widths (CJK=2, combining=0)
+    // Use the buffer's display column calculation for accurate screen positioning
+    unsigned long displayCol = editBuffer->cursorDisplayColumn();
+    unsigned long screenCol = displayCol - _visibleFirstEditBufferCol + _lineNumberOffset;
+#else
+    // For byte-based buffers, column index equals display column
     unsigned long screenCol = bufferCol - _visibleFirstEditBufferCol + _lineNumberOffset;
+#endif
     return(screenCol);
 }
 
@@ -1214,18 +1221,28 @@ EditView::formatEditorLine(unsigned long bufferRow )
     // get the line of text
     //
 	//---------------------------------------------------------------------------------------------
-    CxString *textPtr = editBuffer->line(bufferRow);
-    if (textPtr == NULL) {
-        printf("null  line  in updateEntireOfWindowLine::updateEntireWindowLine\n");
+#ifdef CM_UTF8_SUPPORT
+    CxUTFString *utfLine = editBuffer->line(bufferRow);
+    if (utfLine == NULL) {
+        printf("null line in formatEditorLine\n");
         exit(0);
     }
+    // Use toBytesExpanded() to expand tabs to spaces for display
+    CxString fullText = utfLine->toBytesExpanded();
+#else
+    CxString *textPtr = editBuffer->line(bufferRow);
+    if (textPtr == NULL) {
+        printf("null line in formatEditorLine\n");
+        exit(0);
+    }
+    CxString fullText = *textPtr;
+#endif
 
     //---------------------------------------------------------------------------------------------
     // get a copy of the full text line and the visible text line we need to pass both to
     // to the colorize method
     //
     //---------------------------------------------------------------------------------------------
-    CxString fullText    = *textPtr;
     CxString visibleText = fullText.subString(_visibleFirstEditBufferCol, _screenEditNumberOfCols );
     
     //---------------------------------------------------------------------------------------------
@@ -1606,7 +1623,7 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 // return the underlying edit buffer
 // 
 //-------------------------------------------------------------------------------------------------
-CxEditBuffer *
+CmEditBuffer *
 EditView::getEditBuffer(void)
 {
     return(editBuffer);

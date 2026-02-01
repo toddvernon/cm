@@ -191,7 +191,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     if (dbg) { fprintf(dbg, "5: CommandRegistry created\n"); fflush(dbg); }
 
-    editBufferList = new CxEditBufferList();
+    editBufferList = new CmEditBufferList();
     if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
     
     //---------------------------------------------------------------------------------------------
@@ -424,7 +424,7 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
         if ( checkFile( filePath ) == 0) {
 
             // return the editbuffer already in the list
-            CxEditBuffer *editBuffer = editBufferList->findPath( filePath );
+            CmEditBuffer *editBuffer = editBufferList->findPath( filePath );
             
             // we did find an edit buffer already loaded so just make it the current one
             if (editBuffer != NULL) {
@@ -455,14 +455,14 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
             // we did not find an edit buffer in the list, so create a new one
             // referencing that file path
             } else {
-                
+
                 // if the user wants autosave on buffer changes
                 if (programDefaults->autoSaveOnBufferChange()) {
                     saveCurrentEditBufferOnSwitch();
                 }
-                
+
                 // create a new edit buffer
-                editBuffer = new CxEditBuffer( );
+                CmEditBuffer *editBuffer = new CmEditBuffer( );
 
                 // show loading status and flush immediately
                 setMessage(CxString("(Loading ") + filePath + "...)");
@@ -500,7 +500,7 @@ void
 ScreenEditor::saveCurrentEditBufferOnSwitch(void)
 {
    // get the current buffer
-    CxEditBuffer *currentEditBuffer = editBufferList->current();
+    CmEditBuffer *currentEditBuffer = editBufferList->current();
     if (currentEditBuffer != NULL) {
         
         //  get the current buffer file name
@@ -535,7 +535,7 @@ ScreenEditor::nextBuffer(void)
     }
     
     // create a new edit buffer
-    CxEditBuffer *editBuffer = editBufferList->next();
+    CmEditBuffer *editBuffer = editBufferList->next();
     
     // see if the buffer is in memory
     if (!editBuffer->isInMemory()) {
@@ -568,7 +568,7 @@ ScreenEditor::previousBuffer(void)
     }
     
     // create a new edit buffer
-    CxEditBuffer *editBuffer = editBufferList->previous();
+    CmEditBuffer *editBuffer = editBufferList->previous();
     
     // see if the buffer is in memory
     if (!editBuffer->isInMemory()) {
@@ -1140,7 +1140,7 @@ ScreenEditor::gatherHint( void )
              if (keyAction.tag() == "s") {
                  commandLineView->typeText("save: ");
                  
-                 CxEditBuffer *editBuffer = editBufferList->current();
+                 CmEditBuffer *editBuffer = editBufferList->current();
                  
                  CxString filePath = editBuffer->getFilePath();
                  
@@ -2027,7 +2027,7 @@ ScreenEditor::CMD_LoadFile( CxString commandLine )
 {
     CxString newFileName = commandLine.nextToken(" \t\n");
     
-    //CxEditBuffer *editBuffer = editBufferList->current();
+    //CmEditBuffer *editBuffer = editBufferList->current();
     loadNewFile( newFileName, TRUE );
     
     // redraw the edit view
@@ -2054,7 +2054,7 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
     fileName = fileName.stripLeading(" \t\n\r");
     fileName = fileName.stripTrailing(" \t\n\r");
 
-    CxEditBuffer *editBuffer = editBufferList->current();
+    CmEditBuffer *editBuffer = editBufferList->current();
     editBuffer->saveText( fileName );
     
     setMessage("(file saved)");
@@ -2153,7 +2153,7 @@ ScreenEditor::CMD_Help( CxString commandLine )
 void
 ScreenEditor::CMD_Count( CxString commandLine )
 {
-    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
 
     unsigned long lineCount = editBuffer->numberOfLines();
     unsigned long charCount = editBuffer->characterCount();
@@ -2173,7 +2173,7 @@ ScreenEditor::CMD_Count( CxString commandLine )
 void
 ScreenEditor::CMD_Entab( CxString commandLine )
 {
-    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
     editBuffer->entab();
     editView->reframeAndUpdateScreen();
     setMessage("(entab complete)");
@@ -2189,7 +2189,7 @@ ScreenEditor::CMD_Entab( CxString commandLine )
 void
 ScreenEditor::CMD_Detab( CxString commandLine )
 {
-    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
     editBuffer->detab();
     editView->reframeAndUpdateScreen();
     setMessage("(detab complete)");
@@ -2290,7 +2290,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
     _replaceString.replaceAll( CxString("/n"), CxString("\n") );
 
     // get direct access to editBuffer to avoid per-replacement screen updates
-    CxEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
 
     // move cursor to beginning of buffer
     editBuffer->cursorGotoRequest(0, 0);
@@ -2378,7 +2378,7 @@ void ScreenEditor::CTRL_Help(void)
 
 void ScreenEditor::CTRLX_Save(void)
 {
-    CxEditBuffer *editBuffer = editBufferList->current();
+    CmEditBuffer *editBuffer = editBufferList->current();
     CxString filePath = editBuffer->getFilePath();
 
     if (filePath.length()) {

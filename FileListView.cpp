@@ -29,7 +29,7 @@
 // Constructs an overlay file list view allowing the user to select a file from the edit buffer
 //
 //-------------------------------------------------------------------------------------------------
-FileListView::FileListView( ProgramDefaults *pd, CxEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
+FileListView::FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
 {
     programDefaults = pd;
     editBufferList  = ebl;
@@ -108,7 +108,7 @@ FileListView::calcLongestName(void)
     for (int c=0; c<editBufferList->items(); c++) {
         
         // get the edit buffer at that index
-        CxEditBuffer *eb = editBufferList->at(c);
+        CmEditBuffer *eb = editBufferList->at(c);
         
         // get the file assuming we haven't made a mistake
         CxString filePath = eb->getFilePath( );
@@ -173,7 +173,7 @@ FileListView::redraw( void )
         if (logicalItem < editBufferList->items()) {
             
             // get the edit buffer at that index
-            CxEditBuffer *eb = editBufferList->at(logicalItem);
+            CmEditBuffer *eb = editBufferList->at(logicalItem);
             
             CxString touchedText  = "";
             CxString inMemoryText = "";
@@ -287,7 +287,7 @@ CxString
 FileListView::getSelectedItem( void )
 {
     // get the edit buffer at that index
-    CxEditBuffer *eb = editBufferList->at( selectedListItemIndex );
+    CmEditBuffer *eb = editBufferList->at( selectedListItemIndex );
     
     // get the file assuming we haven't made a mistake
     CxString filePath = eb->getFilePath( );

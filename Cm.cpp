@@ -18,9 +18,9 @@
 #include <cx/base/star.h>
 #include <cx/base/hashmap.h>
 
-#include <cx/editbuffer/editbuffer.h>
 #include <cx/editbuffer/edithint.h>
 #include <cx/editbuffer/stringutils.h>
+#include "CmTypes.h"
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
 #include <cx/functor/defercall.h>

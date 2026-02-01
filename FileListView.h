@@ -23,10 +23,8 @@
 #include <cx/screen/screen.h>
 #include <cx/functor/defercall.h>
 
-#include <cx/editbuffer/editbuffer.h>
-#include <cx/editbuffer/editbufferlist.h>
-
 #include "ProgramDefaults.h"
+#include "CmTypes.h"
 #include "Project.h"
 
 
@@ -41,7 +39,7 @@ class FileListView
 {
   public:
 
-    FileListView( ProgramDefaults *pd, CxEditBufferList *ebl, Project *proj, CxScreen *screen );
+    FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screen );
     // Constructor
 
     void routeKeyAction( CxKeyAction keyAction );
@@ -70,7 +68,7 @@ class FileListView
     int reframe( void );
     // make sure selection is visible in list
     
-    CxEditBufferList *editBufferList;
+    CmEditBufferList *editBufferList;
     // pointer the the list of files being edited
     
     ProgramDefaults *programDefaults;

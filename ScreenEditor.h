@@ -17,8 +17,8 @@
 #include <cx/base/star.h>
 #include <cx/base/hashmap.h>
 
-#include <cx/editbuffer/editbuffer.h>
 #include <cx/editbuffer/edithint.h>
+#include "CmTypes.h"
 #include <cx/editbuffer/stringutils.h>
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
@@ -159,7 +159,7 @@ class ScreenEditor {
     CxKeyboard *keyboard;
     EditView   *editView;
     CommandLineView *commandLineView;
-    CxEditBufferList *editBufferList;
+    CmEditBufferList *editBufferList;
     
     FileListView *fileListView;
 	HelpTextView *helpTextView;
