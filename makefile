@@ -28,18 +28,27 @@ endif
 
 #if this is SUNOS or SOLARIS
 ifeq ($(UNAME_S),sunos)
-
     UNAME_R := $(shell uname -r)
-
-    CPPFLAGS = -D _SOLARIS6_ -g
 
     ifeq ($(UNAME_R), 4.1.3)
         CPPFLAGS = -D _SUNOS_ -g
     endif
 
-	ifeq ($(UNAME_R), 4.1.4)
-		CPPFLAGS = -D _SUNOS_ -g
-	endif
+    ifeq ($(UNAME_R), 4.1.4)
+        CPPFLAGS = -D _SUNOS_ -g
+    endif
+
+    ifeq ($(UNAME_R), 5.6)
+        CPPFLAGS = -D _SOLARIS6_ -g
+    endif
+
+    ifeq ($(UNAME_R), 5.7)
+        CPPFLAGS = -D _SOLARIS6_ -g
+    endif
+
+    ifeq ($(UNAME_R), 5.10)
+        CPPFLAGS = -D _SOLARIS10_ -g
+    endif
 endif
 
 #if this is IRIX
