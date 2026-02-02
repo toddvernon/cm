@@ -113,9 +113,9 @@ ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 {
-    // DEBUG: open log file for startup diagnostics
-    FILE *dbg = fopen("/tmp/cm_debug.log", "w");
-    if (dbg) { fprintf(dbg, "1: constructor start\n"); fflush(dbg); }
+    // DEBUG: open log file for startup diagnostics (commented out)
+    // FILE *dbg = fopen("/tmp/cm_debug.log", "w");
+    // if (dbg) { fprintf(dbg, "1: constructor start\n"); fflush(dbg); }
 
     // Block SIGWINCH during construction to prevent callbacks on partially-constructed objects
     sigset_t blockSet, oldSet;
@@ -123,7 +123,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     sigaddset(&blockSet, SIGWINCH);
     sigprocmask(SIG_BLOCK, &blockSet, &oldSet);
 
-    if (dbg) { fprintf(dbg, "2: signals blocked\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "2: signals blocked\n"); fflush(dbg); }
 
     // initialize command input state FIRST to ensure it's IDLE during all initialization
     _cmdInputState = CMD_INPUT_IDLE;
@@ -144,14 +144,14 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     programMode = ScreenEditor::EDIT;
 
-    if (dbg) { fprintf(dbg, "3: pointers initialized\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "3: pointers initialized\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // load the default setting file - check current directory first, then home directory
     //
     //---------------------------------------------------------------------------------------------
     programDefaults = new ProgramDefaults();
-    if (dbg) { fprintf(dbg, "4: ProgramDefaults created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "4: ProgramDefaults created\n"); fflush(dbg); }
 
     CxString configPath = ".cmrc";
     CxFile testFile;
@@ -189,10 +189,10 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _argBuffer = "";
     _currentCommand = NULL;
 
-    if (dbg) { fprintf(dbg, "5: CommandRegistry created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "5: CommandRegistry created\n"); fflush(dbg); }
 
     editBufferList = new CmEditBufferList();
-    if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
     
     //---------------------------------------------------------------------------------------------
     // create a screen object
@@ -206,7 +206,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //------------------------------------------------------------------------------
     keyboard = key;
     
-    if (dbg) { fprintf(dbg, "7: about to create CommandLineView\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "7: about to create CommandLineView\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // make a command line view where prompts and messages appear
@@ -220,7 +220,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
                                           1,
                                           screen->cols()-1);
 
-    if (dbg) { fprintf(dbg, "8: CommandLineView created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "8: CommandLineView created\n"); fflush(dbg); }
 
     commandLineView->setPrompt("");
 
@@ -228,7 +228,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     screen->clearScreen();
 
-    if (dbg) { fprintf(dbg, "9: screen cleared\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "9: screen cleared\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // make an edit window where the editing happens
@@ -236,14 +236,14 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //---------------------------------------------------------------------------------------------
     editView = new EditView( programDefaults, screen );
 
-    if (dbg) { fprintf(dbg, "10: EditView created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "10: EditView created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a project object (regardless if there is a project)
     //
     //---------------------------------------------------------------------------------------------
     project = new Project();
-    if (dbg) { fprintf(dbg, "11: Project created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "11: Project created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // Check to see if we are loading a project, if the filename ends in .project then its a
@@ -288,7 +288,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
  
     } else {
 
-        if (dbg) { fprintf(dbg, "12: about to loadNewFile\n"); fflush(dbg); }
+        // if (dbg) { fprintf(dbg, "12: about to loadNewFile\n"); fflush(dbg); }
 
         //-----------------------------------------------------------------------------------------
         // not a project file so just load the referenced file
@@ -296,10 +296,10 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
         //-----------------------------------------------------------------------------------------
         loadNewFile( filePath, TRUE );
 
-        if (dbg) { fprintf(dbg, "13: loadNewFile complete\n"); fflush(dbg); }
+        // if (dbg) { fprintf(dbg, "13: loadNewFile complete\n"); fflush(dbg); }
     }
 
-    if (dbg) { fprintf(dbg, "14: about to create FileListView\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "14: about to create FileListView\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a file list view for the project
@@ -312,7 +312,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
                                     screen
                                     );
 
-    if (dbg) { fprintf(dbg, "15: FileListView created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "15: FileListView created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a help view for editor help
@@ -323,31 +323,31 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 									project,
 									screen);
 
-    if (dbg) { fprintf(dbg, "16: HelpTextView created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "16: HelpTextView created\n"); fflush(dbg); }
 
     helpTextView->loadHelpText("./cm.txt");
 
-    if (dbg) { fprintf(dbg, "17: help text loaded\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "17: help text loaded\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // update the screen and place the cursor
     //
     //---------------------------------------------------------------------------------------------
-    if (dbg) { fprintf(dbg, "17a: editView ptr = %p\n", (void*)editView); fflush(dbg); }
-    if (dbg) { fprintf(dbg, "17b: about to call editView->updateScreen()\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "17a: editView ptr = %p\n", (void*)editView); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "17b: about to call editView->updateScreen()\n"); fflush(dbg); }
 
 	editView->updateScreen();
 
-    if (dbg) { fprintf(dbg, "18: editView->updateScreen complete\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "18: editView->updateScreen complete\n"); fflush(dbg); }
 
     editView->placeCursor();
 
-    if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
 
     // Unblock SIGWINCH now that construction is complete
     sigprocmask(SIG_SETMASK, &oldSet, NULL);
 
-    if (dbg) { fprintf(dbg, "20: constructor complete, signals unblocked\n"); fclose(dbg); }
+    // if (dbg) { fprintf(dbg, "20: constructor complete, signals unblocked\n"); fclose(dbg); }
 }
 
 
