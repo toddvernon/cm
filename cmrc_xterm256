@@ -1,0 +1,65 @@
+# cmrc_xterm256 - XTERM 256 color scheme for black background terminals
+# Good balance between compatibility and color variety
+# Works on xterm, iTerm2, gnome-terminal, and most modern terminals
+# --------------------------------------------------------------------------------
+
+{
+    "tabs": 4,
+    "jumpscroll": true,
+    "showLineNumbers": true,
+    "colorizeSyntax": true,
+    "liveStatusLines": true,
+    "autoSaveOnBufferChange": false,
+
+    "colors": {
+        "statusBarTextColor": "XTERM256:White",
+        "statusBarBackgroundColor": "XTERM256:DarkBlue",
+        "lineNumberTextColor": "XTERM256:Grey42",
+        "commandLineMessageTextColor": "XTERM256:MediumOrchid1"
+    },
+
+    "syntaxColors": {
+        "default": {
+            "commentTextColor": "XTERM256:Grey54",
+            "includeTextColor": "XTERM256:Salmon1",
+            "keywordTextColor": "XTERM256:MediumPurple1",
+            "typeTextColor": "XTERM256:DarkTurquoise",
+            "constantTextColor": "XTERM256:Orange1",
+            "methodDefinitionTextColor": "XTERM256:LightGreen",
+            "stringTextColor": "XTERM256:PaleGreen1"
+        },
+        "c": {
+        },
+        "cpp": {
+        },
+        "swift": {
+            "keywordTextColor": "XTERM256:IndianRed1",
+            "typeTextColor": "XTERM256:SkyBlue1",
+            "constantTextColor": "XTERM256:Gold1"
+        },
+        "python": {
+            "keywordTextColor": "XTERM256:Gold1",
+            "methodDefinitionTextColor": "XTERM256:DodgerBlue1"
+        },
+        "javascript": {
+            "keywordTextColor": "XTERM256:HotPink",
+            "constantTextColor": "XTERM256:NavajoWhite1"
+        },
+        "go": {
+            "keywordTextColor": "XTERM256:SteelBlue1",
+            "typeTextColor": "XTERM256:DarkSeaGreen1"
+        },
+        "rust": {
+            "keywordTextColor": "XTERM256:DarkOrange",
+            "typeTextColor": "XTERM256:Aquamarine1"
+        },
+        "java": {
+            "keywordTextColor": "XTERM256:Coral",
+            "typeTextColor": "XTERM256:LightSkyBlue1"
+        },
+        "shell": {
+            "keywordTextColor": "XTERM256:CornflowerBlue",
+            "constantTextColor": "XTERM256:LightGoldenrod1"
+        }
+    }
+}

@@ -1,0 +1,52 @@
+# cmrc_ansi - ANSI color scheme for black background terminals
+# Uses only standard 16-color ANSI palette for maximum compatibility
+# --------------------------------------------------------------------------------
+
+{
+    "tabs": 4,
+    "jumpscroll": true,
+    "showLineNumbers": true,
+    "colorizeSyntax": true,
+    "liveStatusLines": true,
+    "autoSaveOnBufferChange": false,
+
+    "colors": {
+        "statusBarTextColor": "ANSI:BRIGHT_WHITE",
+        "statusBarBackgroundColor": "ANSI:BLUE",
+        "lineNumberTextColor": "ANSI:BRIGHT_BLACK",
+        "commandLineMessageTextColor": "ANSI:BRIGHT_CYAN"
+    },
+
+    "syntaxColors": {
+        "default": {
+            "commentTextColor": "ANSI:BRIGHT_BLACK",
+            "includeTextColor": "ANSI:BRIGHT_MAGENTA",
+            "keywordTextColor": "ANSI:BRIGHT_YELLOW",
+            "typeTextColor": "ANSI:BRIGHT_CYAN",
+            "constantTextColor": "ANSI:BRIGHT_MAGENTA",
+            "methodDefinitionTextColor": "ANSI:BRIGHT_GREEN",
+            "stringTextColor": "ANSI:GREEN"
+        },
+        "c": {
+        },
+        "cpp": {
+        },
+        "swift": {
+        },
+        "python": {
+            "methodDefinitionTextColor": "ANSI:BRIGHT_BLUE"
+        },
+        "javascript": {
+        },
+        "go": {
+        },
+        "rust": {
+        },
+        "java": {
+        },
+        "shell": {
+            "keywordTextColor": "ANSI:BRIGHT_CYAN",
+            "constantTextColor": "ANSI:BRIGHT_YELLOW"
+        }
+    }
+}

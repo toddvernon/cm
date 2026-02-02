@@ -1,0 +1,65 @@
+# cmrc_rgb - RGB true color scheme for black background terminals
+# Requires terminal with 24-bit color support (most modern terminals)
+# Inspired by popular dark themes - soft, easy on the eyes
+# --------------------------------------------------------------------------------
+
+{
+    "tabs": 4,
+    "jumpscroll": true,
+    "showLineNumbers": true,
+    "colorizeSyntax": true,
+    "liveStatusLines": true,
+    "autoSaveOnBufferChange": false,
+
+    "colors": {
+        "statusBarTextColor": "RGB:250,250,245",
+        "statusBarBackgroundColor": "RGB:60,70,100",
+        "lineNumberTextColor": "RGB:100,100,110",
+        "commandLineMessageTextColor": "RGB:180,150,220"
+    },
+
+    "syntaxColors": {
+        "default": {
+            "commentTextColor": "RGB:130,140,150",
+            "includeTextColor": "RGB:255,150,130",
+            "keywordTextColor": "RGB:200,150,255",
+            "typeTextColor": "RGB:100,220,220",
+            "constantTextColor": "RGB:255,180,100",
+            "methodDefinitionTextColor": "RGB:130,220,130",
+            "stringTextColor": "RGB:150,230,150"
+        },
+        "c": {
+        },
+        "cpp": {
+        },
+        "swift": {
+            "keywordTextColor": "RGB:255,120,130",
+            "typeTextColor": "RGB:130,200,255",
+            "constantTextColor": "RGB:255,200,100"
+        },
+        "python": {
+            "keywordTextColor": "RGB:255,200,100",
+            "methodDefinitionTextColor": "RGB:100,180,255"
+        },
+        "javascript": {
+            "keywordTextColor": "RGB:255,150,180",
+            "constantTextColor": "RGB:255,200,130"
+        },
+        "go": {
+            "keywordTextColor": "RGB:100,200,255",
+            "typeTextColor": "RGB:180,230,180"
+        },
+        "rust": {
+            "keywordTextColor": "RGB:255,150,100",
+            "typeTextColor": "RGB:150,220,200"
+        },
+        "java": {
+            "keywordTextColor": "RGB:255,130,100",
+            "typeTextColor": "RGB:130,200,230"
+        },
+        "shell": {
+            "keywordTextColor": "RGB:130,200,255",
+            "constantTextColor": "RGB:255,220,130"
+        }
+    }
+}
