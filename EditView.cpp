@@ -131,7 +131,7 @@ EditView::updateScreen(void)
 
     CxString text = formatMultipleEditorLines(0,0);
 
-    if (dbg) { fprintf(dbg, "  updateScreen: formatMultipleEditorLines done, text len=%lu\n", text.length()); fflush(dbg); }
+    if (dbg) { fprintf(dbg, "  updateScreen: formatMultipleEditorLines done, text len=%d\n", text.length()); fflush(dbg); }
 
     fputs( text.data() , stdout);
 
