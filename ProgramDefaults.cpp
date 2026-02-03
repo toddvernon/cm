@@ -40,7 +40,11 @@ ProgramDefaults::ProgramDefaults(void)
 	_showLineNumbers(TRUE),
 	_autoSaveOnBufferChange(FALSE),
     _colorizeSyntax(FALSE),
+#if defined(_OSX_) || defined(_LINUX_)
+    _liveStatusLine(TRUE)
+#else
     _liveStatusLine(FALSE)
+#endif
 {
     _statusBarTextColor          = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _statusBarBackgroundColor    = new CxAnsiBackgroundColor( CxAnsiForegroundColor::NONE );
@@ -295,7 +299,7 @@ ProgramDefaults::parseAutoSaveOnBufferChange( CxJSONObject *object )
 int
 ProgramDefaults::parseLiveStatusLine( CxJSONObject *object )
 {
-    CxJSONMember *member = object->find("liveStatusLine");
+    CxJSONMember *member = object->find("liveStatusLines");
     if (member != NULL) {
         if (member->object()->type() == CxJSONBase::BOOLEAN) {
             CxJSONBoolean *value  = (CxJSONBoolean *) member->object();

@@ -1443,9 +1443,12 @@ ScreenEditor::updateCommandDisplay( void )
     CxString fullLine = "command> ";
     fullLine += display;
 
-    // pad to screen width
+    // truncate or pad to screen width to prevent line wrap
     unsigned long targetWidth = screen->cols();
     if (targetWidth > 2) targetWidth -= 2;
+    if (fullLine.length() > targetWidth) {
+        fullLine = fullLine.subString(0, targetWidth);
+    }
     while (fullLine.length() < targetWidth) {
         fullLine += " ";
     }
