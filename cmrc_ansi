@@ -25,7 +25,8 @@
             "typeTextColor": "ANSI:BRIGHT_CYAN",
             "constantTextColor": "ANSI:BRIGHT_MAGENTA",
             "methodDefinitionTextColor": "ANSI:BRIGHT_GREEN",
-            "stringTextColor": "ANSI:GREEN"
+            "stringTextColor": "ANSI:GREEN",
+            "numberTextColor": "ANSI:CYAN"
         },
         "c": {
         },

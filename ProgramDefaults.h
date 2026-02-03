@@ -36,6 +36,7 @@ struct SyntaxColorSet
     CxColor *constantTextColor;
     CxColor *stringTextColor;
     CxColor *methodDefinitionTextColor;
+    CxColor *numberTextColor;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -79,6 +80,7 @@ public:
     CxColor *methodDefinitionTextColor( int lang );
     CxColor *commentTextColor( int lang );
     CxColor *includeTextColor( int lang );
+    CxColor *numberTextColor( int lang );
     
     CxString getStatusBarForegroundColor(void);
     // get the status bar foreground color

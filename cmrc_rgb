@@ -26,7 +26,8 @@
             "typeTextColor": "RGB:100,220,220",
             "constantTextColor": "RGB:255,180,100",
             "methodDefinitionTextColor": "RGB:130,220,130",
-            "stringTextColor": "RGB:150,230,150"
+            "stringTextColor": "RGB:150,230,150",
+            "numberTextColor": "RGB:180,220,255"
         },
         "c": {
         },

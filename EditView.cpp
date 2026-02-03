@@ -125,25 +125,10 @@ EditView::reframeAndUpdateScreen(void)
 void
 EditView::updateScreen(void)
 {
-    // DEBUG logging
-    FILE *dbg = fopen("/tmp/cm_debug.log", "a");
-    if (dbg) { fprintf(dbg, "  updateScreen: entered\n"); fflush(dbg); }
-
     CxString text = formatMultipleEditorLines(0,0);
-
-    if (dbg) { fprintf(dbg, "  updateScreen: formatMultipleEditorLines done, text len=%d\n", text.length()); fflush(dbg); }
-
     fputs( text.data() , stdout);
-
-    if (dbg) { fprintf(dbg, "  updateScreen: fputs done\n"); fflush(dbg); }
-
     updateStatusLine();
-
-    if (dbg) { fprintf(dbg, "  updateScreen: updateStatusLine done\n"); fflush(dbg); }
-
     screen->flush();
-
-    if (dbg) { fprintf(dbg, "  updateScreen: flush done\n"); fclose(dbg); }
 }
 
 //-------------------------------------------------------------------------------------------------

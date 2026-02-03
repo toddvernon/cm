@@ -969,6 +969,7 @@ ProgramDefaults::initSyntaxColorSet( SyntaxColorSet *colorSet )
     colorSet->constantTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     colorSet->stringTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     colorSet->methodDefinitionTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    colorSet->numberTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
 }
 
 
@@ -987,6 +988,7 @@ ProgramDefaults::copySyntaxColorSet( SyntaxColorSet *dest, SyntaxColorSet *src )
     dest->constantTextColor = src->constantTextColor;
     dest->stringTextColor = src->stringTextColor;
     dest->methodDefinitionTextColor = src->methodDefinitionTextColor;
+    dest->numberTextColor = src->numberTextColor;
 }
 
 
@@ -1120,6 +1122,13 @@ ProgramDefaults::parseSyntaxColorSet( CxJSONObject *colorSet, int langIndex )
         colors->stringTextColor = ProgramDefaults::parseForegroundColor( value->get() );
     }
 
+    // numberTextColor
+    member = colorSet->find("numberTextColor");
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        value = (CxJSONString *) member->object();
+        colors->numberTextColor = ProgramDefaults::parseForegroundColor( value->get() );
+    }
+
     return( TRUE );
 }
 
@@ -1174,6 +1183,13 @@ ProgramDefaults::includeTextColor( int lang )
 {
     if (lang < 0 || lang >= LANG_COUNT) lang = 0;
     return( _syntaxColors[lang].includeTextColor );
+}
+
+CxColor *
+ProgramDefaults::numberTextColor( int lang )
+{
+    if (lang < 0 || lang >= LANG_COUNT) lang = 0;
+    return( _syntaxColors[lang].numberTextColor );
 }
 
 

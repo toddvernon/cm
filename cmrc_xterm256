@@ -26,7 +26,8 @@
             "typeTextColor": "XTERM256:DarkTurquoise",
             "constantTextColor": "XTERM256:Orange1",
             "methodDefinitionTextColor": "XTERM256:LightGreen",
-            "stringTextColor": "XTERM256:PaleGreen1"
+            "stringTextColor": "XTERM256:PaleGreen1",
+            "numberTextColor": "XTERM256:LightSteelBlue1"
         },
         "c": {
         },

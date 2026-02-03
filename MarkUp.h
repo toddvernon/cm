@@ -60,6 +60,22 @@ struct LanguageSyntax {
 };
 
 //---------------------------------------------------------------------------------------------------------
+// ColorRegion - defines a region of text to exclude from colorization
+// Used to prevent colorizing keywords/numbers inside strings and comments
+//---------------------------------------------------------------------------------------------------------
+#define MAX_COLOR_REGIONS 32
+
+struct ColorRegion {
+    int start;      // starting position (inclusive)
+    int end;        // ending position (exclusive)
+};
+
+struct ColorRegions {
+    ColorRegion regions[MAX_COLOR_REGIONS];
+    int count;
+};
+
+//---------------------------------------------------------------------------------------------------------
 // MarkUp class - handles syntax colorization
 //---------------------------------------------------------------------------------------------------------
 class MarkUp
@@ -114,6 +130,46 @@ private:
     CxString
     colorizeKeywords( CxString line, const char* keywords, CxString colorStart, CxString colorEnd );
     // colorize all matching keywords in line
+
+    CxString
+    colorizeStrings( CxString line, CxString colorStart, CxString colorEnd );
+    // colorize string literals (same-line only)
+
+    CxString
+    colorizeNumbers( CxString line, CxString colorStart, CxString colorEnd );
+    // colorize numeric literals
+
+    CxString
+    colorizeInlineComment( CxString line, const char* commentMarker, CxString colorStart, CxString colorEnd );
+    // colorize trailing comment on a line
+
+    CxString
+    colorizeMakefileSpecial( CxString line, CxString varColor, CxString targetColor, CxString resetColor );
+    // colorize makefile variables $(VAR) and targets
+
+    CxString
+    colorizeMarkdown( CxString line, CxString headerColor, CxString emphasisColor, CxString codeColor, CxString resetColor );
+    // colorize markdown headers, bold, italic, code spans
+
+    CxString
+    colorizePythonDecorators( CxString line, CxString colorStart, CxString colorEnd );
+    // colorize Python @decorators
+
+    void
+    findExclusionRegions( CxString line, const char* commentMarker, ColorRegions* regions );
+    // find all string literals and inline comments to exclude from keyword/number colorization
+
+    int
+    isInsideRegion( int pos, ColorRegions* regions );
+    // check if a position falls inside any exclusion region
+
+    CxString
+    colorizeNumbersWithExclusions( CxString line, CxString colorStart, CxString colorEnd, ColorRegions* regions );
+    // colorize numeric literals, skipping exclusion regions
+
+    CxString
+    colorizeKeywordsWithExclusions( CxString line, const char* keywords, CxString colorStart, CxString colorEnd, ColorRegions* regions );
+    // colorize keywords, skipping exclusion regions
 
     ProgramDefaults *programDefaults;
     // pointer to the startup defaults class
