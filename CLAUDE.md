@@ -3,6 +3,12 @@
 ## Overview
 CMacs is a uEmacs-like terminal text editor written in C++.
 
+## Naming Conventions
+When the user refers to:
+- **"cx"** - means all cx repositories together: `cx/cx` (library), `cx/cx_tests` (tests), and `cx/cx_apps/cm` (this app)
+- **"cm"** - means this application (`cx/cx_apps/cm`)
+- **"cx library"** or **"cx/cx"** - means specifically the shared library at `cx/cx`
+
 ## Related Repositories
 - **cx library**: `../../../cx/cx/` - shared library with modules: base, commandline, editbuffer, expression, functor, json, keyboard, log, net, screen, thread, tz
 
