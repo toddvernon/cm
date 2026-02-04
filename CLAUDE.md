@@ -8,6 +8,7 @@ When the user refers to:
 - **"cx"** - means all cx repositories together: `cx/cx` (library), `cx/cx_tests` (tests), and `cx/cx_apps/cm` (this app)
 - **"cm"** - means this application (`cx/cx_apps/cm`)
 - **"cx library"** or **"cx/cx"** - means specifically the shared library at `cx/cx`
+- **"cx_tests"** or **"cx tests"** - means the test repository at `cx/cx_tests`
 
 ## Related Repositories
 - **cx library**: `../../../cx/cx/` - shared library with modules: base, commandline, editbuffer, expression, functor, json, keyboard, log, net, screen, thread, tz
