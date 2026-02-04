@@ -75,6 +75,18 @@ make
   2) why it is portable across targets,
   3) what repo-local libraries you used.
 
+## Completer Integration Rules
+
+The `Completer` library (`cx/commandcompleter`) handles command selection via a status-driven loop. When integrating or modifying Completer usage:
+
+- **NEVER hardcode knowledge of the command table into the input loop.** The loop must be blind to what commands exist, how many characters it takes to match, or what the outcome will be. It reacts to `getStatus()` and nothing else.
+- **NEVER assume a specific number of processChar calls will reach a result.** Commands may be added, renamed, or restructured at any time.
+- **The only correct pattern is a loop that reacts to status:** processChar/processTab/processEnter → check getStatus() → respond accordingly.
+- **Only the addCandidate() setup knows the command structure.** The input loop does not.
+
+See `COMPLETER_INTEGRATION.md` for command categories, flows, and the integration pattern.
+See `cx_tests/cxcommandcompleter/cxcommandcompleter_example.cpp` for working code.
+
 ## Current Work (2026-01-25)
 
 **New ESC command system with tab completion - NOT YET COMMITTED**
