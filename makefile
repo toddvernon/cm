@@ -186,10 +186,14 @@ archive:
 		--exclude='*.o' \
 		--exclude='*.a' \
 		--exclude='.git' \
+		--exclude='.claude' \
 		--exclude='.DS_Store' \
-		--exclude='darwin_arm64' \
-		--exclude='darwin_x86_64' \
-		--exclude='linux_x86_64' \
+		--exclude='darwin_*' \
+		--exclude='linux_*' \
+		--exclude='sunos_*' \
+		--exclude='irix_*' \
+		--exclude='netbsd_*' \
+		--exclude='nextstep_*' \
 		--exclude='*.xcodeproj' \
 		--exclude='*.xcworkspace' \
 		--exclude='xcuserdata' \
