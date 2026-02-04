@@ -164,4 +164,33 @@ $(OBJECTS):
 	$(CPP) $(CPPFLAGS) $(INC) -c $? -o $@
 
 
+########################################################################################
+# Create tar archive for distribution
+#
+########################################################################################
+
+archive:
+	@echo "Creating cxapps_unix.tar..."
+	@test -d ../../ARCHIVE || mkdir ../../ARCHIVE
+	@tar cvf ../../ARCHIVE/cxapps_unix.tar \
+		--exclude='*.o' \
+		--exclude='*.a' \
+		--exclude='.git' \
+		--exclude='.DS_Store' \
+		--exclude='darwin_arm64' \
+		--exclude='darwin_x86_64' \
+		--exclude='linux_x86_64' \
+		--exclude='*.xcodeproj' \
+		--exclude='*.xcworkspace' \
+		--exclude='xcuserdata' \
+		--exclude='DerivedData' \
+		--exclude='*.pbxuser' \
+		--exclude='*.mode1v3' \
+		--exclude='*.mode2v3' \
+		--exclude='*.perspectivev3' \
+		--exclude='*.xcuserstate' \
+		.
+	@echo "Archive created: ../../ARCHIVE/cxapps_unix.tar"
+
+
 
