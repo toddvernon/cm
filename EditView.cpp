@@ -1515,18 +1515,9 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 		//-----------------------------------------------------------------------------------------
       	case CxKeyAction::NEWLINE:
 			{
-				CxEditHint editHint = editBuffer->addReturn();
-
+				editBuffer->addReturn();
                 reframe();
-
-				if (editHint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT ) {
-					lineText = formatMultipleEditorLines( editHint.startRow(), editHint.startCol() );
-				}
-
-                if (programDefaults->liveStatusLine()) updateStatusLine();
-
-                screen->flush();
-
+                updateScreen();
 			}
 			break;
 

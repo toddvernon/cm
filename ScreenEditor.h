@@ -32,7 +32,8 @@
 #include "Project.h"
 #include "FileListView.h"
 #include "HelpTextView.h"
-#include "CommandRegistry.h"
+#include "CommandTable.h"
+#include <cx/commandcompleter/completer.h>
 
 #ifndef _ScreenEditor_h_
 #define _ScreenEditor_h_
@@ -67,17 +68,12 @@ class ScreenEditor {
     ~ScreenEditor(void);
 
 
-	CxSList< CxString > loadHelpText(void);
-
     void run(void);
-    
+
     void focusCommandPrompt(CxKeyAction keyAction);
     int  focusEditor(CxKeyAction keyAction);
     void focusFilelist( CxKeyAction keyAction);
     void focusHelpView( CxKeyAction keyAction);
-    
-    int executeCommand( CxString commandline );
-    int gatherHint( void );
 
     // command input methods
     void enterCommandMode( void );
@@ -87,6 +83,7 @@ class ScreenEditor {
     void executeCurrentCommand( void );
 
     // command input helpers (private implementation)
+    void initCommandCompleters( void );
     void selectCommand( CommandEntry *cmd );
     void cancelCommandInput( void );
     void handleCommandModeInput( CxKeyAction keyAction );
@@ -136,6 +133,11 @@ class ScreenEditor {
     void CMD_Count( CxString commandLine );
     void CMD_Entab( CxString commandLine );
     void CMD_Detab( CxString commandLine );
+#ifdef CM_UTF8_SUPPORT
+    void CMD_InsertUTFBox( CxString commandLine );
+    void CMD_InsertUTFSymbol( CxString commandLine );
+    void insertUTFSymbolHelper( CxString commandLine, const char *symbolType );
+#endif
 
     // Control key command handlers (called from dispatch table)
     void CTRL_Cut(void);
@@ -187,11 +189,18 @@ private:
 
     int dispatchControlX(void);
 
+    // command completion
+    Completer       _commandCompleter;      // top-level command selection
+#ifdef CM_UTF8_SUPPORT
+    Completer       _boxSymbolCompleter;    // child: box drawing symbols
+    Completer       _symSymbolCompleter;    // child: common symbols
+#endif
+    Completer      *_activeCompleter;       // points to whichever is active
+
     // command input state
-    CommandRegistry *_commandRegistry;
     CommandInputState _cmdInputState;
-    CxString _cmdBuffer;            // command name being typed
-    CxString _argBuffer;            // argument being typed
+    CxString _cmdBuffer;            // input for active completer
+    CxString _argBuffer;            // freeform argument text
     CommandEntry *_currentCommand;  // selected command (after completion)
     int _quitRequested;             // set by CMD_Quit to signal exit
 };

@@ -18,6 +18,10 @@
 #include "ScreenEditor.h"
 #include "Project.h"
 
+#ifdef CM_UTF8_SUPPORT
+#include "UTFSymbols.h"
+#endif
+
 
 //-------------------------------------------------------------------------------------------------
 // copyToSystemClipboard (macOS and Linux)
@@ -138,7 +142,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     fileListView = NULL;
     helpTextView = NULL;
     project = NULL;
-    _commandRegistry = NULL;
+    _activeCompleter = NULL;
     _currentCommand = NULL;
     _quitRequested = FALSE;
 
@@ -180,16 +184,17 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _replaceString = "";
 
     //---------------------------------------------------------------------------------------------
-    // init the command registry and command input state
+    // init the command completers and command input state
     //
     //---------------------------------------------------------------------------------------------
-    _commandRegistry = new CommandRegistry();
+    _activeCompleter = &_commandCompleter;
     _cmdInputState = CMD_INPUT_IDLE;
     _cmdBuffer = "";
     _argBuffer = "";
     _currentCommand = NULL;
+    initCommandCompleters();
 
-    // if (dbg) { fprintf(dbg, "5: CommandRegistry created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "5: command completers created\n"); fflush(dbg); }
 
     editBufferList = new CmEditBufferList();
     // if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
@@ -352,6 +357,61 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::initCommandCompleters
+//
+// Populate the Completer objects from the command table and UTF symbol table.
+// The command completer gets all commands as candidates. Commands with
+// CMD_FLAG_SYMBOL_ARG get child completers for their symbol tables.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::initCommandCompleters( void )
+{
+    // populate child completers first so they're ready when referenced
+#ifdef CM_UTF8_SUPPORT
+    for (int i = 0; UTFSymbols::symbolAt(i) != NULL; i++) {
+        UTFSymbolEntry *sym = UTFSymbols::symbolAt(i);
+        CxString symName = sym->name;
+
+        // symbols starting with "box-" go to box completer (strip prefix)
+        if (symName.length() > 4 && symName.subString(0, 4) == "box-") {
+            CxString shortName = symName.subString(4, symName.length() - 4);
+            _boxSymbolCompleter.addCandidate( shortName, NULL, (void*)sym );
+        }
+        // symbols starting with "sym-" go to symbol completer (strip prefix)
+        else if (symName.length() > 4 && symName.subString(0, 4) == "sym-") {
+            CxString shortName = symName.subString(4, symName.length() - 4);
+            _symSymbolCompleter.addCandidate( shortName, NULL, (void*)sym );
+        }
+    }
+#endif
+
+    // populate command completer from the command table
+    for (int i = 0; commandTable[i].name != NULL; i++) {
+        CommandEntry *entry = &commandTable[i];
+        Completer *child = NULL;
+
+#ifdef CM_UTF8_SUPPORT
+        // link symbol commands to their child completers
+        if (entry->flags & CMD_FLAG_SYMBOL_ARG) {
+            if (entry->symbolFilter != NULL) {
+                CxString filter = entry->symbolFilter;
+                if (filter == "box-") {
+                    child = &_boxSymbolCompleter;
+                }
+                else if (filter == "sym-") {
+                    child = &_symSymbolCompleter;
+                }
+            }
+        }
+#endif
+
+        _commandCompleter.addCandidate( entry->name, child, (void*)entry );
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::~ScreenEditor (destructor)
 //
 // cleans up all the dynamic objects
@@ -365,42 +425,6 @@ ScreenEditor::~ScreenEditor(void)
     // Note: screen and keyboard are owned by main(), not deleted here
 }
 
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::loadHelpText()
-//
-//
-//-------------------------------------------------------------------------------------------------
-CxSList< CxString >
-ScreenEditor::loadHelpText(void)
-{
-	CxSList< CxString > textList;
- 	CxFile inFile;
-    CxString data;
-
-    CxString filePath = "cm.txt";
-
-    // open the file
-    if (!inFile.open( filePath, "r")) {
-
-        // return false indicating a file was not found
-        return( textList );
-    }
-
-	// read each line of text        
-	do {
-	
-		data = inFile.getUntil('\n');
-		textList.append(data);
-
-	} while (!inFile.eof());
-
-    // close the file
-    inFile.close();
-
-	return( textList );
-}
 
 
 //-------------------------------------------------------------------------------------------------
@@ -906,54 +930,7 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
 void
 ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
 {
-    //---------------------------------------------------------------------------------------------
-    // if in new command input mode, use the new handler
-    //---------------------------------------------------------------------------------------------
-    if (_cmdInputState == CMD_INPUT_COMMAND || _cmdInputState == CMD_INPUT_ARGUMENT) {
-        handleCommandInput( keyAction );
-        // cursor is positioned by updateCommandDisplay() or transitionToArgument()
-        return;
-    }
-
-    //---------------------------------------------------------------------------------------------
-    // legacy command line handling (for backward compatibility during transition)
-    //---------------------------------------------------------------------------------------------
-    switch (keyAction.actionType() )
-    {
-        //-----------------------------------------------------------------------------------------
-        // handle the command (esc) and newline key
-        //-----------------------------------------------------------------------------------------
-        case CxKeyAction::COMMAND:
-        case CxKeyAction::NEWLINE:
-        {
-            // handle escape like its a return
-            CxString commandLine = commandLineView->getText();
-            commandLineView->setText("");
-
-            programMode = ScreenEditor::EDIT;
-            editView->placeCursor();
-
-            int result = executeCommand( commandLine );
-            if (result) {
-                return;
-            }
-
-            commandLineView->setText("");
-            editView->placeCursor();
-            screen->flush();
-
-        }
-        break;
-
-        //-----------------------------------------------------------------------------------------
-        // handle all other keys
-        //-----------------------------------------------------------------------------------------
-        default:
-        {
-            commandLineView->routeKeyAction( keyAction );
-        }
-        break;
-    }
+    handleCommandInput( keyAction );
 }
 
 
@@ -1098,143 +1075,12 @@ ScreenEditor::focusHelpView( CxKeyAction keyAction )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::gatherHint
-//
-// fill in the command line with hint text for a command.  If the command is immediate then
-// a 1 is returned and the command will be executed without typing any additional text or
-// gathering any additional input from the user.  If a 0 is returned the test is simply typed
-// into the command line and the user needs to finish the command
-//
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::gatherHint( void )
-{
-    CxKeyAction keyAction = keyboard->getAction();
-
-    // based on the catagory of the key
-    switch (keyAction.actionType() )
-    {
-        //-----------------------------------------------------------------------------------------
-        // if a command action, ignore
-        //
-        //-----------------------------------------------------------------------------------------
-        case CxKeyAction::COMMAND:
-        {
-            return(0);
-        }
-        break;
-
-        //-----------------------------------------------------------------------------------------
-        // if a normal key, then see if it matches the first character of a well known command if it
-        // is then type the command into the commandline.  The user can always backspace.
-        //
-        //-----------------------------------------------------------------------------------------
-        case CxKeyAction::LOWERCASE_ALPHA:
-        case CxKeyAction::UPPERCASE_ALPHA:
-        case CxKeyAction::NUMBER:
-        case CxKeyAction::SYMBOL:
-        {
-             //------------------------------------------------------------------------------------
-             // <esc> s - save command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "s") {
-                 commandLineView->typeText("save: ");
-                 
-                 CmEditBuffer *editBuffer = editBufferList->current();
-                 
-                 CxString filePath = editBuffer->getFilePath();
-                 
-                 if (filePath.length() ) {
-                     commandLineView->typeText(filePath);
-                 }
-                 return(0);
-             }
-            
-            //-------------------------------------------------------------------------------------
-            // <esc> l - load a new buffer
-            //-------------------------------------------------------------------------------------
-            if (keyAction.tag() == "l") {
-                commandLineView->typeText("load-new-buffer: ");
-                return(0);
-            }
-
-             //------------------------------------------------------------------------------------
-             // <esc> f - find command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "f") {
-                 commandLineView->typeText("find: ");
-                 return(0);
-             }
-
-             //------------------------------------------------------------------------------------
-             // (esc> r - replace command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "r") {
-                 commandLineView->typeText("replace: ");
-                 return(0);
-             }
-             
-             //------------------------------------------------------------------------------------
-             // <esc> q - quit command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "q") {
-                 commandLineView->typeText("quit:");
-                 return(0);
-             }
-             
-             //------------------------------------------------------------------------------------
-             // <esc> g - goto line command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "g") {
-                 commandLineView->typeText("goto-line: ");
-                 return(0);
-             }
-
-             //------------------------------------------------------------------------------------
-             // <esc> <space> or esc m set mark command hint
-             //------------------------------------------------------------------------------------
-             if ((keyAction.tag() == " ") || (keyAction.tag() == "m")) {
-                 commandLineView->typeText("set-mark:");
-                 editView->setMark();
-                 return(1);
-             }
-
-             //------------------------------------------------------------------------------------
-             // <esc> c - cut to mark command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "c") {
-                 commandLineView->typeText("cut-to-mark:");
-                 return(0);
-             }
-
-             //------------------------------------------------------------------------------------
-             // <esc> p - paste command hint
-             //------------------------------------------------------------------------------------
-             if (keyAction.tag() == "p") {
-                 commandLineView->typeText("paste:");
-                 return(0);
-             }
-            
-             //------------------------------------------------------------------------------------
-             // if no leading character matches a hint, then just type the character on the
-             // command line so the user can enter a less used command that starts with the
-             // the character
-             //------------------------------------------------------------------------------------
-             commandLineView->typeText(keyAction.tag());
-         }
-    }
-
-    return(0);
-}
-
-
-//-------------------------------------------------------------------------------------------------
 //
 // ESC COMMAND INPUT SYSTEM
 //
 // Overview:
 //   When the user presses ESC, the editor enters a command input mode that provides
-//   fuzzy command completion similar to modern IDE command palettes. The user types
+//   command completion similar to modern IDE command palettes. The user types
 //   a command name, optionally followed by an argument, and the system provides
 //   real-time completion hints.
 //
@@ -1276,16 +1122,16 @@ ScreenEditor::gatherHint( void )
 //   cancelCommandInput()    - cleanup and return to edit mode
 //   executeCurrentCommand() - run the command handler
 //
-// Command Registry:
-//   Commands are defined in CommandRegistry.cpp. Each entry has:
+// Command Table:
+//   Commands are defined in CommandTable.cpp. Each entry has:
 //   - name: the command name (e.g., "find", "goto-line")
 //   - argHint: hint text for argument (e.g., "<pattern>", "<line>")
 //   - description: help text
 //   - flags: CMD_FLAG_NEEDS_ARG, CMD_FLAG_OPTIONAL_ARG
 //   - handler: function pointer to ScreenEditor method
 //
-//   The registry provides fuzzy prefix matching that ignores hyphens, so typing
-//   "gl" matches "goto-line" and "fa" matches "find-all".
+//   The Completer library provides literal prefix matching, so typing
+//   "goto" matches "goto-line" and "buf" matches all "buffer-*" commands.
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -1308,6 +1154,7 @@ ScreenEditor::enterCommandMode( void )
     _cmdBuffer = "";
     _argBuffer = "";
     _currentCommand = NULL;
+    _activeCompleter = &_commandCompleter;
 
     updateCommandDisplay();
 }
@@ -1338,6 +1185,7 @@ ScreenEditor::cancelCommandInput( void )
     _cmdBuffer = "";
     _argBuffer = "";
     _currentCommand = NULL;
+    _activeCompleter = &_commandCompleter;
     programMode = ScreenEditor::EDIT;
 
     commandLineView->setText("");
@@ -1375,16 +1223,19 @@ ScreenEditor::cancelCommandInput( void )
 void
 ScreenEditor::selectCommand( CommandEntry *cmd )
 {
-    int takesArgument = (cmd->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG));
+    int takesSymbolArg = (cmd->flags & CMD_FLAG_SYMBOL_ARG);
+    int takesFreeformArg = (cmd->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG))
+                           && !takesSymbolArg;
 
-    if (takesArgument) {
-        // go to argument input mode
+    if (takesFreeformArg) {
+        // go to freeform argument input mode
         _currentCommand = cmd;
         _cmdInputState = CMD_INPUT_ARGUMENT;
         _argBuffer = "";
         updateArgumentDisplay();
     }
     else {
+        // no-arg command or symbol command (handled by child completer transition)
         // complete the name but wait for ENTER to execute
         _cmdBuffer = cmd->name;
         updateCommandDisplay();
@@ -1415,29 +1266,82 @@ ScreenEditor::selectCommand( CommandEntry *cmd )
 void
 ScreenEditor::updateCommandDisplay( void )
 {
-    CommandEntry *matches[16];
-    int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
-
-    // build display: typed text + completions
     CxString display = _cmdBuffer;
 
-    // don't show completion hint if typed text exactly matches a command
-    int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+    if (_activeCompleter == &_commandCompleter) {
+        // command level - show matching commands with arg hints
+        CompleterCandidate *matches[16];
+        int count = _activeCompleter->findMatchesFull( _cmdBuffer, matches, 16 );
 
-    if (count > 0 && !isExactMatch) {
-        display += "  ";
-        for (int i = 0; i < count && i < 8; i++) {
-            display += "| ";
-            display += matches[i]->name;
-            if (matches[i]->argHint != NULL) {
+        // don't show hint if typed text exactly matches a command
+        int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+
+        if (count > 0 && !isExactMatch) {
+            display += "  ";
+            for (int i = 0; i < count && i < 8; i++) {
+                display += "| ";
+                display += matches[i]->name;
+                CommandEntry *entry = (CommandEntry *)matches[i]->userData;
+                if (entry != NULL && entry->argHint != NULL) {
+                    display += " ";
+                    display += entry->argHint;
+                }
                 display += " ";
-                display += matches[i]->argHint;
             }
-            display += " ";
+            if (count > 8) {
+                display += "...";
+            }
         }
-        if (count > 8) {
-            display += "...";
+    }
+    else {
+        // child completer level - show command name prefix + symbol matches
+        CxString prefix = "";
+        if (_currentCommand != NULL) {
+            prefix = _currentCommand->name;
+            prefix += " ";
+            if (_currentCommand->argHint != NULL) {
+                prefix += _currentCommand->argHint;
+                prefix += ": ";
+            }
         }
+
+        CxString names[16];
+        int count = _activeCompleter->findMatches( _cmdBuffer, names, 16 );
+
+        int isExactMatch = (count == 1 && _cmdBuffer == names[0]);
+
+        CxString symDisplay = prefix;
+        symDisplay += _cmdBuffer;
+
+        if (count > 0 && !isExactMatch) {
+            symDisplay += "  ";
+            for (int i = 0; i < count && i < 6; i++) {
+                symDisplay += "| ";
+                symDisplay += names[i];
+                symDisplay += " ";
+            }
+            if (count > 6) {
+                symDisplay += "...";
+            }
+        }
+
+        // use symDisplay instead of "command> " + display
+        unsigned long targetWidth = screen->cols();
+        if (targetWidth > 2) targetWidth -= 2;
+        if (symDisplay.length() > targetWidth) {
+            symDisplay = symDisplay.subString(0, targetWidth);
+        }
+        while (symDisplay.length() < targetWidth) {
+            symDisplay += " ";
+        }
+
+        screen->resetColors();
+        screen->writeTextAt( screen->rows() - 1, 1, symDisplay, true );
+
+        unsigned long cursorCol = 1 + prefix.length() + _cmdBuffer.length();
+        screen->placeCursor( screen->rows() - 1, cursorCol );
+        screen->flush();
+        return;
     }
 
     CxString fullLine = "command> ";
@@ -1538,99 +1442,162 @@ ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
         return;
     }
 
-    // RETURN - execute if we have a match
+    // RETURN - execute via Completer
     if (keyAction.actionType() == CxKeyAction::NEWLINE) {
-        // prefer exact match (e.g., "find" when "find" and "find-all" both exist)
-        CommandEntry *exact = _commandRegistry->findExact( _cmdBuffer );
-        if (exact != NULL) {
-            _currentCommand = exact;
-            if (exact->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
-                selectCommand( exact );
-            } else {
-                executeCurrentCommand();
-            }
-            return;
-        }
+        CompleterResult result = _activeCompleter->processEnter( _cmdBuffer );
 
-        // otherwise try unique prefix match
-        CommandEntry *matches[16];
-        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+        switch (result.getStatus()) {
+            case COMPLETER_SELECTED:
+            {
+                if (_activeCompleter == &_commandCompleter) {
+                    // command level - selected a command
+                    _currentCommand = (CommandEntry *)result.getSelectedData();
+                    _cmdBuffer = result.getInput();
 
-        if (count == 1) {
-            _currentCommand = matches[0];
-            if (matches[0]->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
-                selectCommand( matches[0] );
-            } else {
-                executeCurrentCommand();
+                    // if it has a child completer, transition to child level
+                    if (result.getNextLevel() != NULL) {
+                        _activeCompleter = result.getNextLevel();
+                        _cmdBuffer = "";
+                        updateCommandDisplay();
+                    }
+                    else if (_currentCommand->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
+                        selectCommand( _currentCommand );
+                    }
+                    else {
+                        executeCurrentCommand();
+                    }
+                }
+                else {
+                    // child completer level - selected a symbol
+                    // _currentCommand was set during NEXT_LEVEL transition
+                    _argBuffer = result.getSelectedName();
+                    executeCurrentCommand();
+                }
             }
-        }
-        else if (count > 1) {
-            setMessage( "(ambiguous command)" );
-            cancelCommandInput();
-        }
-        else {
-            setMessage( "(unknown command)" );
-            cancelCommandInput();
+            break;
+
+            case COMPLETER_NEXT_LEVEL:
+            {
+                _currentCommand = (CommandEntry *)result.getSelectedData();
+                _activeCompleter = result.getNextLevel();
+                _cmdBuffer = "";
+                updateCommandDisplay();
+            }
+            break;
+
+            case COMPLETER_MULTIPLE:
+                setMessage( "(ambiguous command)" );
+                cancelCommandInput();
+                break;
+
+            default:
+                setMessage( "(unknown command)" );
+                cancelCommandInput();
+                break;
         }
         return;
     }
 
-    // TAB - complete prefix
+    // TAB - complete via Completer
     if (keyAction.actionType() == CxKeyAction::TAB) {
-        CommandEntry *matches[16];
-        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+        CompleterResult result = _activeCompleter->processTab( _cmdBuffer );
+        _cmdBuffer = result.getInput();
 
-        if (count == 1) {
-            _cmdBuffer = matches[0]->name;
-            selectCommand( matches[0] );
-        }
-        else if (count > 1) {
-            CxString common = _commandRegistry->completePrefix( _cmdBuffer );
-            if (common.length() > _cmdBuffer.length()) {
-                _cmdBuffer = common;
+        switch (result.getStatus()) {
+            case COMPLETER_UNIQUE:
+            {
+                CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
+                if (_activeCompleter == &_commandCompleter) {
+                    selectCommand( cmd );
+                } else {
+                    // child level - complete symbol name, wait for ENTER
+                    updateCommandDisplay();
+                }
             }
-            updateCommandDisplay();
-        }
-        else {
-            setMessage( "(no match)" );
+            break;
+
+            case COMPLETER_NEXT_LEVEL:
+            {
+                _currentCommand = (CommandEntry *)result.getSelectedData();
+                _activeCompleter = result.getNextLevel();
+                _cmdBuffer = "";
+                updateCommandDisplay();
+            }
+            break;
+
+            case COMPLETER_PARTIAL:
+            case COMPLETER_MULTIPLE:
+                updateCommandDisplay();
+                break;
+
+            case COMPLETER_NO_MATCH:
+                setMessage( "(no match)" );
+                break;
+
+            default:
+                break;
         }
         return;
     }
 
-    // SPACE - transition to argument if exact match
+    // SPACE - transition to argument if at command level with exact match
     if (keyAction.tag() == ' ') {
-        CommandEntry *exact = _commandRegistry->findExact( _cmdBuffer );
-        if (exact != NULL) {
-            selectCommand( exact );
+        if (_activeCompleter == &_commandCompleter) {
+            CompleterResult result = _activeCompleter->processEnter( _cmdBuffer );
+            if (result.getStatus() == COMPLETER_SELECTED) {
+                CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
+                selectCommand( cmd );
+            }
         }
         return;
     }
 
-    // Printable character - add to buffer
+    // Printable character - process via Completer
     if (keyAction.actionType() == CxKeyAction::LOWERCASE_ALPHA ||
         keyAction.actionType() == CxKeyAction::UPPERCASE_ALPHA ||
         keyAction.actionType() == CxKeyAction::NUMBER ||
         keyAction.actionType() == CxKeyAction::SYMBOL) {
 
-        // Check if we already have an exact match with no args - if so, ignore input
-        // This prevents "cut" from becoming "cutt" when user continues typing
-        CommandEntry *existingExact = _commandRegistry->findExact( _cmdBuffer );
-        if (existingExact != NULL &&
-            !(existingExact->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG))) {
-            // Command complete, no args needed - ignore further characters
-            return;
-        }
+        char c = (char)keyAction.tag().charAt(0);
+        CompleterResult result = _activeCompleter->processChar( _cmdBuffer, c );
 
-        _cmdBuffer += keyAction.tag();
+        switch (result.getStatus()) {
+            case COMPLETER_NEXT_LEVEL:
+            {
+                _currentCommand = (CommandEntry *)result.getSelectedData();
+                _activeCompleter = result.getNextLevel();
+                _cmdBuffer = "";
+                updateCommandDisplay();
+            }
+            break;
 
-        CommandEntry *matches[16];
-        int count = _commandRegistry->findMatches( _cmdBuffer, matches, 16 );
+            case COMPLETER_UNIQUE:
+            {
+                _cmdBuffer = result.getInput();
+                if (_activeCompleter == &_commandCompleter) {
+                    CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
+                    selectCommand( cmd );
+                } else {
+                    // child level - symbol auto-completed, show it
+                    updateCommandDisplay();
+                }
+            }
+            break;
 
-        if (count == 1) {
-            selectCommand( matches[0] );
-        }
-        else {
-            updateCommandDisplay();
+            case COMPLETER_PARTIAL:
+            case COMPLETER_MULTIPLE:
+                _cmdBuffer = result.getInput();
+                updateCommandDisplay();
+                break;
+
+            case COMPLETER_NO_MATCH:
+                // reject the character - don't update _cmdBuffer
+                break;
+
+            default:
+                _cmdBuffer = result.getInput();
+                updateCommandDisplay();
+                break;
         }
     }
 }
@@ -1681,7 +1648,7 @@ ScreenEditor::handleArgumentModeInput( CxKeyAction keyAction )
         return;
     }
 
-    // Printable character - add to argument
+    // Printable character - add to argument (freeform text, no completion)
     if (keyAction.actionType() == CxKeyAction::LOWERCASE_ALPHA ||
         keyAction.actionType() == CxKeyAction::UPPERCASE_ALPHA ||
         keyAction.actionType() == CxKeyAction::NUMBER ||
@@ -1727,9 +1694,12 @@ ScreenEditor::updateArgumentDisplay( void )
     unsigned long promptLen = fullLine.length();
     fullLine += _argBuffer;
 
-    // pad to screen width to clear old content
+    // truncate or pad to screen width
     unsigned long targetWidth = screen->cols();
     if (targetWidth > 2) targetWidth -= 2;
+    if (fullLine.length() > targetWidth) {
+        fullLine = fullLine.subString(0, targetWidth);
+    }
     while (fullLine.length() < targetWidth) {
         fullLine += " ";
     }
@@ -1774,6 +1744,7 @@ ScreenEditor::executeCurrentCommand( void )
     if (_currentCommand == NULL) {
         setMessage( "(no command)" );
         _cmdInputState = CMD_INPUT_IDLE;
+        _activeCompleter = &_commandCompleter;
         programMode = ScreenEditor::EDIT;
         return;
     }
@@ -1782,6 +1753,7 @@ ScreenEditor::executeCurrentCommand( void )
     if (_currentCommand->handler == NULL) {
         setMessage( "(command not implemented)" );
         _cmdInputState = CMD_INPUT_IDLE;
+        _activeCompleter = &_commandCompleter;
         _currentCommand = NULL;
         _cmdBuffer = "";
         _argBuffer = "";
@@ -1797,6 +1769,7 @@ ScreenEditor::executeCurrentCommand( void )
 
     // clear internal command input state
     _cmdInputState = CMD_INPUT_IDLE;
+    _activeCompleter = &_commandCompleter;
     _currentCommand = NULL;
     _cmdBuffer = "";
     _argBuffer = "";
@@ -1809,79 +1782,6 @@ ScreenEditor::executeCurrentCommand( void )
         screen->flush();
     }
 }
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::executeCommand
-//
-// this method executes whatever command is on the commandline
-//
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::executeCommand( CxString commandLine )
-{
-    // strip out the command
-    CxString command = commandLine.nextToken(" \t\n");
-
-    // save a file
-    if (command == "save:") {
-        CMD_SaveFile( commandLine );
-        return(0);
-    }
-    
-    if (command == "load-new-buffer:") {
-        CMD_LoadFile( commandLine );
-    }
-
-    if (command == "quit:") {
-        return(1);
-    }
-
-    if (command == "goto-line:") {
-        CMD_GotoLine( commandLine );
-        return(0);
-    }
-
-    if (command == "find:") {
-        CMD_Find( commandLine );
-        return(0);
-    }
-
-    if (command == "set-mark:") {
-        CMD_SetMark( commandLine );
-        return(0);
-    }
-
-    if (command == "cut-to-mark:") {
-        CMD_CutToMark(commandLine );
-        return(0);
-    }
-
-    if (command == "paste:") {
-        CMD_PasteText( commandLine );
-        return(0);
-    }
-
-    if (command == "replace:") {
-        CMD_Replace( commandLine  );
-        return(0);
-    }
-
-    if (command == "cb:") {
-        CMD_CommentBlock( commandLine );
-        return(0);
-    }
-    
-    if (command =="new:") {
-        CMD_NewBuffer( commandLine );
-        return(0);
-    }
-    
-
-    return(0);
-}
-
-
 
 
 //-------------------------------------------------------------------------------------------------
@@ -2110,6 +2010,21 @@ ScreenEditor::CMD_BufferList( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ListProjectFiles:
+//
+// Show project file list (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ListProjectFiles( CxString commandLine )
+{
+    fileListView->recalcScreenPlacements();
+    fileListView->redraw();
+    programMode = ScreenEditor::FILELIST;
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Quit:
 //
 // Quit editor (ESC command wrapper)
@@ -2197,6 +2112,85 @@ ScreenEditor::CMD_Detab( CxString commandLine )
     editView->reframeAndUpdateScreen();
     setMessage("(detab complete)");
 }
+
+
+#ifdef CM_UTF8_SUPPORT
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_InsertUTFBox
+//
+// Insert a box drawing UTF-8 symbol at the cursor position
+// The argument is a short name like "upper-left" which becomes "box-upper-left"
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_InsertUTFBox( CxString commandLine )
+{
+    insertUTFSymbolHelper( commandLine, "box" );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::insertUTFSymbolHelper
+//
+// Common implementation for UTF symbol insertion commands.
+// Uses _currentCommand->symbolFilter to determine the filter prefix.
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::insertUTFSymbolHelper( CxString commandLine, const char *symbolType )
+{
+    CxString shortName = commandLine;
+    shortName = shortName.stripLeading(" \t\n\r");
+    shortName = shortName.stripTrailing(" \t\n\r");
+
+    if (shortName.length() == 0) {
+        setMessage("(no symbol specified)");
+        return;
+    }
+
+    // get filter from current command entry
+    CxString filter = "";
+    if (_currentCommand != NULL && _currentCommand->symbolFilter != NULL) {
+        filter = _currentCommand->symbolFilter;
+    }
+
+    // prepend filter to get full symbol name
+    CxString symbolName = filter;
+    symbolName += shortName;
+
+    UTFSymbolEntry *symbol = UTFSymbols::findExact( symbolName );
+
+    if (symbol == NULL) {
+        char buffer[200];
+        sprintf(buffer, "(unknown %s symbol: %s)", symbolType, shortName.data());
+        setMessage(buffer);
+        return;
+    }
+
+    // insert the UTF-8 character at cursor (as a single character)
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    editBuffer->addCharacter( CxString(symbol->utf8) );
+
+    editView->reframeAndUpdateScreen();
+
+    char buffer[200];
+    sprintf(buffer, "(inserted %s)", symbol->name);
+    setMessage(buffer);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_InsertUTFSymbol
+//
+// Insert a common UTF-8 symbol at the cursor position
+// The argument is a short name like "bullet" which becomes "sym-bullet"
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_InsertUTFSymbol( CxString commandLine )
+{
+    insertUTFSymbolHelper( commandLine, "symbol" );
+}
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

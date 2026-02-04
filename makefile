@@ -88,11 +88,13 @@ LIB_CX_COMMANDLINE_NAME=libcx_commandline.a
 LIB_CX_KEYBOARD_NAME=libcx_keyboard.a
 LIB_CX_EDITBUFFER_NAME=libcx_editbuffer.a
 LIB_CX_JSON_NAME=libcx_json.a
+LIB_CX_COMPLETER_NAME=libcx_commandcompleter.a
 
 CX_LIBS = \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_KEYBOARD_NAME)   \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_SCREEN_NAME)     \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_EDITBUFFER_NAME) \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_COMPLETER_NAME)  \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_JSON_NAME)       \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_BASE_NAME)
 
@@ -108,7 +110,8 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/FileListView.o		 \
 	$(APP_OBJECT_DIR)/HelpTextView.o		 \
 	$(APP_OBJECT_DIR)/MarkUp.o               \
-	$(APP_OBJECT_DIR)/CommandRegistry.o
+	$(APP_OBJECT_DIR)/CommandTable.o         \
+	$(APP_OBJECT_DIR)/UTFSymbols.o
 
 ## Targets ####################################################
 
@@ -136,10 +139,16 @@ clean:
 install:
 	sudo cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
 	sudo chmod 755 /usr/local/bin/cm
+ifeq ($(UNAME_S), darwin)
+	sudo xattr -cr /usr/local/bin/cm
+endif
 
 
 $(APP_OBJECT_DIR)/cm: $(OBJECTS)
 	$(CPP) -v $(CPPFLAGS) $(INC) $(OBJECTS) -o $(APP_OBJECT_DIR)/cm $(ALL_LIBS)
+ifeq ($(UNAME_S), darwin)
+	xattr -cr $(APP_OBJECT_DIR)/cm
+endif
 
 
 ## Conversions ################################################
@@ -153,7 +162,8 @@ $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/FileListView.o	: FileListView.cpp
 $(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
-$(APP_OBJECT_DIR)/CommandRegistry.o	: CommandRegistry.cpp
+$(APP_OBJECT_DIR)/CommandTable.o	: CommandTable.cpp
+$(APP_OBJECT_DIR)/UTFSymbols.o		: UTFSymbols.cpp
 
 
 .PRECIOUS: $(CX_LIBS)

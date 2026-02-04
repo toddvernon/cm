@@ -84,34 +84,50 @@ The `Completer` library (`cx/commandcompleter`) handles command selection via a 
 - **The only correct pattern is a loop that reacts to status:** processChar/processTab/processEnter → check getStatus() → respond accordingly.
 - **Only the addCandidate() setup knows the command structure.** The input loop does not.
 
+## FORBIDDEN: Fuzzy / Dehyphenated Matching
+
+**DO NOT implement, suggest, or reference any of the following:**
+- Dehyphenated matching (removing hyphens before comparing)
+- Fuzzy matching, abbreviated matching, or command shortening
+- Matching "gl" to "goto-line", "sa" to "save-as", "bn" to "buffer-next", etc.
+- A `dehyphenate()` function or any hyphen-stripping logic
+
+**All matching in this project is LITERAL PREFIX matching.** The user's input must be an exact prefix of the candidate name, including hyphens. For example:
+- "goto" matches "goto-line" (literal prefix) - CORRECT
+- "gl" matches "goto-line" (dehyphenated) - WRONG, DO NOT DO THIS
+- "buf" matches "buffer-next" (literal prefix) - CORRECT
+- "bn" matches "buffer-next" (dehyphenated) - WRONG, DO NOT DO THIS
+
+This applies to the Completer library, CommandTable, UTFSymbols, and all code in this project.
+
 See `COMPLETER_INTEGRATION.md` for command categories, flows, and the integration pattern.
 See `cx_tests/cxcommandcompleter/cxcommandcompleter_example.cpp` for working code.
 
-## Current Work (2026-01-25)
+## Current Work (2026-02-04)
 
-**New ESC command system with tab completion - NOT YET COMMITTED**
+**ESC command system with Completer library integration**
 
-### What's Done
-- Created `CommandRegistry.h/cpp` - command table with fuzzy prefix matching
-- Modified `ScreenEditor.h/cpp` - command input state machine, tab completion
+### Architecture
+- `CommandTable.h/cpp` - static command table (data only, no matching logic)
+- `Completer` library (`cx/commandcompleter`) - handles all prefix matching/completion
+- Child completers for UTF symbol selection (`utf-box`, `utf-symbol`)
+- `ScreenEditor.h/cpp` - command input state machine uses Completer status-driven API
+
+### How It Works
 - ESC → "command> " prompt → type partial command → TAB completes → ENTER executes
-- `goto-line` command tested and working via new system
+- Symbol commands (`utf-box`, `utf-symbol`) use child completers for two-level selection
+- Freeform arg commands (`find`, `goto-line`, etc.) transition to argument input mode
+- No-arg commands (`wc`, `mark`, `cut`, etc.) execute directly on ENTER
 
-### What Needs Testing
-- `find` command via new system (ESC → "fi" → TAB → pattern → ENTER)
-- `replace` command
-- `save`, `load`, `mark`, `cut`, `paste` commands
+### Files
+- `CommandTable.h/cpp` - command definitions (replaces old CommandRegistry)
+- `ScreenEditor.h/cpp` - Completer members, status-driven input loop
+- `UTFSymbols.h/cpp` - symbol table (matching now uses Completer static methods)
+- `makefile` - links `libcx_commandcompleter.a`
 
-### Commands with NULL handlers (show "not implemented")
-- `find-all`, `buffer-next`, `buffer-prev`, `buffer-list`, `quit`, `help`
-
-### Files changed (uncommitted)
-- `CommandRegistry.h` (new)
-- `CommandRegistry.cpp` (new)
-- `ScreenEditor.h`
-- `ScreenEditor.cpp`
-- `Makefile`
-- `Cm.cpp` (terminal cleanup on exit)
+### Removed Files
+- `CommandRegistry.h/cpp` - replaced by CommandTable + Completer
+- `PrefixMatcher.h/cpp` - replaced by Completer library
 
 ## ACTIVE DEBUGGING: Intermittent Startup Crash
 

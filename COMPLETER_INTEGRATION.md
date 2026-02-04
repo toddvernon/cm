@@ -29,10 +29,10 @@ This document describes how the `Completer` library will be used in cm.
 
 ## Matching Features Used
 
-### Dehyphenated prefix matching
-- `bufferlist` → `buffer-list` (hyphens ignored during matching)
-- `gotoline` → `goto-line`
+### Prefix matching
 - `b` → matches `buffer-list`, `buffer-next`, etc.
+- `goto` → matches `goto-line`
+- Matching is literal prefix-based. Users type hyphens as part of command names.
 
 ## Status Handling
 
