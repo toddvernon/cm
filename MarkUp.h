@@ -171,6 +171,11 @@ private:
     colorizeKeywordsWithExclusions( CxString line, const char* keywords, CxString colorStart, CxString colorEnd, ColorRegions* regions );
     // colorize keywords, skipping exclusion regions
 
+    int
+    parseNumber( char* data, int len, int startPos, int* endPos );
+    // parse a numeric literal starting at startPos, returns 1 if valid number found
+    // sets endPos to position after the number
+
     ProgramDefaults *programDefaults;
     // pointer to the startup defaults class
 

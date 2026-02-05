@@ -114,6 +114,8 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/FileListView.o		 \
 	$(APP_OBJECT_DIR)/HelpTextView.o		 \
 	$(APP_OBJECT_DIR)/MarkUp.o               \
+	$(APP_OBJECT_DIR)/MarkUpColorizers.o     \
+	$(APP_OBJECT_DIR)/MarkUpParsing.o        \
 	$(APP_OBJECT_DIR)/CommandTable.o         \
 	$(APP_OBJECT_DIR)/UTFSymbols.o
 
@@ -170,6 +172,8 @@ $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/FileListView.o	: FileListView.cpp
 $(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
+$(APP_OBJECT_DIR)/MarkUpColorizers.o: MarkUpColorizers.cpp
+$(APP_OBJECT_DIR)/MarkUpParsing.o	: MarkUpParsing.cpp
 $(APP_OBJECT_DIR)/CommandTable.o	: CommandTable.cpp
 $(APP_OBJECT_DIR)/UTFSymbols.o		: UTFSymbols.cpp
 
