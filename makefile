@@ -105,6 +105,8 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/CommandLineView.o      \
 	$(APP_OBJECT_DIR)/EditView.o             \
 	$(APP_OBJECT_DIR)/ScreenEditor.o         \
+	$(APP_OBJECT_DIR)/ScreenEditorCommands.o \
+	$(APP_OBJECT_DIR)/ScreenEditorCore.o \
 	$(APP_OBJECT_DIR)/ProgramDefaults.o		 \
 	$(APP_OBJECT_DIR)/Project.o				 \
 	$(APP_OBJECT_DIR)/FileListView.o		 \
@@ -158,6 +160,8 @@ $(APP_OBJECT_DIR)/ProgramDefaults.o : ProgramDefaults.cpp
 $(APP_OBJECT_DIR)/CommandLineView.o : CommandLineView.cpp
 $(APP_OBJECT_DIR)/EditView.o		: EditView.cpp
 $(APP_OBJECT_DIR)/ScreenEditor.o	: ScreenEditor.cpp
+$(APP_OBJECT_DIR)/ScreenEditorCommands.o : ScreenEditorCommands.cpp
+$(APP_OBJECT_DIR)/ScreenEditorCore.o : ScreenEditorCore.cpp
 $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/FileListView.o	: FileListView.cpp
 $(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp

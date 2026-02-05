@@ -24,91 +24,6 @@
 
 
 //-------------------------------------------------------------------------------------------------
-// copyToSystemClipboard (macOS and Linux)
-//
-// Copies text to the system clipboard so it can be pasted into other applications.
-// Uses pbcopy on macOS, xclip on Linux.
-//
-//-------------------------------------------------------------------------------------------------
-#if defined(_OSX_) || defined(_LINUX_)
-static void copyToSystemClipboard( CxString text )
-{
-    if (text.length() == 0) return;
-
-#ifdef _OSX_
-    FILE *pipe = popen("pbcopy", "w");
-#else
-    FILE *pipe = popen("xclip -selection clipboard", "w");
-#endif
-    if (pipe) {
-        fwrite(text.data(), 1, text.length(), pipe);
-        pclose(pipe);
-    }
-}
-#endif
-
-
-//-------------------------------------------------------------------------------------------------
-// pasteFromSystemClipboard (macOS and Linux)
-//
-// Reads text from the system clipboard.
-// Uses pbpaste on macOS, xclip on Linux.
-//
-//-------------------------------------------------------------------------------------------------
-#if defined(_OSX_) || defined(_LINUX_)
-static CxString pasteFromSystemClipboard( void )
-{
-    CxString result = "";
-
-#ifdef _OSX_
-    FILE *pipe = popen("pbpaste", "r");
-#else
-    FILE *pipe = popen("xclip -selection clipboard -o", "r");
-#endif
-    if (pipe) {
-        char buffer[1024];
-        while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
-            result += buffer;
-        }
-        pclose(pipe);
-    }
-
-    return result;
-}
-#endif
-
-
-//-------------------------------------------------------------------------------------------------
-// Dispatch tables for control commands
-//
-// Each entry maps a control key tag to a handler method and optional message.
-// The table is terminated by a NULL tag entry.
-//-------------------------------------------------------------------------------------------------
-ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
-    { "J",    &ScreenEditor::CONTROL_ToggleJumpScroll,  NULL },
-    { "F",    &ScreenEditor::CONTROL_FindAgain,         NULL },
-    { "R",    &ScreenEditor::CONTROL_ReplaceAgain,      NULL },
-    { "L",    &ScreenEditor::CONTROL_ToggleLineNumbers, NULL },
-    { "W",    &ScreenEditor::CTRL_Cut,                  "(text cut)" },
-    { "V",    &ScreenEditor::CTRL_PageDown,             "(paged down)" },
-    { "Z",    &ScreenEditor::CTRL_PageUp,               "(paged up)" },
-    { "K",    &ScreenEditor::CTRL_CutToEndOfLine,       "(text cut to end of line)" },
-    { "Y",    &ScreenEditor::CTRL_Paste,                "(text pasted)" },
-    { "N",    &ScreenEditor::CTRL_NextBuffer,           "(next buffer)" },
-    { "P",    &ScreenEditor::CTRL_ProjectList,          "(Project List)" },
-    { "U",    &ScreenEditor::CTRL_UpdateScreen,         "(Update Screen)" },
-    { "<US>", &ScreenEditor::CTRL_Help,                 "(Help)" },
-    { NULL,   NULL,                                      NULL }
-};
-
-ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
-    { "S",    &ScreenEditor::CTRLX_Save,  NULL },
-    { "C",    &ScreenEditor::CTRLX_Quit,  NULL },
-    { NULL,   NULL,                        NULL }
-};
-
-
-//-------------------------------------------------------------------------------------------------
 // ScreenEditor::ScreenEditor (constructor)
 //
 // Creates all the important parts of the program, the editview, the commandline, they keyboard
@@ -426,321 +341,6 @@ ScreenEditor::~ScreenEditor(void)
 }
 
 
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::loadNewFile
-//
-// load a new file into a new buffer and make it the viewable buffer
-//
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::loadNewFile( CxString filePath, int preload )
-{
-    //printf("loading %s\n", filePath.data());
- 
-    filePath = filePath.stripLeading(" \t\r\n");
-    filePath = filePath.stripTrailing(" \t\r\n");
-    
-    // if the file path is actually some text
-    if (filePath.length()) {
-        
-        // if the file is readable path is readable, readwriteable, new but writeable
-        if ( checkFile( filePath ) == 0) {
-
-            // return the editbuffer already in the list
-            CmEditBuffer *editBuffer = editBufferList->findPath( filePath );
-            
-            // we did find an edit buffer already loaded so just make it the current one
-            if (editBuffer != NULL) {
-                
-                // if the user wants autosave  on buffer changes
-                if (programDefaults->autoSaveOnBufferChange()) {
-                    saveCurrentEditBufferOnSwitch();
-                }
-                
-                // check if this buffer has been loaded into memory
-                if (!editBuffer->isInMemory()) {
-
-                    // show loading status and flush immediately
-                    setMessage(CxString("(Loading ") + filePath + "...)");
-                    commandLineView->updateScreen();
-                    screen->flush();
-
-                    // load the text
-                    editBuffer->loadText( filePath, TRUE );
-
-                    // show completion
-                    setMessage(CxString("(Loaded ") + filePath + ")");
-                }
-                
-                // set the edit buffer in the edit view
-                editView->setEditBuffer( editBuffer );
-                                
-            // we did not find an edit buffer in the list, so create a new one
-            // referencing that file path
-            } else {
-
-                // if the user wants autosave on buffer changes
-                if (programDefaults->autoSaveOnBufferChange()) {
-                    saveCurrentEditBufferOnSwitch();
-                }
-
-                // create a new edit buffer
-                CmEditBuffer *editBuffer = new CmEditBuffer( );
-
-                // show loading status and flush immediately
-                setMessage(CxString("(Loading ") + filePath + "...)");
-                commandLineView->updateScreen();
-                screen->flush();
-
-                // load the text into it
-                editBuffer->loadText( filePath, preload );
-
-                // show completion
-                setMessage(CxString("(Loaded ") + filePath + ")");
-
-                // add it to the list of edit buffers
-                editBufferList->add( editBuffer );
-                
-                // set teh editbuffer in the edit view
-                editView->setEditBuffer( editBuffer );
-                
-            }
-        }
-    }
-
-    commandLineView->updateScreen();
-    
-    return(0);
-}
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::saveCurrentEditBufferOnSwitch
-//
-// Save the current buffer if the user pref says to and the file is changed
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::saveCurrentEditBufferOnSwitch(void)
-{
-   // get the current buffer
-    CmEditBuffer *currentEditBuffer = editBufferList->current();
-    if (currentEditBuffer != NULL) {
-        
-        //  get the current buffer file name
-        CxString currentFilePath = currentEditBuffer->getFilePath();
-        
-        // if the buffer is loaded into memory
-        if (currentEditBuffer->isInMemory()) {
-            
-            // and if the buffer has been touched
-            if (currentEditBuffer->isTouched()) {
-                
-                // save the file
-                currentEditBuffer->saveText( currentFilePath );
-            }
-        }
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::nextBuffer
-//
-// Change to the next buffer, saving the old one if required
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::nextBuffer(void)
-{
-    // if the user wants autosave  on buffer changes
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
-    }
-    
-    // create a new edit buffer
-    CmEditBuffer *editBuffer = editBufferList->next();
-    
-    // see if the buffer is in memory
-    if (!editBuffer->isInMemory()) {
-        
-        // if not then load the text
-        editBuffer->loadText( editBuffer->getFilePath() , TRUE );
-    }
-
-    // hand it to the edit view to display
-    editView->setEditBuffer( editBuffer );
-    
-    // redraw the edit view
-    editView->reframeAndUpdateScreen();
-    
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::previousBuffer
-//
-// Change to the preveous buffer, saving the old one if required
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::previousBuffer(void)
-{
-    // if the user wants autosave  on buffer changes
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
-    }
-    
-    // create a new edit buffer
-    CmEditBuffer *editBuffer = editBufferList->previous();
-    
-    // see if the buffer is in memory
-    if (!editBuffer->isInMemory()) {
-        
-        // if not then load the text
-        editBuffer->loadText( editBuffer->getFilePath() , TRUE );
-    }
-    
-    // hand it to the edit view to display
-    editView->setEditBuffer( editBuffer );
-    
-    // redraw the edit view
-    editView->reframeAndUpdateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::::checkfile
-//
-// This method checks if the path is actually a file (or potential file) and checks for
-// the ability to write the file.  Not all cases are fatal but the user to notified of any
-// issues ahead of time so if a mistake was made they an correct.
-//
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::checkFile( CxString filePath )
-{
-    char buffer[200];
-    CxFileAccess::status stat = CxFileAccess::checkStatus( filePath );
-
-    switch( stat ) {
-
-        case CxFileAccess::NOT_A_REGULAR_FILE:
-        {
-            sprintf(buffer, "file: %s could not be loaded and is NOT A REGULAR file, SAVING WON'T work to the same path", filePath.data());
-            setMessage( buffer );
-            return(-1);
-        }
-        break;
-
-        case CxFileAccess::FOUND_W:
-        {
-            sprintf(buffer, "file: %s could not be loaded, directory permissions WON'T ALLOW SAVING to the same path", filePath.data());
-            setMessage( buffer );
-            return(-1);
-        }
-        break;
-
-        case CxFileAccess::FOUND_R:           // file was found and is readable only
-        {
-            sprintf(buffer, "file: %s loaded, however the file is READ ONLY and WON'T ALLOW SAVING to the same path", filePath.data());
-            setMessage( buffer );
-            return(0);
-        }
-        break;
-
-        case CxFileAccess::FOUND_RW:           // file was found and is read/writable
-        {
-            sprintf(buffer, "file: %s loaded", filePath.data());
-            setMessage( buffer );
-            return(0);
-        }
-        break;
-
-        case CxFileAccess::NOT_FOUND_W:        // file was not found but one can be written
-        {
-            sprintf(buffer, "file: %s not found, a new file will be created", filePath.data());
-            setMessage( buffer );
-            return(0);
-        }
-        break;
-
-        case CxFileAccess::NOT_FOUND:
-        {
-            sprintf(buffer, "file %s was not found, and directory permissions WON'T ALLOW SAVING at that path", filePath.data() );
-            setMessage( buffer );
-            return(-1);
-        }
-        break;
-    }
-
-    return(-1);
-}
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CONTROL_ReplaceAgain
-//
-// Performs a secondary replace command using the preveous (stored) find string and the previous 
-// (stored) replace string.
-//
-//
-//-------------------------------------------------------------------------------------------------
-void 
-ScreenEditor::CONTROL_ReplaceAgain( void )
-{    
-    char buffer[200];
-    
-    if (editView->replaceAgain( _findString, _replaceString )  == TRUE ) {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(replace again found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-        
-    } else {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(replace again not found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CONTROL_ToggleLineNumbers
-//
-// turn line numbers on or off
-//
-//-------------------------------------------------------------------------------------------------
-void 
-ScreenEditor::CONTROL_ToggleLineNumbers( void )
-{
-    editView->toggleLineNumbers();
-    setMessage("(toggled line numbers)");
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CONTROL_ToggleJumpScroll
-//
-// turn jump scrolling on and off
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CONTROL_ToggleJumpScroll( void )
-{
-    editView->toggleJumpScroll();
-    setMessage("(toggled jump scrolling)");
-}
-    
-
-
-
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::resetPrompt
 //
@@ -780,6 +380,68 @@ ScreenEditor::setMessage(CxString message)
 }
 
 
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::setMessageWithLocation
+//
+// Helper: formats a message with the current cursor location and displays it.
+// Used by find/replace handlers to show "(prefix) loc=(row,col)".
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::setMessageWithLocation(CxString prefix)
+{
+    CxEditBufferPosition loc = editView->cursorPosition();
+    char buffer[200];
+    sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
+    setMessage(prefix + " " + CxString(buffer));
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::showFileListView
+//
+// Helper: recalculates, redraws and switches to the file list view.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::showFileListView(void)
+{
+    fileListView->recalcScreenPlacements();
+    fileListView->redraw();
+    programMode = FILELIST;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::showHelpView
+//
+// Helper: recalculates, redraws and switches to the help text view.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::showHelpView(void)
+{
+    helpTextView->recalcScreenPlacements();
+    helpTextView->redraw();
+    programMode = HELPVIEW;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::resetCommandInputState
+//
+// Helper: resets all command input state variables to idle.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::resetCommandInputState(void)
+{
+    _cmdInputState = CMD_INPUT_IDLE;
+    _activeCompleter = &_commandCompleter;
+    _currentCommand = NULL;
+    _cmdBuffer = "";
+    _argBuffer = "";
+}
 
 
 //-------------------------------------------------------------------------------------------------
@@ -1181,11 +843,7 @@ ScreenEditor::enterCommandMode( void )
 void
 ScreenEditor::cancelCommandInput( void )
 {
-    _cmdInputState = CMD_INPUT_IDLE;
-    _cmdBuffer = "";
-    _argBuffer = "";
-    _currentCommand = NULL;
-    _activeCompleter = &_commandCompleter;
+    resetCommandInputState();
     programMode = ScreenEditor::EDIT;
 
     commandLineView->setText("");
@@ -1264,90 +922,11 @@ ScreenEditor::selectCommand( CommandEntry *cmd )
 //
 //-------------------------------------------------------------------------------------------------
 void
-ScreenEditor::updateCommandDisplay( void )
+ScreenEditor::renderCommandLine( CxString prefix, CxString display, unsigned long cursorOffset )
 {
-    CxString display = _cmdBuffer;
-
-    if (_activeCompleter == &_commandCompleter) {
-        // command level - show matching commands with arg hints
-        CompleterCandidate *matches[16];
-        int count = _activeCompleter->findMatchesFull( _cmdBuffer, matches, 16 );
-
-        // don't show hint if typed text exactly matches a command
-        int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
-
-        if (count > 0 && !isExactMatch) {
-            display += "  ";
-            for (int i = 0; i < count && i < 8; i++) {
-                display += "| ";
-                display += matches[i]->name;
-                CommandEntry *entry = (CommandEntry *)matches[i]->userData;
-                if (entry != NULL && entry->argHint != NULL) {
-                    display += " ";
-                    display += entry->argHint;
-                }
-                display += " ";
-            }
-            if (count > 8) {
-                display += "...";
-            }
-        }
-    }
-    else {
-        // child completer level - show command name prefix + symbol matches
-        CxString prefix = "";
-        if (_currentCommand != NULL) {
-            prefix = _currentCommand->name;
-            prefix += " ";
-            if (_currentCommand->argHint != NULL) {
-                prefix += _currentCommand->argHint;
-                prefix += ": ";
-            }
-        }
-
-        CxString names[16];
-        int count = _activeCompleter->findMatches( _cmdBuffer, names, 16 );
-
-        int isExactMatch = (count == 1 && _cmdBuffer == names[0]);
-
-        CxString symDisplay = prefix;
-        symDisplay += _cmdBuffer;
-
-        if (count > 0 && !isExactMatch) {
-            symDisplay += "  ";
-            for (int i = 0; i < count && i < 6; i++) {
-                symDisplay += "| ";
-                symDisplay += names[i];
-                symDisplay += " ";
-            }
-            if (count > 6) {
-                symDisplay += "...";
-            }
-        }
-
-        // use symDisplay instead of "command> " + display
-        unsigned long targetWidth = screen->cols();
-        if (targetWidth > 2) targetWidth -= 2;
-        if (symDisplay.length() > targetWidth) {
-            symDisplay = symDisplay.subString(0, targetWidth);
-        }
-        while (symDisplay.length() < targetWidth) {
-            symDisplay += " ";
-        }
-
-        screen->resetColors();
-        screen->writeTextAt( screen->rows() - 1, 1, symDisplay, true );
-
-        unsigned long cursorCol = 1 + prefix.length() + _cmdBuffer.length();
-        screen->placeCursor( screen->rows() - 1, cursorCol );
-        screen->flush();
-        return;
-    }
-
-    CxString fullLine = "command> ";
+    CxString fullLine = prefix;
     fullLine += display;
 
-    // truncate or pad to screen width to prevent line wrap
     unsigned long targetWidth = screen->cols();
     if (targetWidth > 2) targetWidth -= 2;
     if (fullLine.length() > targetWidth) {
@@ -1360,10 +939,82 @@ ScreenEditor::updateCommandDisplay( void )
     screen->resetColors();
     screen->writeTextAt( screen->rows() - 1, 1, fullLine, true );
 
-    // cursor after typed text
-    unsigned long cursorCol = 1 + 9 + _cmdBuffer.length();
-    screen->placeCursor( screen->rows() - 1, cursorCol );
+    screen->placeCursor( screen->rows() - 1, 1 + cursorOffset );
     screen->flush();
+}
+
+
+void
+ScreenEditor::updateCommandDisplayForSymbol( void )
+{
+    CxString prefix = "";
+    if (_currentCommand != NULL) {
+        prefix = _currentCommand->name;
+        prefix += " ";
+        if (_currentCommand->argHint != NULL) {
+            prefix += _currentCommand->argHint;
+            prefix += ": ";
+        }
+    }
+
+    CxString names[16];
+    int count = _activeCompleter->findMatches( _cmdBuffer, names, 16 );
+
+    int isExactMatch = (count == 1 && _cmdBuffer == names[0]);
+
+    CxString symDisplay = _cmdBuffer;
+
+    if (count > 0 && !isExactMatch) {
+        symDisplay += "  ";
+        for (int i = 0; i < count && i < 6; i++) {
+            symDisplay += "| ";
+            symDisplay += names[i];
+            symDisplay += " ";
+        }
+        if (count > 6) {
+            symDisplay += "...";
+        }
+    }
+
+    renderCommandLine( prefix, symDisplay, prefix.length() + _cmdBuffer.length() );
+}
+
+
+void
+ScreenEditor::updateCommandDisplay( void )
+{
+    if (_activeCompleter != &_commandCompleter) {
+        updateCommandDisplayForSymbol();
+        return;
+    }
+
+    // command level - show matching commands with arg hints
+    CxString display = _cmdBuffer;
+
+    CompleterCandidate *matches[16];
+    int count = _activeCompleter->findMatchesFull( _cmdBuffer, matches, 16 );
+
+    // don't show hint if typed text exactly matches a command
+    int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+
+    if (count > 0 && !isExactMatch) {
+        display += "  ";
+        for (int i = 0; i < count && i < 8; i++) {
+            display += "| ";
+            display += matches[i]->name;
+            CommandEntry *entry = (CommandEntry *)matches[i]->userData;
+            if (entry != NULL && entry->argHint != NULL) {
+                display += " ";
+                display += entry->argHint;
+            }
+            display += " ";
+        }
+        if (count > 8) {
+            display += "...";
+        }
+    }
+
+    renderCommandLine( "command> ", display, 9 + _cmdBuffer.length() );
 }
 
 
@@ -1425,6 +1076,153 @@ ScreenEditor::handleCommandInput( CxKeyAction keyAction )
 //
 //-------------------------------------------------------------------------------------------------
 void
+ScreenEditor::handleCommandEnter( void )
+{
+    CompleterResult result = _activeCompleter->processEnter( _cmdBuffer );
+
+    switch (result.getStatus()) {
+        case COMPLETER_SELECTED:
+        {
+            if (_activeCompleter == &_commandCompleter) {
+                // command level - selected a command
+                _currentCommand = (CommandEntry *)result.getSelectedData();
+                _cmdBuffer = result.getInput();
+
+                // if it has a child completer, transition to child level
+                if (result.getNextLevel() != NULL) {
+                    _activeCompleter = result.getNextLevel();
+                    _cmdBuffer = "";
+                    updateCommandDisplay();
+                }
+                else if (_currentCommand->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
+                    selectCommand( _currentCommand );
+                }
+                else {
+                    executeCurrentCommand();
+                }
+            }
+            else {
+                // child completer level - selected a symbol
+                // _currentCommand was set during NEXT_LEVEL transition
+                _argBuffer = result.getSelectedName();
+                executeCurrentCommand();
+            }
+        }
+        break;
+
+        case COMPLETER_NEXT_LEVEL:
+        {
+            _currentCommand = (CommandEntry *)result.getSelectedData();
+            _activeCompleter = result.getNextLevel();
+            _cmdBuffer = "";
+            updateCommandDisplay();
+        }
+        break;
+
+        case COMPLETER_MULTIPLE:
+            setMessage( "(ambiguous command)" );
+            cancelCommandInput();
+            break;
+
+        default:
+            setMessage( "(unknown command)" );
+            cancelCommandInput();
+            break;
+    }
+}
+
+
+void
+ScreenEditor::handleCommandTab( void )
+{
+    CompleterResult result = _activeCompleter->processTab( _cmdBuffer );
+    _cmdBuffer = result.getInput();
+
+    switch (result.getStatus()) {
+        case COMPLETER_UNIQUE:
+        {
+            CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
+            if (_activeCompleter == &_commandCompleter) {
+                selectCommand( cmd );
+            } else {
+                // child level - complete symbol name, wait for ENTER
+                updateCommandDisplay();
+            }
+        }
+        break;
+
+        case COMPLETER_NEXT_LEVEL:
+        {
+            _currentCommand = (CommandEntry *)result.getSelectedData();
+            _activeCompleter = result.getNextLevel();
+            _cmdBuffer = "";
+            updateCommandDisplay();
+        }
+        break;
+
+        case COMPLETER_PARTIAL:
+        case COMPLETER_MULTIPLE:
+            updateCommandDisplay();
+            break;
+
+        case COMPLETER_NO_MATCH:
+            setMessage( "(no match)" );
+            break;
+
+        default:
+            break;
+    }
+}
+
+
+void
+ScreenEditor::handleCommandChar( CxKeyAction keyAction )
+{
+    char c = (char)keyAction.tag().charAt(0);
+    CompleterResult result = _activeCompleter->processChar( _cmdBuffer, c );
+
+    switch (result.getStatus()) {
+        case COMPLETER_NEXT_LEVEL:
+        {
+            _currentCommand = (CommandEntry *)result.getSelectedData();
+            _activeCompleter = result.getNextLevel();
+            _cmdBuffer = "";
+            updateCommandDisplay();
+        }
+        break;
+
+        case COMPLETER_UNIQUE:
+        {
+            _cmdBuffer = result.getInput();
+            if (_activeCompleter == &_commandCompleter) {
+                CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
+                selectCommand( cmd );
+            } else {
+                // child level - symbol auto-completed, show it
+                updateCommandDisplay();
+            }
+        }
+        break;
+
+        case COMPLETER_PARTIAL:
+        case COMPLETER_MULTIPLE:
+            _cmdBuffer = result.getInput();
+            updateCommandDisplay();
+            break;
+
+        case COMPLETER_NO_MATCH:
+            // reject the character - don't update _cmdBuffer
+            break;
+
+        default:
+            _cmdBuffer = result.getInput();
+            updateCommandDisplay();
+            break;
+    }
+}
+
+
+void
 ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
 {
     // ESCAPE - cancel
@@ -1444,99 +1242,13 @@ ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
 
     // RETURN - execute via Completer
     if (keyAction.actionType() == CxKeyAction::NEWLINE) {
-        CompleterResult result = _activeCompleter->processEnter( _cmdBuffer );
-
-        switch (result.getStatus()) {
-            case COMPLETER_SELECTED:
-            {
-                if (_activeCompleter == &_commandCompleter) {
-                    // command level - selected a command
-                    _currentCommand = (CommandEntry *)result.getSelectedData();
-                    _cmdBuffer = result.getInput();
-
-                    // if it has a child completer, transition to child level
-                    if (result.getNextLevel() != NULL) {
-                        _activeCompleter = result.getNextLevel();
-                        _cmdBuffer = "";
-                        updateCommandDisplay();
-                    }
-                    else if (_currentCommand->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
-                        selectCommand( _currentCommand );
-                    }
-                    else {
-                        executeCurrentCommand();
-                    }
-                }
-                else {
-                    // child completer level - selected a symbol
-                    // _currentCommand was set during NEXT_LEVEL transition
-                    _argBuffer = result.getSelectedName();
-                    executeCurrentCommand();
-                }
-            }
-            break;
-
-            case COMPLETER_NEXT_LEVEL:
-            {
-                _currentCommand = (CommandEntry *)result.getSelectedData();
-                _activeCompleter = result.getNextLevel();
-                _cmdBuffer = "";
-                updateCommandDisplay();
-            }
-            break;
-
-            case COMPLETER_MULTIPLE:
-                setMessage( "(ambiguous command)" );
-                cancelCommandInput();
-                break;
-
-            default:
-                setMessage( "(unknown command)" );
-                cancelCommandInput();
-                break;
-        }
+        handleCommandEnter();
         return;
     }
 
     // TAB - complete via Completer
     if (keyAction.actionType() == CxKeyAction::TAB) {
-        CompleterResult result = _activeCompleter->processTab( _cmdBuffer );
-        _cmdBuffer = result.getInput();
-
-        switch (result.getStatus()) {
-            case COMPLETER_UNIQUE:
-            {
-                CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
-                if (_activeCompleter == &_commandCompleter) {
-                    selectCommand( cmd );
-                } else {
-                    // child level - complete symbol name, wait for ENTER
-                    updateCommandDisplay();
-                }
-            }
-            break;
-
-            case COMPLETER_NEXT_LEVEL:
-            {
-                _currentCommand = (CommandEntry *)result.getSelectedData();
-                _activeCompleter = result.getNextLevel();
-                _cmdBuffer = "";
-                updateCommandDisplay();
-            }
-            break;
-
-            case COMPLETER_PARTIAL:
-            case COMPLETER_MULTIPLE:
-                updateCommandDisplay();
-                break;
-
-            case COMPLETER_NO_MATCH:
-                setMessage( "(no match)" );
-                break;
-
-            default:
-                break;
-        }
+        handleCommandTab();
         return;
     }
 
@@ -1558,47 +1270,7 @@ ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
         keyAction.actionType() == CxKeyAction::NUMBER ||
         keyAction.actionType() == CxKeyAction::SYMBOL) {
 
-        char c = (char)keyAction.tag().charAt(0);
-        CompleterResult result = _activeCompleter->processChar( _cmdBuffer, c );
-
-        switch (result.getStatus()) {
-            case COMPLETER_NEXT_LEVEL:
-            {
-                _currentCommand = (CommandEntry *)result.getSelectedData();
-                _activeCompleter = result.getNextLevel();
-                _cmdBuffer = "";
-                updateCommandDisplay();
-            }
-            break;
-
-            case COMPLETER_UNIQUE:
-            {
-                _cmdBuffer = result.getInput();
-                if (_activeCompleter == &_commandCompleter) {
-                    CommandEntry *cmd = (CommandEntry *)result.getSelectedData();
-                    selectCommand( cmd );
-                } else {
-                    // child level - symbol auto-completed, show it
-                    updateCommandDisplay();
-                }
-            }
-            break;
-
-            case COMPLETER_PARTIAL:
-            case COMPLETER_MULTIPLE:
-                _cmdBuffer = result.getInput();
-                updateCommandDisplay();
-                break;
-
-            case COMPLETER_NO_MATCH:
-                // reject the character - don't update _cmdBuffer
-                break;
-
-            default:
-                _cmdBuffer = result.getInput();
-                updateCommandDisplay();
-                break;
-        }
+        handleCommandChar( keyAction );
     }
 }
 
@@ -1683,35 +1355,15 @@ ScreenEditor::handleArgumentModeInput( CxKeyAction keyAction )
 void
 ScreenEditor::updateArgumentDisplay( void )
 {
-    // build prompt: "command <hint>: argument"
-    CxString fullLine = _currentCommand->name;
+    // build prompt: "command <hint>: "
+    CxString prefix = _currentCommand->name;
     if (_currentCommand->argHint != NULL) {
-        fullLine += " ";
-        fullLine += _currentCommand->argHint;
+        prefix += " ";
+        prefix += _currentCommand->argHint;
     }
-    fullLine += ": ";
+    prefix += ": ";
 
-    unsigned long promptLen = fullLine.length();
-    fullLine += _argBuffer;
-
-    // truncate or pad to screen width
-    unsigned long targetWidth = screen->cols();
-    if (targetWidth > 2) targetWidth -= 2;
-    if (fullLine.length() > targetWidth) {
-        fullLine = fullLine.subString(0, targetWidth);
-    }
-    while (fullLine.length() < targetWidth) {
-        fullLine += " ";
-    }
-
-    // use default colors (not magenta)
-    screen->resetColors();
-    screen->writeTextAt( screen->rows() - 1, 1, fullLine, true );
-
-    // position cursor after the argument text
-    unsigned long cursorCol = 1 + promptLen + _argBuffer.length();
-    screen->placeCursor( screen->rows() - 1, cursorCol );
-    screen->flush();
+    renderCommandLine( prefix, _argBuffer, prefix.length() + _argBuffer.length() );
 }
 
 
@@ -1743,8 +1395,7 @@ ScreenEditor::executeCurrentCommand( void )
 {
     if (_currentCommand == NULL) {
         setMessage( "(no command)" );
-        _cmdInputState = CMD_INPUT_IDLE;
-        _activeCompleter = &_commandCompleter;
+        resetCommandInputState();
         programMode = ScreenEditor::EDIT;
         return;
     }
@@ -1752,11 +1403,7 @@ ScreenEditor::executeCurrentCommand( void )
     // check if handler exists
     if (_currentCommand->handler == NULL) {
         setMessage( "(command not implemented)" );
-        _cmdInputState = CMD_INPUT_IDLE;
-        _activeCompleter = &_commandCompleter;
-        _currentCommand = NULL;
-        _cmdBuffer = "";
-        _argBuffer = "";
+        resetCommandInputState();
         programMode = ScreenEditor::EDIT;
         editView->placeCursor();
         screen->flush();
@@ -1768,11 +1415,7 @@ ScreenEditor::executeCurrentCommand( void )
     (this->*handler)( _argBuffer );
 
     // clear internal command input state
-    _cmdInputState = CMD_INPUT_IDLE;
-    _activeCompleter = &_commandCompleter;
-    _currentCommand = NULL;
-    _cmdBuffer = "";
-    _argBuffer = "";
+    resetCommandInputState();
 
     // only return to edit mode if handler didn't switch to a different mode
     // (e.g., CMD_Help switches to HELPVIEW, CMD_BufferList switches to FILELIST)
@@ -1781,734 +1424,5 @@ ScreenEditor::executeCurrentCommand( void )
         editView->placeCursor();
         screen->flush();
     }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_NewBuffer:
-//
-// Insert a comment block
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_NewBuffer( CxString commandLine )
-{
-    CxString fileName = commandLine.nextToken(" \t\n");
-
-    char buffer[200];
-    sprintf(buffer, "(new buffer %s loaded)", fileName.data() );
-
-    setMessage( CxString(buffer));
-
-    editView->updateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_CommentBlock:
-//
-// Insert a comment block
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_CommentBlock( CxString commandLine )
-{
-    CxString numberString = commandLine.nextToken(" \t\n");
-    unsigned long lastCol = numberString.toUnsignedLong();
-
-    char buffer[200];
-    sprintf(buffer, "(comment block to column %lu inserted)", lastCol);
-
-    setMessage( CxString(buffer));
-    editView->insertCommentBlock( lastCol );
-    editView->updateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_PasteText:
-//
-// Set the mark used in cut commands
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_PasteText( CxString commandLine )
-{
-    commandLineView->setText("");
-    commandLineView->setPrompt("(text pasted)");
-    editView->pasteText( _cutBuffer );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_SystemPaste:
-//
-// Paste text from the system clipboard (macOS/Linux only)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_SystemPaste( CxString commandLine )
-{
-#if defined(_OSX_) || defined(_LINUX_)
-    CxString clipboardText = pasteFromSystemClipboard();
-    if (clipboardText.length() > 0) {
-        editView->pasteText( clipboardText );
-        setMessage("(pasted from system clipboard)");
-    } else {
-        setMessage("(system clipboard empty)");
-    }
-#else
-    setMessage("(system clipboard not available on this platform)");
-#endif
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_CutToMark:
-//
-// Cuts text from the cursor position to the current mark (if there is one)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_CutToMark( CxString commandLine )
-{
-    commandLineView->setText("");
-    commandLineView->setPrompt("(text cut)");
-    _cutBuffer = editView->cutToMark();
-#if defined(_OSX_) || defined(_LINUX_)
-    copyToSystemClipboard(_cutBuffer);
-#endif
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_SetMark:
-//
-// Set the mark used in cut commands
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_SetMark( CxString commandLine )
-{
-    commandLineView->setText("");
-    commandLineView->setPrompt("(mark set)");
-    editView->setMark();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_GotoLine:
-//
-// Move cursor to entered line number
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_GotoLine( CxString commandLine )
-{
-    CxString numberString = commandLine.nextToken(" \t\n");
-    unsigned long lineNumber = numberString.toUnsignedLong();
-
-    if (lineNumber == 0) lineNumber = 1;
-
-    char buffer[200];
-    sprintf(buffer, "(goto-line %lu)", lineNumber);
-
-    setMessage( CxString(buffer));
-    editView->cursorGotoLine( lineNumber - 1 );
-}
-
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_LoadFile( CxString commandLine )
-//
-// load a file into a newly created buffer
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_LoadFile( CxString commandLine )
-{
-    CxString newFileName = commandLine.nextToken(" \t\n");
-    
-    //CmEditBuffer *editBuffer = editBufferList->current();
-    loadNewFile( newFileName, TRUE );
-    
-    // redraw the edit view
-    editView->reframeAndUpdateScreen();
-    
-    char buffer[200];
-    sprintf( buffer, "(load %s)", newFileName.data());
-    setMessage( buffer );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_SaveFile:
-//
-// Save the current buffer to the filename specified.  If the file name is different than the
-// file path that is held in the editbuffer, the name is changed in the editbuffer and the file
-// is written as a new file.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_SaveFile(CxString commandLine)
-{
-    CxString fileName = commandLine.nextToken(" \t\n");
-    fileName = fileName.stripLeading(" \t\n\r");
-    fileName = fileName.stripTrailing(" \t\n\r");
-
-    CmEditBuffer *editBuffer = editBufferList->current();
-    editBuffer->saveText( fileName );
-    
-    setMessage("(file saved)");
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferNext:
-//
-// Switch to next buffer (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferNext( CxString commandLine )
-{
-    nextBuffer();
-    setMessage("(next buffer)");
-    editView->updateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferPrev:
-//
-// Switch to previous buffer (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferPrev( CxString commandLine )
-{
-    previousBuffer();
-    setMessage("(previous buffer)");
-    editView->updateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferList:
-//
-// Show project/buffer list (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferList( CxString commandLine )
-{
-    fileListView->recalcScreenPlacements();
-    fileListView->redraw();
-    programMode = ScreenEditor::FILELIST;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ListProjectFiles:
-//
-// Show project file list (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ListProjectFiles( CxString commandLine )
-{
-    fileListView->recalcScreenPlacements();
-    fileListView->redraw();
-    programMode = ScreenEditor::FILELIST;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Quit:
-//
-// Quit editor (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Quit( CxString commandLine )
-{
-    setMessage("(quit)");
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
-    }
-
-    // ensure screen is in clean state before exit
-    screen->resetColors();
-    screen->flush();
-    fflush(stdout);
-
-    _quitRequested = TRUE;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Help
-//
-// Show help view (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Help( CxString commandLine )
-{
-    helpTextView->recalcScreenPlacements();
-    helpTextView->redraw();
-    programMode = HELPVIEW;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Count
-//
-// Count lines and characters in the current buffer
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Count( CxString commandLine )
-{
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
-
-    unsigned long lineCount = editBuffer->numberOfLines();
-    unsigned long charCount = editBuffer->characterCount();
-
-    char buffer[200];
-    sprintf(buffer, "(%lu lines, %lu characters)", lineCount, charCount);
-    setMessage(buffer);
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Entab
-//
-// Convert leading spaces to tabs in entire buffer
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Entab( CxString commandLine )
-{
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
-    editBuffer->entab();
-    editView->reframeAndUpdateScreen();
-    setMessage("(entab complete)");
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Detab
-//
-// Convert tabs to spaces in entire buffer
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Detab( CxString commandLine )
-{
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
-    editBuffer->detab();
-    editView->reframeAndUpdateScreen();
-    setMessage("(detab complete)");
-}
-
-
-#ifdef CM_UTF8_SUPPORT
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_InsertUTFBox
-//
-// Insert a box drawing UTF-8 symbol at the cursor position
-// The argument is a short name like "upper-left" which becomes "box-upper-left"
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_InsertUTFBox( CxString commandLine )
-{
-    insertUTFSymbolHelper( commandLine, "box" );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::insertUTFSymbolHelper
-//
-// Common implementation for UTF symbol insertion commands.
-// Uses _currentCommand->symbolFilter to determine the filter prefix.
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::insertUTFSymbolHelper( CxString commandLine, const char *symbolType )
-{
-    CxString shortName = commandLine;
-    shortName = shortName.stripLeading(" \t\n\r");
-    shortName = shortName.stripTrailing(" \t\n\r");
-
-    if (shortName.length() == 0) {
-        setMessage("(no symbol specified)");
-        return;
-    }
-
-    // get filter from current command entry
-    CxString filter = "";
-    if (_currentCommand != NULL && _currentCommand->symbolFilter != NULL) {
-        filter = _currentCommand->symbolFilter;
-    }
-
-    // prepend filter to get full symbol name
-    CxString symbolName = filter;
-    symbolName += shortName;
-
-    UTFSymbolEntry *symbol = UTFSymbols::findExact( symbolName );
-
-    if (symbol == NULL) {
-        char buffer[200];
-        sprintf(buffer, "(unknown %s symbol: %s)", symbolType, shortName.data());
-        setMessage(buffer);
-        return;
-    }
-
-    // insert the UTF-8 character at cursor (as a single character)
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
-    editBuffer->addCharacter( CxString(symbol->utf8) );
-
-    editView->reframeAndUpdateScreen();
-
-    char buffer[200];
-    sprintf(buffer, "(inserted %s)", symbol->name);
-    setMessage(buffer);
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_InsertUTFSymbol
-//
-// Insert a common UTF-8 symbol at the cursor position
-// The argument is a short name like "bullet" which becomes "sym-bullet"
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_InsertUTFSymbol( CxString commandLine )
-{
-    insertUTFSymbolHelper( commandLine, "symbol" );
-}
-#endif
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Find:
-//
-// Find a string in the buffer beyond the current current position
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Find( CxString commandLine )
-{
-//	_findString = commandLine.nextToken(" \t\n");
-    _findString = commandLine;
-    _findString = _findString.stripLeading(" \t\n\r");
-    _findString = _findString.stripTrailing(" \t\n\r");
-    _findString.replaceAll( CxString("/n"), CxString("\n") );
-
-    char buffer[200];
-
-    if(    editView->findString( _findString ) == TRUE ) {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-        
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-        
-    } else {
-        setMessage("(not found)");
-    }
-}
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Replace
-//
-// Performs an initial replace command using the preveous (stored) find string and replacing
-// with the stated replace string.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_Replace(CxString commandLine)
-{
-//    _replaceString = commandLine.nextToken(" \t\n");
-    _replaceString = commandLine;
-
-    _replaceString = _replaceString.stripLeading(" \t\n\r");
-    _replaceString = _replaceString.stripTrailing(" \t\n\r");
-    _replaceString.replaceAll( CxString("/n"), CxString("\n") );
-
-    char buffer[200];
-
-    if( editView->replaceString( _findString, _replaceString ) == TRUE ) {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(replace found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-        
-    } else {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(replace not found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ReplaceAll
-//
-// Replace all occurrences of the previous find string with the replacement string.
-// User must have done a find (ESC f) first to set the find pattern.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ReplaceAll(CxString commandLine)
-{
-    // check if we have a find pattern
-    if (_findString.length() == 0) {
-        setMessage("(no find pattern - use ESC f first)");
-        return;
-    }
-
-    // parse and store the replacement string
-    _replaceString = commandLine;
-    _replaceString = _replaceString.stripLeading(" \t\n\r");
-    _replaceString = _replaceString.stripTrailing(" \t\n\r");
-    _replaceString.replaceAll( CxString("/n"), CxString("\n") );
-
-    // get direct access to editBuffer to avoid per-replacement screen updates
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
-
-    // move cursor to beginning of buffer
-    editBuffer->cursorGotoRequest(0, 0);
-
-    // replace all occurrences - call editBuffer directly to skip screen updates
-    int count = 0;
-    while (editBuffer->replaceAgain(_findString, _replaceString) == TRUE) {
-        count++;
-    }
-
-    // single screen refresh after all replacements
-    editView->reframeAndUpdateScreen();
-
-    // report results
-    char buffer[200];
-    if (count == 0) {
-        sprintf(buffer, "(no occurrences of '%s' found)", _findString.data());
-    } else if (count == 1) {
-        sprintf(buffer, "(1 replacement)");
-    } else {
-        sprintf(buffer, "(%d replacements)", count);
-    }
-    setMessage(buffer);
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// Control command handlers - small focused methods called from dispatch table
-//-------------------------------------------------------------------------------------------------
-
-void ScreenEditor::CTRL_Cut(void)
-{
-    _cutBuffer = editView->cutToMark();
-#if defined(_OSX_) || defined(_LINUX_)
-    copyToSystemClipboard(_cutBuffer);
-#endif
-}
-
-void ScreenEditor::CTRL_Paste(void)
-{
-    editView->pasteText(_cutBuffer);
-}
-
-void ScreenEditor::CTRL_CutToEndOfLine(void)
-{
-    _cutBuffer = editView->cutTextToEndOfLine();
-#if defined(_OSX_) || defined(_LINUX_)
-    copyToSystemClipboard(_cutBuffer);
-#endif
-}
-
-void ScreenEditor::CTRL_PageDown(void)
-{
-    editView->pageDown();
-}
-
-void ScreenEditor::CTRL_PageUp(void)
-{
-    editView->pageUp();
-}
-
-void ScreenEditor::CTRL_NextBuffer(void)
-{
-    nextBuffer();
-}
-
-void ScreenEditor::CTRL_ProjectList(void)
-{
-    fileListView->recalcScreenPlacements();
-    fileListView->redraw();
-    programMode = FILELIST;
-}
-
-void ScreenEditor::CTRL_UpdateScreen(void)
-{
-    editView->updateScreen();
-}
-
-void ScreenEditor::CTRL_Help(void)
-{
-    helpTextView->recalcScreenPlacements();
-    helpTextView->redraw();
-    programMode = HELPVIEW;
-}
-
-void ScreenEditor::CTRLX_Save(void)
-{
-    CmEditBuffer *editBuffer = editBufferList->current();
-    CxString filePath = editBuffer->getFilePath();
-
-    if (filePath.length()) {
-        CMD_SaveFile(filePath);
-    } else {
-        setMessage("(there is no current filename, use ESC s)");
-    }
-}
-
-void ScreenEditor::CTRLX_Quit(void)
-{
-    setMessage("(quit)");
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::dispatchControlX
-//
-// Handle Control-X prefix commands (two-key sequences)
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::dispatchControlX(void)
-{
-    CxKeyAction secondAction = keyboard->getAction();
-
-    // Control-X, Enter - toggle jump scroll
-    if (secondAction.actionType() == CxKeyAction::NEWLINE) {
-        CONTROL_ToggleJumpScroll();
-        editView->placeCursor();
-        screen->flush();
-        return 0;
-    }
-
-    // Must be a control key for other Control-X commands
-    if (secondAction.actionType() != CxKeyAction::CONTROL) {
-        return 0;
-    }
-
-    // Look up in Control-X dispatch table
-    for (int i = 0; _ctrlXCommands[i].tag != NULL; i++) {
-        if (secondAction.tag() == _ctrlXCommands[i].tag) {
-            if (_ctrlXCommands[i].message != NULL) {
-                setMessage(_ctrlXCommands[i].message);
-            }
-            (this->*_ctrlXCommands[i].handler)();
-            editView->placeCursor();
-            screen->flush();
-
-            // Special case: Control-X Control-C (quit) returns 1
-            if (secondAction.tag() == "C") {
-                return 1;
-            }
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::handleControl
-//
-// Dispatch control key commands using lookup tables.
-// Control-X prefix commands are handled by dispatchControlX().
-//
-//-------------------------------------------------------------------------------------------------
-int
-ScreenEditor::handleControl( CxKeyAction keyAction )
-{
-    // Control-X prefix - two-key command sequence
-    if (keyAction.tag() == "X") {
-        return dispatchControlX();
-    }
-
-    // Control-H (backspace) - special case, routes directly to editView
-    if (keyAction.tag() == "H") {
-        editView->routeKeyAction(keyAction);
-        return 0;
-    }
-
-    // Look up in dispatch table
-    for (int i = 0; _controlCommands[i].tag != NULL; i++) {
-        if (keyAction.tag() == _controlCommands[i].tag) {
-            if (_controlCommands[i].message != NULL) {
-                setMessage(_controlCommands[i].message);
-            }
-            (this->*_controlCommands[i].handler)();
-            editView->placeCursor();
-            screen->flush();
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CONTROL_FindAgain
-//
-// Repeat the last find command finding the last find string beyond the current cursor
-// position
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CONTROL_FindAgain( void )
-{
-    char buffer[200];
-    
-    if (editView->findAgain( _findString ) == TRUE ) {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-        
-    } else {
-        
-        CxEditBufferPosition loc = editView->cursorPosition();
-
-        sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
-        CxString locBuffer = CxString("(not found) ") + CxString(buffer);
-        
-        setMessage(locBuffer);
-    }
-    
-    editView->placeCursor();
-    screen->flush();
 }
 

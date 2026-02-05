@@ -189,6 +189,21 @@ private:
 
     int dispatchControlX(void);
 
+    // helper methods to reduce duplication
+    void setMessageWithLocation(CxString prefix);
+    void showFileListView(void);
+    void showHelpView(void);
+    void resetCommandInputState(void);
+
+    // decomposed command input handlers
+    void handleCommandEnter(void);
+    void handleCommandTab(void);
+    void handleCommandChar(CxKeyAction keyAction);
+
+    // decomposed display methods
+    void updateCommandDisplayForSymbol(void);
+    void renderCommandLine(CxString prefix, CxString display, unsigned long cursorOffset);
+
     // command completion
     Completer       _commandCompleter;      // top-level command selection
 #ifdef CM_UTF8_SUPPORT
