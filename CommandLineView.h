@@ -148,10 +148,6 @@ class CommandLineView
     void handleEscape( CxKeyAction keyAction );
 	// handle the escape key
 
-
-    CxSList< CxString > findMatchingCommandNames( CxString partialCommand );
-    CxString commonBeginningCharacters( CxSList< CxString > list);
-
     int _commandLineInputDone;
 
     unsigned long _screenRow;
@@ -174,8 +170,6 @@ class CommandLineView
     ProgramDefaults *_programDefaults;
 
     EditView *_editView;
-
-    CxSList< CxString > _commandList;
 
     AppMode _mode;
  

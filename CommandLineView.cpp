@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  ProgramDefaults.cpp
+//  CommandLineView.cpp
 //  cmacs
 //
 //  Created by Todd Vernon on 6/24/22.
@@ -206,66 +206,6 @@ void CommandLineView::typeText( CxString text )
             updateScreen();
         }
     }
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-// CommandLineView::findMatchingCommandNames
-//
-//---------------------------------------------------------------------------------------------------------
-CxSList< CxString >
-CommandLineView::findMatchingCommandNames( CxString partialCommand )
-{
-    CxSList< CxString > keeperList;
-    CxMatchTemplate temp(partialCommand+CxString("*"));
-
-    for( int i=0; i<_commandList.entries(); i++) {
-        CxString command = _commandList.at(i);
-        if (temp.test(command)) {
-            keeperList.append(command);
-        }
-    }
-
-    return(keeperList);
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-// commandBeginningCharacters
-//
-// returns the leading string that is common to all the strings in the
-// list
-//
-//---------------------------------------------------------------------------------------------------------
-CxString
-CommandLineView::commonBeginningCharacters( CxSList< CxString > list)
-{
-    int shortest = 1000000;
-
-    if (list.entries()==0) {
-        return("");
-    }
-
-    // find the shortest string in the group
-    for (int c=0; c<list.entries(); c++) {
-        if (shortest > list.at(c).length()) {
-            shortest = list.at(c).length();
-        }
-    }
-
-    if (shortest==0) {
-        return("");
-    }
-
-    for (int charPosition=0; charPosition<shortest; charPosition++) {
-        char matchChar = list.at(0).charAt(charPosition);
-        for (int c=1; c<list.entries(); c++) {
-            if (matchChar != list.at(c).charAt(charPosition)) {
-                return( list.at(0).subString(0, charPosition));
-            }
-        }
-    }
-    return( list.at(0).subString(0, shortest));
 }
 
 
