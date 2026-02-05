@@ -224,6 +224,9 @@ class EditView
     EditStatus handleArrows( CxKeyAction keyAction );
     // handles arrow key functions
 
+    void updateAfterEdit( CxEditHint& hint, CxString& lineText );
+    // common pattern for updating display after an edit operation
+
     unsigned long bufferRowToScreenRow(unsigned long bufferRow);
     // translates edit buffer row location to screen locations
 
