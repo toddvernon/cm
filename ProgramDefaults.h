@@ -111,23 +111,10 @@ private:
     int readFile( CxString fname );
     int parse( void );
     
-    int parseColorizeSyntax( CxJSONObject *object );
-
 	int parseTabs( CxJSONObject *object );
-	int parseJumpScroll( CxJSONObject *object );
-    int parseShowLineNumbers( CxJSONObject *object );
-	int parseAutoSaveOnBufferChange( CxJSONObject *object );
-    int parseLiveStatusLine( CxJSONObject *object );
-    
-    int parseCommentTextColor( CxJSONObject *object );
-    int parseStatusBarTextColor( CxJSONObject *object );
-    int parseStatusBarBackgroundColor( CxJSONObject *object );
-    int parseIncludeTextColor( CxJSONObject *object );
-    int parseLineNumberTextColor( CxJSONObject *object );
-    int parseCommandLineMessageTextColor( CxJSONObject *object );
-    int parseCppLanguageTypesTextColor( CxJSONObject *object );
-    int parseCppLanguageElementsTextColor( CxJSONObject *object );
-    int parseCppLanguageMethodDefinitionTextColor( CxJSONObject *object );
+    int parseBooleanField( CxJSONObject *obj, const char *fieldName, int *target );
+    int parseColorFromJSON( CxJSONObject *obj, const char *fieldName,
+                            CxColor **target, int isBackground );
 
     int parseSyntaxColors( CxJSONObject *object );
     int parseSyntaxColorSet( CxJSONObject *colorSet, int langIndex );
@@ -135,8 +122,7 @@ private:
     void initSyntaxColorSet( SyntaxColorSet *colorSet );
     void copySyntaxColorSet( SyntaxColorSet *dest, SyntaxColorSet *src );
 
-    static CxColor *parseForegroundColor( CxString colorName );
-    static CxColor *parseBackgroundColor( CxString colorName );
+    static CxColor *parseColor( CxString colorName, int isBackground );
 
     CxString _data;
 

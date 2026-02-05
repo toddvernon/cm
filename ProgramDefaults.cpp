@@ -189,11 +189,11 @@ ProgramDefaults::loadDefaults( CxString fname )
             //-------------------------------------------------------------------------------------
             CxJSONObject *object = (CxJSONObject *) baseItem;
 			parseTabs( object );
-			parseJumpScroll( object );
-            parseShowLineNumbers( object );
-            parseAutoSaveOnBufferChange( object );
-            parseColorizeSyntax( object );
-            parseLiveStatusLine( object );
+			parseBooleanField( object, "jumpscroll", &_jumpscroll );
+            parseBooleanField( object, "showLineNumbers", &_showLineNumbers );
+            parseBooleanField( object, "autoSaveOnBufferChange", &_autoSaveOnBufferChange );
+            parseBooleanField( object, "colorizeSyntax", &_colorizeSyntax );
+            parseBooleanField( object, "liveStatusLines", &_liveStatusLine );
             
             //-------------------------------------------------------------------------------------
             // get the colors member
@@ -218,16 +218,15 @@ ProgramDefaults::loadDefaults( CxString fname )
                     //
                     //-----------------------------------------------------------------------------
                     CxJSONObject *colorObject = (CxJSONObject *) colorsMember->object();
-                    parseCommentTextColor( colorObject );
-                    parseIncludeTextColor( colorObject );
-                    parseStatusBarTextColor( colorObject );
-                    parseStatusBarBackgroundColor( colorObject );
-                    parseIncludeTextColor( colorObject );
-                    parseLineNumberTextColor( colorObject );
-                    parseCommandLineMessageTextColor( colorObject );
-                    parseCppLanguageTypesTextColor( colorObject );
-                    parseCppLanguageElementsTextColor( colorObject );
-                    parseCppLanguageMethodDefinitionTextColor( colorObject );
+                    parseColorFromJSON(colorObject, "commentTextColor", &_commentTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "statusBarTextColor", &_statusBarTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "statusBarBackgroundColor", &_statusBarBackgroundColor, TRUE);
+                    parseColorFromJSON(colorObject, "includeTextColor", &_includeTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "lineNumberTextColor", &_lineNumberTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "commandLineMessageTextColor", &_commandLineMessageTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "cppLanguageTypesTextColor", &_cppLanguageTypesTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "cppLanguageElementsTextColor", &_cppLanguageElementsTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "cppLanguageMethodDefinitionTextColor", &_cppLanguageMethodDefinitionTextColor, FALSE);
 
                 }
             }
@@ -271,384 +270,39 @@ ProgramDefaults::parseTabs( CxJSONObject *object )
 
 
 //-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseAutoSaveOnBufferChange
+// ProgramDefaults::parseBooleanField
 //
-//
+// Parse a boolean field from a JSON object and assign it to the target pointer.
 //-------------------------------------------------------------------------------------------------
 int
-ProgramDefaults::parseAutoSaveOnBufferChange( CxJSONObject *object )
+ProgramDefaults::parseBooleanField( CxJSONObject *obj, const char *fieldName, int *target )
 {
-    CxJSONMember *member = object->find("autoSaveOnBufferChange");
-    if (member != NULL) {
-        if (member->object()->type() == CxJSONBase::BOOLEAN) {
-            CxJSONBoolean *value  = (CxJSONBoolean *) member->object();
-            _autoSaveOnBufferChange = value->get();
-			return( TRUE );
-      	}
- 	}
-
-	return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseLiveStatusLine
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseLiveStatusLine( CxJSONObject *object )
-{
-    CxJSONMember *member = object->find("liveStatusLines");
-    if (member != NULL) {
-        if (member->object()->type() == CxJSONBase::BOOLEAN) {
-            CxJSONBoolean *value  = (CxJSONBoolean *) member->object();
-            _liveStatusLine = value->get();
-            return( TRUE );
-          }
-     }
-
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseColorizeSyntax
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseColorizeSyntax( CxJSONObject *object )
-{
-    CxJSONMember *member = object->find("colorizeSyntax");
-    if (member != NULL) {
-        if (member->object()->type() == CxJSONBase::BOOLEAN) {
-            CxJSONBoolean *value  = (CxJSONBoolean *) member->object();
-            _colorizeSyntax = value->get();
-            return( TRUE );
-          }
-     }
-
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseJumpScroll
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseJumpScroll( CxJSONObject *object )
-{
-    CxJSONMember *member = object->find("jumpscroll");
-    if (member != NULL) {
-        if (member->object()->type() == CxJSONBase::BOOLEAN) {
-            CxJSONBoolean *value  = (CxJSONBoolean *) member->object();
-            _jumpscroll = value->get();
-			return( TRUE );
-      	}
- 	}
-
-	return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseShowLineNumbers
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseShowLineNumbers( CxJSONObject *object)
-{
-    CxJSONMember *member = object->find("showLineNumbers");
-    if (member != NULL) {
-        if (member->object()->type() == CxJSONBase::BOOLEAN) {
-            CxJSONBoolean *value  = (CxJSONBoolean *) member->object();
-            _showLineNumbers = value->get();
-            return( TRUE );
-        }
-    }
-    return(FALSE);
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseCommentTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseCommentTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *commentTextColorMember =
-        colorObject->find("commentTextColor");
-
-    if (commentTextColorMember != NULL ) {
-        if (commentTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) commentTextColorMember->object();
-
-            CxString commentTextColorName = value->get();
-            
-            _commentTextColor =
-                ProgramDefaults::parseForegroundColor( commentTextColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseStatusBarTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseStatusBarTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *statusBarTextColorMember =
-        colorObject->find("statusBarTextColor");
-
-    if ( statusBarTextColorMember != NULL ) {
-        
-        if (statusBarTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) statusBarTextColorMember->object();
-
-            CxString statusBarTextColorName = value->get();
-            
-            _statusBarTextColor =
-                ProgramDefaults::parseForegroundColor( statusBarTextColorName );
-
-            return (TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseStatusBarBackgroundColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseStatusBarBackgroundColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *statusBarBackgroundColorMember =
-        colorObject->find("statusBarBackgroundColor");
-
-    if ( statusBarBackgroundColorMember != NULL ) {
-
-        if (statusBarBackgroundColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) statusBarBackgroundColorMember->object();
-
-            CxString statusBarBackgroundColorName = value->get();
-            
-            _statusBarBackgroundColor =
-                ProgramDefaults::parseBackgroundColor( statusBarBackgroundColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );    
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseIncludeTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseIncludeTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *includeTextColorMember =
-        colorObject->find("includeTextColor");
-
-    if ( includeTextColorMember != NULL ) {
-
-        if (includeTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) includeTextColorMember->object();
-
-            CxString includeTextColorName = value->get();
-            
-            _includeTextColor =
-                ProgramDefaults::parseForegroundColor( includeTextColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseLineNumberTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseLineNumberTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *lineNumberTextColorMember =
-        colorObject->find("lineNumberTextColor");
-
-    if ( lineNumberTextColorMember != NULL ) {
-
-        if (lineNumberTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) lineNumberTextColorMember->object();
-
-            CxString lineNumberTextColorName = value->get();
-            
-            _lineNumberTextColor =
-                ProgramDefaults::parseForegroundColor( lineNumberTextColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseCommandLineMessageTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseCommandLineMessageTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *commandLineMessageTextColorMember =
-        colorObject->find("commandLineMessageTextColor");
-
-    if ( commandLineMessageTextColorMember != NULL ) {
-
-        if (commandLineMessageTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) commandLineMessageTextColorMember->object();
-
-            CxString commandLineMessageTextColorName = value->get();
-            
-            _commandLineMessageTextColor =
-                ProgramDefaults::parseForegroundColor( commandLineMessageTextColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseCppLanguageTypesTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseCppLanguageTypesTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *_cppLanguageTypesTextColorMember =
-        colorObject->find("cppLanguageTypesTextColor");
-
-
-    if ( _cppLanguageTypesTextColorMember != NULL ) {
-
-        if (_cppLanguageTypesTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) _cppLanguageTypesTextColorMember->object();
-
-            CxString cppLanguageTypesTextColorName = value->get();
-           
-            _cppLanguageTypesTextColor =
-                ProgramDefaults::parseForegroundColor( cppLanguageTypesTextColorName );
-            
-            return( TRUE );
-        }
-    }
-    
-    return( FALSE );
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseCppLanguageElementsTextColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-int
-ProgramDefaults::parseCppLanguageElementsTextColor( CxJSONObject *colorObject )
-{
-    CxJSONMember *_cppLanguageElementsTextColorMember =
-        colorObject->find("cppLanguageElementsTextColor");
-
-    if ( _cppLanguageElementsTextColorMember != NULL ) {
-
-        if (_cppLanguageElementsTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) _cppLanguageElementsTextColorMember->object();
-
-            CxString cppLanguageElementsTextColorName = value->get();
-            
-            _cppLanguageElementsTextColor =
-                ProgramDefaults::parseForegroundColor( cppLanguageElementsTextColorName );
-        }
-        
+    CxJSONMember *member = obj->find( fieldName );
+    if (member != NULL && member->object()->type() == CxJSONBase::BOOLEAN) {
+        CxJSONBoolean *value = (CxJSONBoolean *) member->object();
+        *target = value->get();
         return( TRUE );
     }
-    
     return( FALSE );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseCppLanguageMethodDefinitionTextColor
+// ProgramDefaults::parseColorFromJSON
 //
-//
+// Parse a color field from a JSON object and assign it to the target pointer.
+// isBackground: FALSE = foreground, TRUE = background
 //-------------------------------------------------------------------------------------------------
 int
-ProgramDefaults::parseCppLanguageMethodDefinitionTextColor( CxJSONObject *colorObject )
+ProgramDefaults::parseColorFromJSON( CxJSONObject *obj, const char *fieldName,
+                                     CxColor **target, int isBackground )
 {
-    CxJSONMember *cppLanguageMethodDefinitionTextColorMember =
-        colorObject->find("cppLanguageMethodDefinitionTextColor");
-
-    if ( cppLanguageMethodDefinitionTextColorMember != NULL ) {
-
-        if (cppLanguageMethodDefinitionTextColorMember->object()->type() == CxJSONBase::STRING) {
-
-            CxJSONString *value  =
-                (CxJSONString *) cppLanguageMethodDefinitionTextColorMember->object();
-
-            CxString cppLanguageMethodDefinitionTextColorName = value->get();
-            
-            _cppLanguageMethodDefinitionTextColor =
-                ProgramDefaults::parseForegroundColor( cppLanguageMethodDefinitionTextColorName );
-            
-            return( TRUE );
-        }
+    CxJSONMember *member = obj->find( fieldName );
+    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
+        CxJSONString *value = (CxJSONString *) member->object();
+        *target = ProgramDefaults::parseColor( value->get(), isBackground );
+        return( TRUE );
     }
-    
     return( FALSE );
 }
 
@@ -656,157 +310,63 @@ ProgramDefaults::parseCppLanguageMethodDefinitionTextColor( CxJSONObject *colorO
 //-------------------------------------------------------------------------------------------------
 // ProgramDefaults::parseColor
 //
-//
+// Unified color parser for both foreground and background colors.
+// isBackground: FALSE = foreground, TRUE = background
 //-------------------------------------------------------------------------------------------------
 /* static */
 CxColor *
-ProgramDefaults::parseForegroundColor( CxString colorString )
+ProgramDefaults::parseColor( CxString colorString, int isBackground )
 {
-    // if there is no colon that the color selector is not present and the
-    // hte none color is assigned and returned
+    // if there is no colon the color selector is not present
     if (colorString.firstChar(":") == -1) {
-        CxAnsiColor *color = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
-        return ( color );
+        if (isBackground)
+            return new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+        return new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     }
-    
-    // there is some string before the colon so we assume that is a color
-    // type selector and grab it
+
+    // extract the color type selector before the colon
     CxString colorTypeSelector = colorString.nextToken(" :\t\n\r");
-    
-    //printf("colorTypeSelector = %s\n", colorTypeSelector.data() );
-    
-    // proactively get the next three arguments.  There might be three however
+
+    // proactively get the next three arguments
     CxString item1 = colorString.nextToken(" ,\n\r\t:");
     CxString item2 = colorString.nextToken(" ,\n\r\t:");
     CxString item3 = colorString.nextToken(" ,\n\r\t:");
-    
-    //printf("item1 = %s\n", item1.data() );
-    //printf("item2 = %s\n", item2.data() );
-    //printf("item3 = %s\n", item3.data() );
-    
+
     // if the color type selector is empty
     if (colorTypeSelector.length() == 0) {
-
-        //printf("invalid selector\n");
-
-        CxAnsiColor *color = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
-        return ( color );
+        if (isBackground)
+            return new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+        return new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     }
-    
-    // Now test the color type selector for type ANSI
+
+    // ANSI color type
     if (CxString::toUpper(colorTypeSelector) == "ANSI") {
-        
-        //printf("ansi value = %s\n", item1.data());
+        if (isBackground)
+            return new CxAnsiBackgroundColor( item1 );
+        return new CxAnsiForegroundColor( item1 );
+    }
 
-        CxAnsiColor *color = new CxAnsiForegroundColor( item1 );
-        return ( color );
-    }
-    
-    // Now test the color type selector for the type XTERM256
+    // XTERM256 color type
     if (CxString::toUpper(colorTypeSelector) == "XTERM256") {
-        
-        //printf("xterm256 value = %s\n", item1.data());
-        
-        CxXterm256Color *color = new CxXterm256ForegroundColor( item1 );
-        return( color );
+        if (isBackground)
+            return new CxXterm256BackgroundColor( item1 );
+        return new CxXterm256ForegroundColor( item1 );
     }
-    
-    // Now test the color type selector for RBG
+
+    // RGB color type
     if (CxString::toUpper(colorTypeSelector) == "RGB") {
-        
-        // item is expected to be an rgb value
         int red   = item1.toInt();
         int green = item2.toInt();
         int blue  = item3.toInt();
-        
-        // create the color
-        CxRGBColor *color = new CxRGBForegroundColor( red, green, blue );
-        
-        return( color );
+        if (isBackground)
+            return new CxRGBBackgroundColor( red, green, blue );
+        return new CxRGBForegroundColor( red, green, blue );
     }
-    
-    // something went wrong somewhere so just return the none foreground color
-    CxAnsiColor *color = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
-    return ( color );
-}
 
-
-
-//-------------------------------------------------------------------------------------------------
-// ProgramDefaults::parseColor
-//
-//
-//-------------------------------------------------------------------------------------------------
-/* static */
-CxColor *
-ProgramDefaults::parseBackgroundColor( CxString colorString )
-{
-    // if there is no colon that the color selector is not present and the
-    // hte none color is assigned and returned
-    if (colorString.firstChar(":") == -1) {
-        CxAnsiColor *color = new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
-        return ( color );
-    }
-    
-    // there is some string before the colon so we assume that is a color
-    // type selector and grab it
-    CxString colorTypeSelector = colorString.nextToken(" :\t\n\r");
-    
-    //printf("colorTypeSelector = %s\n", colorTypeSelector.data() );
-    
-    // proactively get the next three arguments.  There might be three however
-    CxString item1 = colorString.nextToken(" ,\n\r\t:");
-    CxString item2 = colorString.nextToken(" ,\n\r\t:");
-    CxString item3 = colorString.nextToken(" ,\n\r\t:");
-    
-    //printf("item1 = %s\n", item1.data() );
-    //printf("item2 = %s\n", item2.data() );
-    //printf("item3 = %s\n", item3.data() );
-    
-    // if the color type selector is empty
-    if (colorTypeSelector.length() == 0) {
-
-        //printf("invalid selector\n");
-
-        CxAnsiColor *color = new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
-        return ( color );
-    }
-    
-    // Now test the color type selector for type ANSI
-    if (CxString::toUpper(colorTypeSelector) == "ANSI") {
-        
-        //printf("ansi value = %s\n", item1.data());
-
-        CxAnsiColor *color = new CxAnsiBackgroundColor( item1 );
-        return ( color );
-    }
-    
-    // Now test the color type selector for the type XTERM256
-    if (CxString::toUpper(colorTypeSelector) == "XTERM256") {
-        
-        //printf("xterm256 value = %s\n", item1.data());
-        
-        CxXterm256Color *color = new CxXterm256BackgroundColor( item1 );
-        return( color );
-    }
-    
-    // Now test the color type selector for RBG
-    if (CxString::toUpper(colorTypeSelector) == "RGB") {
-        
-        // item is expected to be an rgb value
-        int red   = item1.toInt();
-        int green = item2.toInt();
-        int blue  = item3.toInt();
-        
-        // create the color
-        CxRGBColor *color = new CxRGBBackgroundColor( red, green, blue );
-        
-        return( color );
-    }
-    
-    // something went wrong somewhere so just return the none foreground color
-    CxAnsiColor *color = new CxAnsiForegroundColor( CxAnsiBackgroundColor::NONE );
-    return ( color );
+    // fallback: return NONE color of the correct type
+    if (isBackground)
+        return new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+    return new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
 }
 
 
@@ -1074,64 +634,15 @@ ProgramDefaults::parseSyntaxColorSet( CxJSONObject *colorSet, int langIndex )
     }
 
     SyntaxColorSet *colors = &_syntaxColors[langIndex];
-    CxJSONMember *member;
-    CxJSONString *value;
 
-    // commentTextColor
-    member = colorSet->find("commentTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->commentTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // includeTextColor
-    member = colorSet->find("includeTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->includeTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // keywordTextColor
-    member = colorSet->find("keywordTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->keywordTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // typeTextColor
-    member = colorSet->find("typeTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->typeTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // constantTextColor
-    member = colorSet->find("constantTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->constantTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // methodDefinitionTextColor
-    member = colorSet->find("methodDefinitionTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->methodDefinitionTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // stringTextColor
-    member = colorSet->find("stringTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->stringTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
-
-    // numberTextColor
-    member = colorSet->find("numberTextColor");
-    if (member != NULL && member->object()->type() == CxJSONBase::STRING) {
-        value = (CxJSONString *) member->object();
-        colors->numberTextColor = ProgramDefaults::parseForegroundColor( value->get() );
-    }
+    parseColorFromJSON(colorSet, "commentTextColor", &colors->commentTextColor, FALSE);
+    parseColorFromJSON(colorSet, "includeTextColor", &colors->includeTextColor, FALSE);
+    parseColorFromJSON(colorSet, "keywordTextColor", &colors->keywordTextColor, FALSE);
+    parseColorFromJSON(colorSet, "typeTextColor", &colors->typeTextColor, FALSE);
+    parseColorFromJSON(colorSet, "constantTextColor", &colors->constantTextColor, FALSE);
+    parseColorFromJSON(colorSet, "methodDefinitionTextColor", &colors->methodDefinitionTextColor, FALSE);
+    parseColorFromJSON(colorSet, "stringTextColor", &colors->stringTextColor, FALSE);
+    parseColorFromJSON(colorSet, "numberTextColor", &colors->numberTextColor, FALSE);
 
     return( TRUE );
 }
@@ -1205,30 +716,178 @@ ProgramDefaults::writeDefaults(CxString path)
     if (!file.open(path, "w")) {
         return;
     }
-    
-    file.printf((char*) "# .cmrc defaults file: see README for more details\n");
-    file.printf((char*) "# color sytax is ANSI:<ansicolorname>, XTERM256:<xterm256colorname>, RFB:<R><B><G>\n");
-    file.printf((char*) "# not all models work on all computers, specifically older variations of Xterm\n");
-    file.printf((char*) "# --------------------------------------------------------------------------------\n");
-    file.printf((char*) "\n");
-    file.printf((char*) "{\n");
-    file.printf((char*) "    \"tabs\": 4,\n");
-    file.printf((char*) "    \"jumpscroll\": true,\n");
-    file.printf((char*) "    \"showLineNumbers\": true,\n");
-    file.printf((char*) "    \"colorizeSyntax\": true,\n");
-    file.printf((char*) "    \"liveStatusLines\": true,\n");
-    file.printf((char*) "    \"colors\": {\n");
-    file.printf((char*) "        \"statusBarTextColor\":\"ANSI:BRIGHT_WHITE\",\n");
-    file.printf((char*) "        \"statusBarBackgroundColor\":\"ANSI:BLUE\",\n");
-    file.printf((char*) "        \"commentTextColor\":\"ANSI:WHITE\",\n");
-    file.printf((char*) "        \"includeTextColor\":\"ANSI:MAGENTA\",\n");
-    file.printf((char*) "        \"lineNumberTextColor\":\"ANSI:BRIGHT_BLACK\",\n");
-    file.printf((char*) "        \"commandLineMessageTextColor\":\"ANSI:MAGENTA\",\n");
-    file.printf((char*) "        \"cppTypesTextColor\":\"ANSI:BRIGHT_BLUE\",\n");
-    file.printf((char*) "        \"cppLanguageElementsTextColor\":\"ANSI:BRIGHT_YELLOW\",\n");
-    file.printf((char*) "        \"cppLanguageMethodDefinitionTextColor\":\"ANSI:MAGENTA\"\n");
-    file.printf((char*) "    }\n");
-    file.printf((char*) "}\n");
-        
+
+    // platform-specific default color values
+#if defined(_OSX_) || defined(_LINUX_)
+    const char *hdr  = "# Uses RGB true color - requires 24-bit color terminal support";
+    const char *statusFg  = "RGB:250,250,245";
+    const char *statusBg  = "RGB:60,70,100";
+    const char *lineNum   = "RGB:100,100,110";
+    const char *cmdMsg    = "RGB:180,150,220";
+    const char *comment   = "RGB:130,140,150";
+    const char *include   = "RGB:255,150,130";
+    const char *keyword   = "RGB:200,150,255";
+    const char *type      = "RGB:100,220,220";
+    const char *constant  = "RGB:255,180,100";
+    const char *methodDef = "RGB:130,220,130";
+    const char *strColor  = "RGB:150,230,150";
+    const char *number    = "RGB:180,220,255";
+    const char *liveStatus = "true";
+#elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
+    const char *hdr  = "# Uses XTERM 256 color palette for broad terminal compatibility";
+    const char *statusFg  = "XTERM256:White";
+    const char *statusBg  = "XTERM256:DarkBlue";
+    const char *lineNum   = "XTERM256:Grey42";
+    const char *cmdMsg    = "XTERM256:MediumOrchid1";
+    const char *comment   = "XTERM256:Grey54";
+    const char *include   = "XTERM256:Salmon1";
+    const char *keyword   = "XTERM256:MediumPurple1";
+    const char *type      = "XTERM256:DarkTurquoise";
+    const char *constant  = "XTERM256:Orange1";
+    const char *methodDef = "XTERM256:LightGreen";
+    const char *strColor  = "XTERM256:PaleGreen1";
+    const char *number    = "XTERM256:LightSteelBlue1";
+    const char *liveStatus = "false";
+#else
+    const char *hdr  = "# Uses ANSI 16-color palette for maximum terminal compatibility";
+    const char *statusFg  = "ANSI:BRIGHT_WHITE";
+    const char *statusBg  = "ANSI:BLUE";
+    const char *lineNum   = "ANSI:BRIGHT_BLACK";
+    const char *cmdMsg    = "ANSI:BRIGHT_CYAN";
+    const char *comment   = "ANSI:BRIGHT_BLACK";
+    const char *include   = "ANSI:BRIGHT_MAGENTA";
+    const char *keyword   = "ANSI:BRIGHT_YELLOW";
+    const char *type      = "ANSI:BRIGHT_CYAN";
+    const char *constant  = "ANSI:BRIGHT_MAGENTA";
+    const char *methodDef = "ANSI:BRIGHT_GREEN";
+    const char *strColor  = "ANSI:GREEN";
+    const char *number    = "ANSI:CYAN";
+    const char *liveStatus = "false";
+#endif
+
+    file.printf("# .cmrc defaults file\n");
+    file.printf("%s\n", hdr);
+    file.printf("# color syntax is ANSI:<name>, XTERM256:<name>, RGB:<R>,<G>,<B>\n");
+    file.printf("# --------------------------------------------------------------------------------\n");
+    file.printf("\n");
+    file.printf("{\n");
+    file.printf("    \"tabs\": 4,\n");
+    file.printf("    \"jumpscroll\": true,\n");
+    file.printf("    \"showLineNumbers\": true,\n");
+    file.printf("    \"colorizeSyntax\": true,\n");
+    file.printf("    \"liveStatusLines\": %s,\n", liveStatus);
+    file.printf("    \"autoSaveOnBufferChange\": false,\n");
+    file.printf("\n");
+
+    // UI colors
+    file.printf("    \"colors\": {\n");
+    file.printf("        \"statusBarTextColor\": \"%s\",\n", statusFg);
+    file.printf("        \"statusBarBackgroundColor\": \"%s\",\n", statusBg);
+    file.printf("        \"lineNumberTextColor\": \"%s\",\n", lineNum);
+    file.printf("        \"commandLineMessageTextColor\": \"%s\"\n", cmdMsg);
+    file.printf("    },\n");
+    file.printf("\n");
+
+    // syntax colors
+    file.printf("    \"syntaxColors\": {\n");
+    file.printf("        \"default\": {\n");
+    file.printf("            \"commentTextColor\": \"%s\",\n", comment);
+    file.printf("            \"includeTextColor\": \"%s\",\n", include);
+    file.printf("            \"keywordTextColor\": \"%s\",\n", keyword);
+    file.printf("            \"typeTextColor\": \"%s\",\n", type);
+    file.printf("            \"constantTextColor\": \"%s\",\n", constant);
+    file.printf("            \"methodDefinitionTextColor\": \"%s\",\n", methodDef);
+    file.printf("            \"stringTextColor\": \"%s\",\n", strColor);
+    file.printf("            \"numberTextColor\": \"%s\"\n", number);
+    file.printf("        },\n");
+    file.printf("        \"c\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"cpp\": {\n");
+    file.printf("        },\n");
+
+    // per-language overrides vary by platform
+#if defined(_OSX_) || defined(_LINUX_)
+    file.printf("        \"swift\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:255,120,130\",\n");
+    file.printf("            \"typeTextColor\": \"RGB:130,200,255\",\n");
+    file.printf("            \"constantTextColor\": \"RGB:255,200,100\"\n");
+    file.printf("        },\n");
+    file.printf("        \"python\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:255,200,100\",\n");
+    file.printf("            \"methodDefinitionTextColor\": \"RGB:100,180,255\"\n");
+    file.printf("        },\n");
+    file.printf("        \"javascript\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:255,150,180\",\n");
+    file.printf("            \"constantTextColor\": \"RGB:255,200,130\"\n");
+    file.printf("        },\n");
+    file.printf("        \"go\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:100,200,255\",\n");
+    file.printf("            \"typeTextColor\": \"RGB:180,230,180\"\n");
+    file.printf("        },\n");
+    file.printf("        \"rust\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:255,150,100\",\n");
+    file.printf("            \"typeTextColor\": \"RGB:150,220,200\"\n");
+    file.printf("        },\n");
+    file.printf("        \"java\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:255,130,100\",\n");
+    file.printf("            \"typeTextColor\": \"RGB:130,200,230\"\n");
+    file.printf("        },\n");
+    file.printf("        \"shell\": {\n");
+    file.printf("            \"keywordTextColor\": \"RGB:130,200,255\",\n");
+    file.printf("            \"constantTextColor\": \"RGB:255,220,130\"\n");
+    file.printf("        }\n");
+#elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
+    file.printf("        \"swift\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:IndianRed1\",\n");
+    file.printf("            \"typeTextColor\": \"XTERM256:SkyBlue1\",\n");
+    file.printf("            \"constantTextColor\": \"XTERM256:Gold1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"python\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:Gold1\",\n");
+    file.printf("            \"methodDefinitionTextColor\": \"XTERM256:DodgerBlue1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"javascript\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:HotPink\",\n");
+    file.printf("            \"constantTextColor\": \"XTERM256:NavajoWhite1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"go\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:SteelBlue1\",\n");
+    file.printf("            \"typeTextColor\": \"XTERM256:DarkSeaGreen1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"rust\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:DarkOrange\",\n");
+    file.printf("            \"typeTextColor\": \"XTERM256:Aquamarine1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"java\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:Coral\",\n");
+    file.printf("            \"typeTextColor\": \"XTERM256:LightSkyBlue1\"\n");
+    file.printf("        },\n");
+    file.printf("        \"shell\": {\n");
+    file.printf("            \"keywordTextColor\": \"XTERM256:CornflowerBlue\",\n");
+    file.printf("            \"constantTextColor\": \"XTERM256:LightGoldenrod1\"\n");
+    file.printf("        }\n");
+#else
+    file.printf("        \"swift\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"python\": {\n");
+    file.printf("            \"methodDefinitionTextColor\": \"ANSI:BRIGHT_BLUE\"\n");
+    file.printf("        },\n");
+    file.printf("        \"javascript\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"go\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"rust\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"java\": {\n");
+    file.printf("        },\n");
+    file.printf("        \"shell\": {\n");
+    file.printf("            \"keywordTextColor\": \"ANSI:BRIGHT_CYAN\",\n");
+    file.printf("            \"constantTextColor\": \"ANSI:BRIGHT_YELLOW\"\n");
+    file.printf("        }\n");
+#endif
+
+    file.printf("    }\n");
+    file.printf("}\n");
+
     file.close();
 }
