@@ -89,6 +89,7 @@ LIB_CX_KEYBOARD_NAME=libcx_keyboard.a
 LIB_CX_EDITBUFFER_NAME=libcx_editbuffer.a
 LIB_CX_JSON_NAME=libcx_json.a
 LIB_CX_COMPLETER_NAME=libcx_commandcompleter.a
+LIB_CX_REGEX_NAME=libcx_regex.a
 
 CX_LIBS = \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_KEYBOARD_NAME)   \
@@ -119,13 +120,27 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/CommandTable.o         \
 	$(APP_OBJECT_DIR)/UTFSymbols.o
 
-## MCP Bridge (Linux/macOS only) ##############################
+## MCP Support (Linux/macOS only) #############################
 
 ifeq ($(UNAME_S),darwin)
     BUILD_MCP=1
 endif
 ifeq ($(UNAME_S),linux)
     BUILD_MCP=1
+endif
+
+ifdef BUILD_MCP
+    # Add MCP handler object
+    OBJECTS += $(APP_OBJECT_DIR)/MCPHandler.o
+
+    # Add thread, net, and regex libraries for MCP
+    CX_LIBS += \
+        $(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_THREAD_NAME) \
+        $(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_NET_NAME)    \
+        $(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_REGEX_NAME)
+
+    # pthread for threading
+    PLATFORM_LIBS += -lpthread
 endif
 
 MCP_BRIDGE_LIBS = \
@@ -205,6 +220,9 @@ $(APP_OBJECT_DIR)/MarkUpParsing.o	: MarkUpParsing.cpp
 $(APP_OBJECT_DIR)/CommandTable.o	: CommandTable.cpp
 $(APP_OBJECT_DIR)/UTFSymbols.o		: UTFSymbols.cpp
 
+ifdef BUILD_MCP
+$(APP_OBJECT_DIR)/MCPHandler.o		: MCPHandler.cpp
+endif
 
 .PRECIOUS: $(CX_LIBS)
 .SUFFIXES: .cpp .C .cc .cxx .o

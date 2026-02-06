@@ -35,6 +35,10 @@
 #include "CommandTable.h"
 #include <cx/commandcompleter/completer.h>
 
+#if defined(_LINUX_) || defined(_OSX_)
+#include "MCPHandler.h"
+#endif
+
 #ifndef _ScreenEditor_h_
 #define _ScreenEditor_h_
 
@@ -218,6 +222,10 @@ private:
     CxString _argBuffer;            // freeform argument text
     CommandEntry *_currentCommand;  // selected command (after completion)
     int _quitRequested;             // set by CMD_Quit to signal exit
+
+#if defined(_LINUX_) || defined(_OSX_)
+    MCPHandler *_mcpHandler;        // MCP socket handler thread
+#endif
 };
 
 

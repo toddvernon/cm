@@ -1,0 +1,919 @@
+//-------------------------------------------------------------------------------------------------
+//
+// MCPHandler.cpp
+//
+// MCP socket thread - connects to mcp_bridge and handles tool commands
+//
+// Linux and macOS only.
+//
+//-------------------------------------------------------------------------------------------------
+//
+// (c) Copyright 2024 T.Vernon
+// ALL RIGHTS RESERVED
+//
+//-------------------------------------------------------------------------------------------------
+
+#if defined(_LINUX_) || defined(_OSX_)
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "MCPHandler.h"
+#include "ScreenEditor.h"
+
+#include <cx/net/inaddr.h>
+#include <cx/json/json_factory.h>
+#include <cx/json/json_object.h>
+#include <cx/json/json_array.h>
+#include <cx/json/json_string.h>
+#include <cx/json/json_number.h>
+#include <cx/json/json_boolean.h>
+#include <cx/json/json_member.h>
+#include <cx/regex/regex.h>
+
+//-------------------------------------------------------------------------
+// Constants
+//-------------------------------------------------------------------------
+static const int BRIDGE_PORT = 9876;
+static const int RECONNECT_DELAY_SEC = 2;
+
+//-------------------------------------------------------------------------
+// Constructor
+//-------------------------------------------------------------------------
+MCPHandler::MCPHandler(ScreenEditor *editor)
+    : _editor(editor)
+    , _socket(NULL)
+    , _needsRedraw(0)
+    , _shutdownRequested(0)
+{
+}
+
+//-------------------------------------------------------------------------
+// Destructor
+//-------------------------------------------------------------------------
+MCPHandler::~MCPHandler()
+{
+    if (_socket != NULL) {
+        _socket->close();
+        delete _socket;
+        _socket = NULL;
+    }
+}
+
+//-------------------------------------------------------------------------
+// Request shutdown
+//-------------------------------------------------------------------------
+void MCPHandler::shutdown()
+{
+    _shutdownRequested = 1;
+    suggestQuit();  // from CxThread
+
+    // Close socket to unblock recvUntil
+    _mutex.acquire();
+    if (_socket != NULL) {
+        _socket->close();
+    }
+    _mutex.release();
+}
+
+//-------------------------------------------------------------------------
+// Check if screen needs refresh
+//-------------------------------------------------------------------------
+int MCPHandler::needsRedraw()
+{
+    _mutex.acquire();
+    int result = _needsRedraw;
+    _mutex.release();
+    return result;
+}
+
+//-------------------------------------------------------------------------
+// Clear redraw flag
+//-------------------------------------------------------------------------
+void MCPHandler::clearNeedsRedraw()
+{
+    _mutex.acquire();
+    _needsRedraw = 0;
+    _mutex.release();
+}
+
+//-------------------------------------------------------------------------
+// Escape a string for JSON
+//-------------------------------------------------------------------------
+CxString MCPHandler::escapeJSON(CxString text)
+{
+    CxString escaped = "";
+    for (unsigned long i = 0; i < text.length(); i++) {
+        char c = text.charAt(i);
+        switch (c) {
+            case '"':  escaped.append("\\\""); break;
+            case '\\': escaped.append("\\\\"); break;
+            case '\n': escaped.append("\\n"); break;
+            case '\r': escaped.append("\\r"); break;
+            case '\t': escaped.append("\\t"); break;
+            case '\b': escaped.append("\\b"); break;
+            case '\f': escaped.append("\\f"); break;
+            default:
+                if ((unsigned char)c < 0x20) {
+                    // Control character - skip or escape as \uXXXX
+                    char buf[8];
+                    sprintf(buf, "\\u%04x", (unsigned char)c);
+                    escaped.append(buf);
+                } else {
+                    escaped.append(c);
+                }
+                break;
+        }
+    }
+    return escaped;
+}
+
+//-------------------------------------------------------------------------
+// Build success response
+//-------------------------------------------------------------------------
+CxString MCPHandler::buildSuccessResponse(int id, CxString data)
+{
+    CxString response = "{\"id\":";
+    char idBuf[32];
+    sprintf(idBuf, "%d", id);
+    response.append(idBuf);
+    response.append(",\"ok\":true,\"data\":");
+    response.append(data);
+    response.append("}");
+    return response;
+}
+
+//-------------------------------------------------------------------------
+// Build error response
+//-------------------------------------------------------------------------
+CxString MCPHandler::buildErrorResponse(int id, CxString error)
+{
+    CxString response = "{\"id\":";
+    char idBuf[32];
+    sprintf(idBuf, "%d", id);
+    response.append(idBuf);
+    response.append(",\"ok\":false,\"error\":\"");
+    response.append(escapeJSON(error));
+    response.append("\"}");
+    return response;
+}
+
+//-------------------------------------------------------------------------
+// Thread entry point
+//-------------------------------------------------------------------------
+void MCPHandler::run()
+{
+    while (!_suggestQuit && !_shutdownRequested) {
+        // Try to connect to bridge
+        CxSocket *sock = new CxSocket();
+        CxInetAddress addr(BRIDGE_PORT, "127.0.0.1");
+        addr.process();
+
+        if (sock->connect(addr, 5) != 0) {
+            // Connection failed - retry after delay
+            delete sock;
+            for (int i = 0; i < RECONNECT_DELAY_SEC && !_shutdownRequested; i++) {
+                sleep(1);
+            }
+            continue;
+        }
+
+        // Connected
+        _mutex.acquire();
+        _socket = sock;
+        _mutex.release();
+
+        // Main receive loop
+        while (!_suggestQuit && !_shutdownRequested) {
+            CxString line;
+            try {
+                line = _socket->recvUntil('\n');
+            } catch (...) {
+                // Socket error or closed
+                break;
+            }
+
+            if (line.length() == 0) {
+                // Connection closed
+                break;
+            }
+
+            // Parse request
+            line = line.stripTrailing("\n\r");
+            CxJSONBase *json = CxJSONFactory::parse(line);
+            if (json == NULL) {
+                continue;
+            }
+
+            CxJSONObject *request = (CxJSONObject *)json;
+
+            // Get request ID
+            int id = 0;
+            CxJSONMember *idMember = request->find("id");
+            if (idMember != NULL) {
+                CxJSONNumber *idValue = (CxJSONNumber *)idMember->object();
+                id = (int)idValue->get();
+            }
+
+            // Handle command with mutex protection
+            _mutex.acquire();
+            CxString response = handleCommand(request);
+            _mutex.release();
+
+            delete json;
+
+            // Send response
+            response.append("\n");
+            try {
+                _socket->sendAtLeast(response);
+            } catch (...) {
+                break;
+            }
+        }
+
+        // Cleanup socket
+        _mutex.acquire();
+        if (_socket != NULL) {
+            _socket->close();
+            delete _socket;
+            _socket = NULL;
+        }
+        _mutex.release();
+
+        // Brief delay before reconnect attempt
+        if (!_shutdownRequested) {
+            sleep(1);
+        }
+    }
+}
+
+//-------------------------------------------------------------------------
+// Command dispatcher
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleCommand(CxJSONObject *request)
+{
+    // Get request ID
+    int id = 0;
+    CxJSONMember *idMember = request->find("id");
+    if (idMember != NULL) {
+        CxJSONNumber *idValue = (CxJSONNumber *)idMember->object();
+        id = (int)idValue->get();
+    }
+
+    // Get command name
+    CxJSONMember *cmdMember = request->find("cmd");
+    if (cmdMember == NULL) {
+        return buildErrorResponse(id, "missing cmd field");
+    }
+    CxJSONString *cmdValue = (CxJSONString *)cmdMember->object();
+    CxString cmd = cmdValue->get();
+
+    // Get arguments object
+    CxJSONObject *args = NULL;
+    CxJSONMember *argsMember = request->find("args");
+    if (argsMember != NULL) {
+        args = (CxJSONObject *)argsMember->object();
+    }
+
+    // Dispatch to handler
+    if (cmd == "list_buffers") {
+        return handleListBuffers();
+    }
+    else if (cmd == "get_buffer") {
+        CxString bufferId = "";
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+        }
+        return handleGetBuffer(bufferId);
+    }
+    else if (cmd == "get_buffer_range") {
+        CxString bufferId = "";
+        int startLine = 1, endLine = 1;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("start_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                startLine = (int)n->get();
+            }
+            m = args->find("end_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                endLine = (int)n->get();
+            }
+        }
+        return handleGetBufferRange(bufferId, startLine, endLine);
+    }
+    else if (cmd == "replace_range") {
+        CxString bufferId = "", newText = "";
+        int startLine = 1, endLine = 1;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("start_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                startLine = (int)n->get();
+            }
+            m = args->find("end_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                endLine = (int)n->get();
+            }
+            m = args->find("new_text");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                newText = s->get();
+            }
+        }
+        return handleReplaceRange(bufferId, startLine, endLine, newText);
+    }
+    else if (cmd == "insert_lines") {
+        CxString bufferId = "", text = "";
+        int beforeLine = 1;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("before_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                beforeLine = (int)n->get();
+            }
+            m = args->find("text");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                text = s->get();
+            }
+        }
+        return handleInsertLines(bufferId, beforeLine, text);
+    }
+    else if (cmd == "delete_lines") {
+        CxString bufferId = "";
+        int startLine = 1, endLine = 1;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("start_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                startLine = (int)n->get();
+            }
+            m = args->find("end_line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                endLine = (int)n->get();
+            }
+        }
+        return handleDeleteLines(bufferId, startLine, endLine);
+    }
+    else if (cmd == "find_in_buffer") {
+        CxString bufferId = "", pattern = "";
+        int isRegex = 0, caseInsensitive = 0;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("pattern");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                pattern = s->get();
+            }
+            m = args->find("is_regex");
+            if (m != NULL) {
+                CxJSONBoolean *b = (CxJSONBoolean *)m->object();
+                isRegex = b->get() ? 1 : 0;
+            }
+            m = args->find("case_insensitive");
+            if (m != NULL) {
+                CxJSONBoolean *b = (CxJSONBoolean *)m->object();
+                caseInsensitive = b->get() ? 1 : 0;
+            }
+        }
+        return handleFindInBuffer(bufferId, pattern, isRegex, caseInsensitive);
+    }
+    else if (cmd == "find_and_replace") {
+        CxString bufferId = "", pattern = "", replacement = "";
+        int isRegex = 0, caseInsensitive = 0, maxReplacements = 0;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("pattern");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                pattern = s->get();
+            }
+            m = args->find("replacement");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                replacement = s->get();
+            }
+            m = args->find("is_regex");
+            if (m != NULL) {
+                CxJSONBoolean *b = (CxJSONBoolean *)m->object();
+                isRegex = b->get() ? 1 : 0;
+            }
+            m = args->find("case_insensitive");
+            if (m != NULL) {
+                CxJSONBoolean *b = (CxJSONBoolean *)m->object();
+                caseInsensitive = b->get() ? 1 : 0;
+            }
+            m = args->find("max_replacements");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                maxReplacements = (int)n->get();
+            }
+        }
+        return handleFindAndReplace(bufferId, pattern, replacement, isRegex, caseInsensitive, maxReplacements);
+    }
+    else if (cmd == "open_file") {
+        CxString path = "";
+        if (args != NULL) {
+            CxJSONMember *m = args->find("path");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                path = s->get();
+            }
+        }
+        return handleOpenFile(path);
+    }
+    else if (cmd == "save_buffer") {
+        CxString bufferId = "";
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+        }
+        return handleSaveBuffer(bufferId);
+    }
+    else if (cmd == "get_cursor") {
+        return handleGetCursor();
+    }
+    else {
+        return buildErrorResponse(id, CxString("unknown command: ") + cmd);
+    }
+}
+
+//-------------------------------------------------------------------------
+// list_buffers - List all open buffers
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleListBuffers()
+{
+    CxString result = "[";
+    int first = 1;
+
+    CmEditBufferList *bufList = _editor->editBufferList;
+    int count = bufList->items();
+
+    for (int i = 0; i < count; i++) {
+        CmEditBuffer *buf = bufList->at(i);
+        if (buf == NULL) continue;
+
+        if (!first) result.append(",");
+        first = 0;
+
+        result.append("{\"buffer_id\":\"");
+        result.append(escapeJSON(buf->getFilePath()));
+        result.append("\",\"path\":\"");
+        result.append(escapeJSON(buf->getFilePath()));
+        result.append("\",\"modified\":");
+        result.append(buf->isTouched() ? "true" : "false");
+        result.append("}");
+    }
+
+    result.append("]");
+    return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// get_buffer - Get full buffer contents
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleGetBuffer(CxString bufferId)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    CxString content = buf->flattenBuffer();
+    CxString result = "\"";
+    result.append(escapeJSON(content));
+    result.append("\"");
+
+    return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// get_buffer_range - Get a range of lines
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleGetBufferRange(CxString bufferId, int startLine, int endLine)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    unsigned long lineCount = buf->numberOfLines();
+
+    // Convert to 0-based, clamp to valid range
+    int start = startLine - 1;
+    int end = endLine - 1;
+    if (start < 0) start = 0;
+    if (end < 0) end = 0;
+    if ((unsigned long)start >= lineCount) start = lineCount - 1;
+    if ((unsigned long)end >= lineCount) end = lineCount - 1;
+    if (start > end) {
+        return buildErrorResponse(0, "invalid line range");
+    }
+
+    CxString content = "";
+    for (int i = start; i <= end; i++) {
+        CxUTFString *line = buf->line(i);
+        if (line != NULL) {
+            if (i > start) content.append("\n");
+            content.append(line->toBytes());
+        }
+    }
+
+    CxString result = "\"";
+    result.append(escapeJSON(content));
+    result.append("\"");
+
+    return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// replace_range - Replace a range of lines
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleReplaceRange(CxString bufferId, int startLine, int endLine, CxString newText)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    unsigned long lineCount = buf->numberOfLines();
+
+    // Convert to 0-based
+    int start = startLine - 1;
+    int end = endLine - 1;
+    if (start < 0) start = 0;
+    if (end < 0) end = 0;
+    if ((unsigned long)start >= lineCount) {
+        return buildErrorResponse(0, "start line out of range");
+    }
+    if ((unsigned long)end >= lineCount) end = lineCount - 1;
+
+    // Position cursor at start of range
+    buf->cursorGotoRequest(start, 0);
+    buf->setMark();
+
+    // Position cursor at end of range (end of last line)
+    CxUTFString *lastLine = buf->line(end);
+    unsigned long lastCol = lastLine ? lastLine->charCount() : 0;
+    buf->cursorGotoRequest(end, lastCol);
+
+    // Delete the marked range
+    buf->deleteText();
+
+    // Insert new text
+    buf->insertTextAtCursor(newText);
+
+    _needsRedraw = 1;
+
+    char msg[64];
+    sprintf(msg, "\"replaced lines %d-%d\"", startLine, endLine);
+    return buildSuccessResponse(0, msg);
+}
+
+//-------------------------------------------------------------------------
+// insert_lines - Insert text before a line
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleInsertLines(CxString bufferId, int beforeLine, CxString text)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    // Convert to 0-based
+    int lineNum = beforeLine - 1;
+    if (lineNum < 0) lineNum = 0;
+
+    // Position cursor at start of the line
+    buf->cursorGotoRequest(lineNum, 0);
+
+    // Insert text followed by newline
+    buf->insertTextAtCursor(text);
+    buf->addReturn();
+
+    _needsRedraw = 1;
+
+    // Count lines inserted
+    int lineCount = 1;
+    for (unsigned long i = 0; i < text.length(); i++) {
+        if (text.charAt(i) == '\n') lineCount++;
+    }
+
+    char msg[64];
+    sprintf(msg, "\"inserted %d lines before line %d\"", lineCount, beforeLine);
+    return buildSuccessResponse(0, msg);
+}
+
+//-------------------------------------------------------------------------
+// delete_lines - Delete a range of lines
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleDeleteLines(CxString bufferId, int startLine, int endLine)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    unsigned long lineCount = buf->numberOfLines();
+
+    // Convert to 0-based
+    int start = startLine - 1;
+    int end = endLine - 1;
+    if (start < 0) start = 0;
+    if (end < 0) end = 0;
+    if ((unsigned long)start >= lineCount) {
+        return buildErrorResponse(0, "start line out of range");
+    }
+    if ((unsigned long)end >= lineCount) end = lineCount - 1;
+
+    // Position cursor at start of range
+    buf->cursorGotoRequest(start, 0);
+    buf->setMark();
+
+    // Position cursor at start of line after range (or end of buffer)
+    if ((unsigned long)(end + 1) < lineCount) {
+        buf->cursorGotoRequest(end + 1, 0);
+    } else {
+        // Deleting to end of buffer
+        CxUTFString *lastLine = buf->line(end);
+        unsigned long lastCol = lastLine ? lastLine->charCount() : 0;
+        buf->cursorGotoRequest(end, lastCol);
+    }
+
+    // Delete the marked range
+    buf->deleteText();
+
+    _needsRedraw = 1;
+
+    char msg[64];
+    sprintf(msg, "\"deleted lines %d-%d\"", startLine, endLine);
+    return buildSuccessResponse(0, msg);
+}
+
+//-------------------------------------------------------------------------
+// find_in_buffer - Search for pattern in buffer
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleFindInBuffer(CxString bufferId, CxString pattern, int isRegex, int caseInsensitive)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    CxString result = "[";
+    int first = 1;
+
+    CxRegex regex;
+    if (isRegex) {
+        if (regex.compile(pattern, caseInsensitive) != 0) {
+            return buildErrorResponse(0, CxString("invalid regex: ") + regex.getError());
+        }
+    }
+
+    unsigned long lineCount = buf->numberOfLines();
+    for (unsigned long i = 0; i < lineCount; i++) {
+        CxUTFString *lineObj = buf->line(i);
+        if (lineObj == NULL) continue;
+
+        CxString lineText = lineObj->toBytes();
+        int matched = 0;
+
+        if (isRegex) {
+            matched = regex.match(lineText);
+        } else {
+            // Simple string search
+            if (caseInsensitive) {
+                matched = (CxString::toLower(lineText).index(CxString::toLower(pattern)) >= 0) ? 1 : 0;
+            } else {
+                matched = (lineText.index(pattern) >= 0) ? 1 : 0;
+            }
+        }
+
+        if (matched) {
+            if (!first) result.append(",");
+            first = 0;
+
+            char lineBuf[32];
+            sprintf(lineBuf, "%lu", i + 1);  // 1-based
+
+            result.append("{\"line\":");
+            result.append(lineBuf);
+            result.append(",\"text\":\"");
+            result.append(escapeJSON(lineText));
+            result.append("\"}");
+        }
+    }
+
+    result.append("]");
+    return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// find_and_replace - Find and replace in buffer
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleFindAndReplace(CxString bufferId, CxString pattern, CxString replacement,
+                                           int isRegex, int caseInsensitive, int maxReplacements)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    CxRegex regex;
+    if (isRegex) {
+        if (regex.compile(pattern, caseInsensitive) != 0) {
+            return buildErrorResponse(0, CxString("invalid regex: ") + regex.getError());
+        }
+    }
+
+    int totalReplacements = 0;
+    unsigned long lineCount = buf->numberOfLines();
+
+    for (unsigned long i = 0; i < lineCount; i++) {
+        if (maxReplacements > 0 && totalReplacements >= maxReplacements) break;
+
+        CxUTFString *lineObj = buf->line(i);
+        if (lineObj == NULL) continue;
+
+        CxString lineText = lineObj->toBytes();
+        CxString newLine;
+
+        if (isRegex) {
+            newLine = regexReplaceAll(lineText, pattern, replacement, caseInsensitive);
+        } else {
+            // Simple string replace
+            newLine = lineText;
+            if (caseInsensitive) {
+                // Case-insensitive literal replace is more complex
+                // For now, just do case-sensitive
+                newLine = lineText.replaceAll(pattern, replacement);
+            } else {
+                newLine = lineText.replaceAll(pattern, replacement);
+            }
+        }
+
+        if (newLine != lineText) {
+            // Replace line content by positioning cursor and rewriting
+            buf->cursorGotoRequest(i, 0);
+            buf->setMark();
+            CxUTFString *currentLine = buf->line(i);
+            unsigned long lineLen = currentLine ? currentLine->charCount() : 0;
+            buf->cursorGotoRequest(i, lineLen);
+            buf->deleteText();
+            buf->insertTextAtCursor(newLine);
+            totalReplacements++;
+        }
+    }
+
+    if (totalReplacements > 0) {
+        _needsRedraw = 1;
+    }
+
+    char msg[128];
+    sprintf(msg, "{\"replacements\":%d,\"message\":\"replaced %d occurrences\"}",
+            totalReplacements, totalReplacements);
+    return buildSuccessResponse(0, msg);
+}
+
+//-------------------------------------------------------------------------
+// open_file - Open a file in the editor
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleOpenFile(CxString path)
+{
+    if (path.length() == 0) {
+        return buildErrorResponse(0, "path is required");
+    }
+
+    // Check if already open
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *existing = bufList->findPath(path);
+    if (existing != NULL) {
+        // Already open, just return success
+        CxString result = "\"";
+        result.append(escapeJSON(path));
+        result.append(" already open\"");
+        return buildSuccessResponse(0, result);
+    }
+
+    // Load file
+    int loaded = _editor->loadNewFile(path, 0);
+    if (!loaded) {
+        return buildErrorResponse(0, CxString("failed to open file: ") + path);
+    }
+
+    _needsRedraw = 1;
+
+    CxString result = "\"opened ";
+    result.append(escapeJSON(path));
+    result.append("\"");
+    return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// save_buffer - Save a buffer to disk
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleSaveBuffer(CxString bufferId)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    CxString filePath = buf->getFilePath();
+    if (filePath.length() == 0) {
+        return buildErrorResponse(0, "buffer has no file path");
+    }
+
+    buf->saveText(filePath);
+
+    return buildSuccessResponse(0, "\"saved\"");
+}
+
+//-------------------------------------------------------------------------
+// get_cursor - Get current cursor position
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleGetCursor()
+{
+    // Get current buffer from edit view
+    CmEditBuffer *buf = _editor->editView->getEditBuffer();
+    if (buf == NULL) {
+        return buildErrorResponse(0, "no active buffer");
+    }
+
+    CxEditBufferPosition pos = _editor->editView->cursorPosition();
+
+    CxString result = "{\"buffer_id\":\"";
+    result.append(escapeJSON(buf->getFilePath()));
+    result.append("\",\"line\":");
+
+    char lineBuf[32];
+    sprintf(lineBuf, "%lu", pos.row + 1);  // 1-based
+    result.append(lineBuf);
+
+    result.append(",\"col\":");
+    sprintf(lineBuf, "%lu", pos.col + 1);  // 1-based
+    result.append(lineBuf);
+
+    result.append("}");
+
+    return buildSuccessResponse(0, result);
+}
+
+#endif // _LINUX_ || _OSX_

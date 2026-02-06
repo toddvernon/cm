@@ -60,6 +60,9 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _activeCompleter = NULL;
     _currentCommand = NULL;
     _quitRequested = FALSE;
+#if defined(_LINUX_) || defined(_OSX_)
+    _mcpHandler = NULL;
+#endif
 
     programMode = ScreenEditor::EDIT;
 
@@ -264,6 +267,15 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
 
+#if defined(_LINUX_) || defined(_OSX_)
+    //---------------------------------------------------------------------------------------------
+    // Start MCP handler thread for Claude Desktop integration
+    //
+    //---------------------------------------------------------------------------------------------
+    _mcpHandler = new MCPHandler(this);
+    _mcpHandler->start();
+#endif
+
     // Unblock SIGWINCH now that construction is complete
     sigprocmask(SIG_SETMASK, &oldSet, NULL);
 
@@ -334,6 +346,16 @@ ScreenEditor::initCommandCompleters( void )
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::~ScreenEditor(void)
 {
+#if defined(_LINUX_) || defined(_OSX_)
+    // Shutdown MCP handler thread
+    if (_mcpHandler != NULL) {
+        _mcpHandler->shutdown();
+        _mcpHandler->join();
+        delete _mcpHandler;
+        _mcpHandler = NULL;
+    }
+#endif
+
     delete programDefaults;
     delete commandLineView;
     delete editView;
@@ -465,7 +487,19 @@ ScreenEditor::run(void)
         // get the next key
         //-----------------------------------------------------------------------------------------
         CxKeyAction keyAction = keyboard->getAction();
-        
+
+#if defined(_LINUX_) || defined(_OSX_)
+        //-----------------------------------------------------------------------------------------
+        // check if MCP handler modified buffers and needs a redraw
+        //-----------------------------------------------------------------------------------------
+        if (_mcpHandler != NULL && _mcpHandler->needsRedraw()) {
+            _mcpHandler->clearNeedsRedraw();
+            editView->reframeAndUpdateScreen();
+            editView->placeCursor();
+            screen->flush();
+        }
+#endif
+
         //-----------------------------------------------------------------------------------------
         // based on the edit mode call a different focus routine
         //-----------------------------------------------------------------------------------------
