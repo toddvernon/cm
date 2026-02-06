@@ -214,7 +214,14 @@ static CxString getToolsList() {
 
         "{\"name\":\"get_cursor\","
         "\"description\":\"Get current cursor position and active buffer\","
-        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}"
+        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},"
+
+        "{\"name\":\"goto_line\","
+        "\"description\":\"Move cursor to a specific line in a buffer and scroll to make it visible\","
+        "\"inputSchema\":{\"type\":\"object\",\"properties\":{"
+        "\"buffer_id\":{\"type\":\"string\",\"description\":\"Buffer identifier (file path)\"},"
+        "\"line\":{\"type\":\"integer\",\"description\":\"1-based line number to go to\"}},"
+        "\"required\":[\"buffer_id\",\"line\"]}}"
         "]}"
     );
 }

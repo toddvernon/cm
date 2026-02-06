@@ -59,6 +59,7 @@ private:
     CxString handleOpenFile(CxString path);
     CxString handleSaveBuffer(CxString bufferId);
     CxString handleGetCursor();
+    CxString handleGotoLine(CxString bufferId, int line);
 
     // Response builders
     CxString buildSuccessResponse(int id, CxString data);

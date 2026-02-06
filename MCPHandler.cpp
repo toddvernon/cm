@@ -166,81 +166,100 @@ CxString MCPHandler::buildErrorResponse(int id, CxString error)
 void MCPHandler::run()
 {
     while (!_suggestQuit && !_shutdownRequested) {
-        // Try to connect to bridge
-        CxSocket *sock = new CxSocket();
-        CxInetAddress addr(BRIDGE_PORT, "127.0.0.1");
-        addr.process();
+        try {
+            // Try to connect to bridge
+            CxSocket *sock = new CxSocket();
+            CxInetAddress addr(BRIDGE_PORT, "127.0.0.1");
+            addr.process();
 
-        if (sock->connect(addr, 5) != 0) {
-            // Connection failed - retry after delay
-            delete sock;
-            for (int i = 0; i < RECONNECT_DELAY_SEC && !_shutdownRequested; i++) {
-                sleep(1);
-            }
-            continue;
-        }
-
-        // Connected
-        _mutex.acquire();
-        _socket = sock;
-        _mutex.release();
-
-        // Main receive loop
-        while (!_suggestQuit && !_shutdownRequested) {
-            CxString line;
-            try {
-                line = _socket->recvUntil('\n');
-            } catch (...) {
-                // Socket error or closed
-                break;
-            }
-
-            if (line.length() == 0) {
-                // Connection closed
-                break;
-            }
-
-            // Parse request
-            line = line.stripTrailing("\n\r");
-            CxJSONBase *json = CxJSONFactory::parse(line);
-            if (json == NULL) {
+            if (sock->connect(addr, 5) != 0) {
+                // Connection failed - retry after delay
+                delete sock;
+                for (int i = 0; i < RECONNECT_DELAY_SEC && !_shutdownRequested; i++) {
+                    sleep(1);
+                }
                 continue;
             }
 
-            CxJSONObject *request = (CxJSONObject *)json;
-
-            // Get request ID
-            int id = 0;
-            CxJSONMember *idMember = request->find("id");
-            if (idMember != NULL) {
-                CxJSONNumber *idValue = (CxJSONNumber *)idMember->object();
-                id = (int)idValue->get();
-            }
-
-            // Handle command with mutex protection
+            // Connected
             _mutex.acquire();
-            CxString response = handleCommand(request);
+            _socket = sock;
             _mutex.release();
 
-            delete json;
+            // Main receive loop
+            while (!_suggestQuit && !_shutdownRequested) {
+                CxString line;
+                try {
+                    line = _socket->recvUntil('\n');
+                } catch (...) {
+                    // Socket error or closed
+                    break;
+                }
 
-            // Send response
-            response.append("\n");
-            try {
-                _socket->sendAtLeast(response);
-            } catch (...) {
-                break;
+                if (line.length() == 0) {
+                    // Connection closed
+                    break;
+                }
+
+                // Parse request
+                line = line.stripTrailing("\n\r");
+                CxJSONBase *json = CxJSONFactory::parse(line);
+                if (json == NULL) {
+                    // Send error response for unparseable JSON
+                    CxString errorResp = "{\"id\":0,\"ok\":false,\"error\":\"JSON parse error\"}\n";
+                    try {
+                        _socket->sendAtLeast(errorResp);
+                    } catch (...) {
+                        break;
+                    }
+                    continue;
+                }
+
+                CxJSONObject *request = (CxJSONObject *)json;
+
+                // Get request ID
+                int id = 0;
+                CxJSONMember *idMember = request->find("id");
+                if (idMember != NULL) {
+                    CxJSONNumber *idValue = (CxJSONNumber *)idMember->object();
+                    id = (int)idValue->get();
+                }
+
+                // Handle command with mutex protection
+                _mutex.acquire();
+                CxString response = handleCommand(request);
+                _mutex.release();
+
+                delete json;
+
+                // Send response
+                response.append("\n");
+                try {
+                    _socket->sendAtLeast(response);
+                } catch (...) {
+                    break;
+                }
             }
-        }
 
-        // Cleanup socket
-        _mutex.acquire();
-        if (_socket != NULL) {
-            _socket->close();
-            delete _socket;
-            _socket = NULL;
+            // Cleanup socket
+            _mutex.acquire();
+            if (_socket != NULL) {
+                _socket->close();
+                delete _socket;
+                _socket = NULL;
+            }
+            _mutex.release();
+
+        } catch (...) {
+            // Catch any other socket exceptions
+            _mutex.acquire();
+            if (_socket != NULL) {
+                try { _socket->close(); } catch (...) {}
+                delete _socket;
+                _socket = NULL;
+            }
+            _mutex.release();
         }
-        _mutex.release();
 
         // Brief delay before reconnect attempt
         if (!_shutdownRequested) {
@@ -473,6 +492,23 @@ CxString MCPHandler::handleCommand(CxJSONObject *request)
     }
     else if (cmd == "get_cursor") {
         return handleGetCursor();
+    }
+    else if (cmd == "goto_line") {
+        CxString bufferId = "";
+        int line = 1;
+        if (args != NULL) {
+            CxJSONMember *m = args->find("buffer_id");
+            if (m != NULL) {
+                CxJSONString *s = (CxJSONString *)m->object();
+                bufferId = s->get();
+            }
+            m = args->find("line");
+            if (m != NULL) {
+                CxJSONNumber *n = (CxJSONNumber *)m->object();
+                line = (int)n->get();
+            }
+        }
+        return handleGotoLine(bufferId, line);
     }
     else {
         return buildErrorResponse(id, CxString("unknown command: ") + cmd);
@@ -914,6 +950,42 @@ CxString MCPHandler::handleGetCursor()
     result.append("}");
 
     return buildSuccessResponse(0, result);
+}
+
+//-------------------------------------------------------------------------
+// goto_line - Move cursor to a specific line
+//-------------------------------------------------------------------------
+CxString MCPHandler::handleGotoLine(CxString bufferId, int line)
+{
+    CmEditBufferList *bufList = _editor->editBufferList;
+    CmEditBuffer *buf = bufList->findPath(bufferId);
+
+    if (buf == NULL) {
+        return buildErrorResponse(0, CxString("buffer not found: ") + bufferId);
+    }
+
+    // Check if this is the current buffer
+    CmEditBuffer *currentBuf = _editor->editView->getEditBuffer();
+    if (currentBuf != buf) {
+        return buildErrorResponse(0, "buffer is not the active buffer");
+    }
+
+    // Convert to 0-based
+    int lineNum = line - 1;
+    if (lineNum < 0) lineNum = 0;
+    unsigned long lineCount = buf->numberOfLines();
+    if ((unsigned long)lineNum >= lineCount) {
+        lineNum = lineCount - 1;
+    }
+
+    // Move cursor using EditView's method which handles screen scrolling
+    _editor->editView->cursorGotoLine(lineNum);
+
+    _needsRedraw = 1;
+
+    char msg[64];
+    sprintf(msg, "\"moved to line %d\"", line);
+    return buildSuccessResponse(0, msg);
 }
 
 #endif // _LINUX_ || _OSX_
