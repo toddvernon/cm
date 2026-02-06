@@ -119,6 +119,20 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/CommandTable.o         \
 	$(APP_OBJECT_DIR)/UTFSymbols.o
 
+## MCP Bridge (Linux/macOS only) ##############################
+
+ifeq ($(UNAME_S),darwin)
+    BUILD_MCP=1
+endif
+ifeq ($(UNAME_S),linux)
+    BUILD_MCP=1
+endif
+
+MCP_BRIDGE_LIBS = \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_JSON_NAME) \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_NET_NAME) \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_BASE_NAME)
+
 ## Targets ####################################################
 
 
@@ -126,6 +140,20 @@ ALL: MAKE_OBJ_DIR $(APP_OBJECT_DIR)/cm
 
 MAKE_OBJ_DIR:
 	test -d $(APP_OBJECT_DIR) || mkdir $(APP_OBJECT_DIR)
+
+ifdef BUILD_MCP
+.PHONY: mcp_bridge
+mcp_bridge: MAKE_OBJ_DIR
+	$(CPP) $(CPPFLAGS) $(INC) mcp_bridge.cpp -o $(APP_OBJECT_DIR)/mcp_bridge $(MCP_BRIDGE_LIBS)
+ifeq ($(UNAME_S), darwin)
+	xattr -cr $(APP_OBJECT_DIR)/mcp_bridge
+endif
+	@echo "Built mcp_bridge"
+else
+.PHONY: mcp_bridge
+mcp_bridge:
+	@echo "mcp_bridge: skipping (not Linux/macOS)"
+endif
 
 
 cleanupmac:
