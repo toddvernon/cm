@@ -46,12 +46,6 @@ EditView::updateStatusLine(void)
     statusLineTextLeft += editBuffer->getFilePath();
     statusLineTextLeft += " ] ";
 
-#if defined(_LINUX_) || defined(_OSX_)
-    if (_mcpConnected) {
-        statusLineTextLeft += "[MCP] ";
-    }
-#endif
-
     //---------------------------------------------------------------------------------------------
     // do the line part of the status line
     //
@@ -64,8 +58,21 @@ EditView::updateStatusLine(void)
 
         char buffer[100];
 
-        sprintf(buffer, " line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
+#if defined(_LINUX_) || defined(_OSX_)
+        // Add Claude connection indicator on the right side
+        if (_mcpConnected) {
+            statusLineTextRight += "[ Claude ] ";
+        }
+#endif
+
+        sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
         CxString linePartString = buffer;
+
+        // Pad linePartString to fixed width (22 chars for max "line(10000,10000,100%)")
+        // so [ Claude ] indicator stays in a fixed position
+        while (linePartString.length() < 22) {
+            linePartString = CxString("=") + linePartString;
+        }
 
         //---------------------------------------------------------------------------------------------
         // do the col part of the status line, we pad the col part so the line of text doesn't
@@ -80,7 +87,7 @@ EditView::updateStatusLine(void)
             colPartString += "=";
         }
 
-        statusLineTextRight = linePartString + CxString(" ") + colPartString;
+        statusLineTextRight += linePartString + CxString(" ") + colPartString;
 
     }
 
