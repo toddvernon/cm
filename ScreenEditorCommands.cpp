@@ -468,6 +468,25 @@ ScreenEditor::CMD_Detab( CxString commandLine )
 }
 
 
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_TrimTrailing
+//
+// Remove trailing whitespace from all lines in buffer
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_TrimTrailing( CxString commandLine )
+{
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    int removed = editBuffer->trimTrailing();
+    editView->reframeAndUpdateScreen();
+
+    char msg[80];
+    sprintf(msg, "(%d trailing character%s removed)", removed, removed == 1 ? "" : "s");
+    setMessage(msg);
+}
+
+
 #ifdef CM_UTF8_SUPPORT
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_InsertUTFBox

@@ -63,6 +63,13 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_Detab,
       NULL },
 
+    { "trim-trailing",
+      NULL,
+      "Remove trailing whitespace from all lines",
+      0,
+      &ScreenEditor::CMD_TrimTrailing,
+      NULL },
+
     //---------------------------------------------------------------------------------------------
     // UTF symbol insertion (modern platforms only)
     //---------------------------------------------------------------------------------------------

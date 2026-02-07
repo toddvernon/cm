@@ -249,12 +249,15 @@ void MCPHandler::run()
 {
     while (!_suggestQuit && !_shutdownRequested) {
         try {
-            // Try to connect to bridge
+            // Check shutdown before attempting connect (which can block)
+            if (_shutdownRequested) break;
+
+            // Try to connect to bridge (1 second timeout for faster shutdown)
             CxSocket *sock = new CxSocket();
             CxInetAddress addr(BRIDGE_PORT, "127.0.0.1");
             addr.process();
 
-            if (sock->connect(addr, 5) != 0) {
+            if (sock->connect(addr, 1) != 0) {
                 // Connection failed - retry after delay
                 delete sock;
                 for (int i = 0; i < RECONNECT_DELAY_SEC && !_shutdownRequested; i++) {
