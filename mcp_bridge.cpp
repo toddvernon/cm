@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <sstream>
+#include <sys/socket.h>
 
 #include <cx/base/string.h>
 #include <cx/net/socket.h>
@@ -552,6 +553,10 @@ int main(int argc, char* argv[]) {
     CxSocket serverSocket;
     CxInetAddress addr(BRIDGE_PORT, "127.0.0.1");
     addr.process();
+
+    // Allow port reuse so new bridge can start even if old one just exited
+    int reuseAddr = 1;
+    setsockopt(serverSocket.fd(), SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(reuseAddr));
 
     if (serverSocket.bind(addr) != 0) {
         logError("Failed to bind to port");
