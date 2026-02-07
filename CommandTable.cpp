@@ -71,6 +71,23 @@ CommandEntry commandTable[] = {
       NULL },
 
     //---------------------------------------------------------------------------------------------
+    // Build commands
+    //---------------------------------------------------------------------------------------------
+    { "make",
+      "[target]",
+      "Run make and capture output to *build* buffer",
+      CMD_FLAG_OPTIONAL_ARG,
+      &ScreenEditor::CMD_Make,
+      NULL },
+
+    { "goto-error",
+      NULL,
+      "Jump to file:line from error message under cursor",
+      0,
+      &ScreenEditor::CMD_GotoError,
+      NULL },
+
+    //---------------------------------------------------------------------------------------------
     // UTF symbol insertion (modern platforms only)
     //---------------------------------------------------------------------------------------------
 #ifdef CM_UTF8_SUPPORT

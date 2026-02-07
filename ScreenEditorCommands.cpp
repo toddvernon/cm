@@ -16,6 +16,8 @@
 #include "ScreenEditor.h"
 #include "Project.h"
 
+#include <cx/process/process.h>
+
 #ifdef CM_UTF8_SUPPORT
 #include "UTFSymbols.h"
 #endif
@@ -483,6 +485,143 @@ ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 
     char msg[80];
     sprintf(msg, "(%d trailing character%s removed)", removed, removed == 1 ? "" : "s");
+    setMessage(msg);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Make
+//
+// Run make (or make <target>) and capture output to *build* buffer.
+// The buffer is created if it doesn't exist, or reused if it does.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Make( CxString commandLine )
+{
+    // Build the command - "make" or "make <target>"
+    CxString command = "make";
+    if (commandLine.length() > 0) {
+        command += " ";
+        command += commandLine;
+    }
+
+    setMessage(CxString("(running: ") + command + ")");
+    screen->flush();
+
+    // Run the command
+    CxProcess proc;
+    int result = proc.run(command);
+
+    if (result != 0) {
+        setMessage("(make: failed to execute command)");
+        return;
+    }
+
+    CxString output = proc.getOutput();
+
+    // Find or create the *build* buffer
+    CmEditBuffer *buildBuffer = editBufferList->findPath("*build*");
+
+    if (buildBuffer == NULL) {
+        // Create new buffer
+        buildBuffer = new CmEditBuffer();
+        buildBuffer->setFilePath("*build*");
+        editBufferList->add(buildBuffer);
+    } else {
+        // Clear existing buffer and reload with new output
+        buildBuffer->reset();
+    }
+
+    // Load output into buffer
+    buildBuffer->loadTextFromString(output);
+
+    // Switch to build buffer
+    editView->setEditBuffer(buildBuffer);
+    buildBuffer->cursorGotoRequest(0, 0);
+    editView->reframeAndUpdateScreen();
+
+    // Report result
+    int exitCode = proc.getExitCode();
+    char msg[80];
+    if (exitCode == 0) {
+        sprintf(msg, "(make: success, %lu lines)", buildBuffer->numberOfLines());
+    } else {
+        sprintf(msg, "(make: exit code %d, %lu lines - use goto-error to jump)",
+                exitCode, buildBuffer->numberOfLines());
+    }
+    setMessage(msg);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_GotoError
+//
+// Parse the current line for a file:line: pattern and jump to that location.
+// Loads the file if not already open.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_GotoError( CxString commandLine )
+{
+    CmEditBuffer *editBuffer = editView->getEditBuffer();
+
+    // Get current line
+    unsigned long cursorRow = editBuffer->cursor.row;
+    if (cursorRow >= editBuffer->numberOfLines()) {
+        setMessage("(no error pattern found)");
+        return;
+    }
+
+#ifdef CM_UTF8_SUPPORT
+    CxUTFString *utfLine = editBuffer->line(cursorRow);
+    if (utfLine == NULL) {
+        setMessage("(no error pattern found)");
+        return;
+    }
+    CxString line = utfLine->toBytes();
+#else
+    CxString *linePtr = editBuffer->line(cursorRow);
+    if (linePtr == NULL) {
+        setMessage("(no error pattern found)");
+        return;
+    }
+    CxString line = *linePtr;
+#endif
+
+    // Parse the line for error pattern
+    CxBuildError err = CxProcess::parseBuildError(line);
+
+    if (!err.valid) {
+        setMessage("(no error pattern found on this line)");
+        return;
+    }
+
+    // Check if file is already open
+    CmEditBuffer *targetBuffer = editBufferList->findPath(err.filename);
+
+    if (targetBuffer == NULL) {
+        // Load the file
+        int loaded = loadNewFile(err.filename, 1);
+        if (!loaded) {
+            setMessage(CxString("(cannot open file: ") + err.filename + ")");
+            return;
+        }
+        targetBuffer = editView->getEditBuffer();
+    } else {
+        // Switch to the buffer
+        editView->setEditBuffer(targetBuffer);
+    }
+
+    // Go to the line (convert 1-based to 0-based)
+    unsigned long targetLine = (err.line > 0) ? err.line - 1 : 0;
+    unsigned long targetCol = (err.column > 0) ? err.column - 1 : 0;
+
+    targetBuffer->cursorGotoRequest(targetLine, targetCol);
+    editView->reframeAndUpdateScreen();
+
+    char msg[120];
+    sprintf(msg, "(%s:%d)", err.filename.data(), err.line);
     setMessage(msg);
 }
 

@@ -90,12 +90,14 @@ LIB_CX_EDITBUFFER_NAME=libcx_editbuffer.a
 LIB_CX_JSON_NAME=libcx_json.a
 LIB_CX_COMPLETER_NAME=libcx_commandcompleter.a
 LIB_CX_REGEX_NAME=libcx_regex.a
+LIB_CX_PROCESS_NAME=libcx_process.a
 
 CX_LIBS = \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_KEYBOARD_NAME)   \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_SCREEN_NAME)     \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_EDITBUFFER_NAME) \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_COMPLETER_NAME)  \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_PROCESS_NAME)    \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_JSON_NAME)
 
 # Base library must come last - other libs depend on it (e.g., net uses CxError)

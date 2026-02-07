@@ -138,6 +138,8 @@ class ScreenEditor {
     void CMD_Entab( CxString commandLine );
     void CMD_Detab( CxString commandLine );
     void CMD_TrimTrailing( CxString commandLine );
+    void CMD_Make( CxString commandLine );
+    void CMD_GotoError( CxString commandLine );
 #ifdef CM_UTF8_SUPPORT
     void CMD_InsertUTFBox( CxString commandLine );
     void CMD_InsertUTFSymbol( CxString commandLine );
