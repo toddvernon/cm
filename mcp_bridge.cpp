@@ -48,31 +48,119 @@ static const char* SERVER_VERSION = "1.0.0";
 static CxSocket* g_editorSocket = NULL;
 static int g_editorConnected = 0;
 static int g_nextRequestId = 1;
+static FILE* g_debugLog = NULL;
 
 //-------------------------------------------------------------------------
-// Logging to stderr
+// Debug log file
+//-------------------------------------------------------------------------
+static void openDebugLog() {
+    g_debugLog = fopen("/tmp/mcp_bridge.log", "a");
+    if (g_debugLog) {
+        fprintf(g_debugLog, "\n========== mcp_bridge started ==========\n");
+        fflush(g_debugLog);
+    }
+}
+
+static void closeDebugLog() {
+    if (g_debugLog) {
+        fprintf(g_debugLog, "========== mcp_bridge exiting ==========\n");
+        fclose(g_debugLog);
+        g_debugLog = NULL;
+    }
+}
+
+//-------------------------------------------------------------------------
+// Logging to stderr and debug file
 //-------------------------------------------------------------------------
 static void logMsg(const char* msg) {
     fprintf(stderr, "[mcp_bridge] %s\n", msg);
     fflush(stderr);
+    if (g_debugLog) {
+        fprintf(g_debugLog, "[mcp_bridge] %s\n", msg);
+        fflush(g_debugLog);
+    }
 }
 
 static void logMsg(CxString msg) {
     fprintf(stderr, "[mcp_bridge] %s\n", msg.data());
     fflush(stderr);
+    if (g_debugLog) {
+        fprintf(g_debugLog, "[mcp_bridge] %s\n", msg.data());
+        fflush(g_debugLog);
+    }
 }
 
 static void logError(const char* msg) {
     fprintf(stderr, "[mcp_bridge] ERROR: %s\n", msg);
     fflush(stderr);
+    if (g_debugLog) {
+        fprintf(g_debugLog, "[mcp_bridge] ERROR: %s\n", msg);
+        fflush(g_debugLog);
+    }
+}
+
+//-------------------------------------------------------------------------
+// Pretty print JSON for debug log
+//-------------------------------------------------------------------------
+static void prettyPrintJSON(FILE* f, const char* prefix, const char* json) {
+    fprintf(f, "%s ", prefix);
+    int indent = 0;
+    int inString = 0;
+    char prev = 0;
+
+    for (const char* p = json; *p; p++) {
+        char c = *p;
+
+        // Track string state (handle escaped quotes)
+        if (c == '"' && prev != '\\') {
+            inString = !inString;
+        }
+
+        if (!inString) {
+            if (c == '{' || c == '[') {
+                fprintf(f, "%c\n", c);
+                indent += 2;
+                for (int i = 0; i < indent; i++) fputc(' ', f);
+            } else if (c == '}' || c == ']') {
+                fprintf(f, "\n");
+                indent -= 2;
+                for (int i = 0; i < indent; i++) fputc(' ', f);
+                fprintf(f, "%c", c);
+            } else if (c == ',') {
+                fprintf(f, ",\n");
+                for (int i = 0; i < indent; i++) fputc(' ', f);
+            } else if (c == ':') {
+                fprintf(f, ": ");
+            } else {
+                fputc(c, f);
+            }
+        } else {
+            fputc(c, f);
+        }
+        prev = c;
+    }
+    fprintf(f, "\n");
+    fflush(f);
 }
 
 //-------------------------------------------------------------------------
 // Send JSON-RPC response to stdout
 //-------------------------------------------------------------------------
 static void sendResponse(CxString json) {
+    if (g_debugLog) {
+        prettyPrintJSON(g_debugLog, ">>", json.data());
+    }
     printf("%s\n", json.data());
     fflush(stdout);
+}
+
+//-------------------------------------------------------------------------
+// Log incoming request
+//-------------------------------------------------------------------------
+static void logRequest(CxString line) {
+    if (g_debugLog) {
+        prettyPrintJSON(g_debugLog, "<<", line.data());
+    }
 }
 
 //-------------------------------------------------------------------------
@@ -236,11 +324,23 @@ static CxString jsonToString(CxJSONBase* json) {
 }
 
 //-------------------------------------------------------------------------
+// Forward declaration for connection check
+//-------------------------------------------------------------------------
+static void checkForEditorConnection(CxSocket* serverSocket);
+static CxSocket* g_serverSocket = NULL;  // Reference to server socket for reconnection
+
+//-------------------------------------------------------------------------
 // Forward tool call to editor and get response
 //-------------------------------------------------------------------------
 static CxString forwardToEditor(CxString toolName, CxString argsJson) {
     if (!g_editorConnected || g_editorSocket == NULL) {
-        return buildToolResult("editor not connected", 1);
+        // Try to accept a pending connection before giving up
+        if (g_serverSocket != NULL) {
+            checkForEditorConnection(g_serverSocket);
+        }
+        if (!g_editorConnected || g_editorSocket == NULL) {
+            return buildToolResult("editor not connected", 1);
+        }
     }
 
     // Build request for editor
@@ -253,9 +353,25 @@ static CxString forwardToEditor(CxString toolName, CxString argsJson) {
     try {
         g_editorSocket->sendAtLeast(reqBuf);
     } catch (...) {
-        logError("Failed to send to editor");
+        logError("Failed to send to editor - checking for reconnection");
         g_editorConnected = 0;
-        return buildToolResult("editor connection lost", 1);
+        // Try to accept a new connection (editor may have restarted)
+        if (g_serverSocket != NULL) {
+            checkForEditorConnection(g_serverSocket);
+            if (g_editorConnected) {
+                // Retry with new connection
+                try {
+                    g_editorSocket->sendAtLeast(reqBuf);
+                } catch (...) {
+                    g_editorConnected = 0;
+                    return buildToolResult("editor connection lost", 1);
+                }
+            } else {
+                return buildToolResult("editor connection lost", 1);
+            }
+        } else {
+            return buildToolResult("editor connection lost", 1);
+        }
     }
 
     // Read response (newline-delimited JSON)
@@ -263,8 +379,12 @@ static CxString forwardToEditor(CxString toolName, CxString argsJson) {
     try {
         response = g_editorSocket->recvUntil('\n');
     } catch (...) {
-        logError("Failed to read from editor");
+        logError("Failed to read from editor - checking for reconnection");
         g_editorConnected = 0;
+        // Try to accept a new connection (editor may have restarted)
+        if (g_serverSocket != NULL) {
+            checkForEditorConnection(g_serverSocket);
+        }
         return buildToolResult("editor not responding", 1);
     }
 
@@ -335,6 +455,9 @@ static CxString handleToolsCall(CxJSONObject* params) {
 // Process a JSON-RPC request
 //-------------------------------------------------------------------------
 static void processRequest(CxString line) {
+    // Log incoming request
+    logRequest(line);
+
     // Parse JSON
     CxJSONBase* json = CxJSONFactory::parse(line);
     if (json == NULL) {
@@ -420,6 +543,9 @@ int main(int argc, char* argv[]) {
     // Ignore SIGPIPE (broken pipe)
     signal(SIGPIPE, SIG_IGN);
 
+    // Open debug log
+    openDebugLog();
+
     logMsg("Starting MCP bridge");
 
     // Create server socket
@@ -440,6 +566,9 @@ int main(int argc, char* argv[]) {
     char msg[256];
     sprintf(msg, "Listening on port %d", BRIDGE_PORT);
     logMsg(msg);
+
+    // Store server socket reference for reconnection handling
+    g_serverSocket = &serverSocket;
 
     // Main loop: read from stdin, process requests
     char inputBuf[65536];
@@ -464,6 +593,7 @@ int main(int argc, char* argv[]) {
     }
     serverSocket.close();
 
+    closeDebugLog();
     return 0;
 }
 

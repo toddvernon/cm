@@ -22,7 +22,9 @@
 #include <cx/net/socket.h>
 #include <cx/thread/thread.h>
 #include <cx/thread/mutex.h>
+#include <cx/thread/cond.h>
 #include <cx/json/json_object.h>
+#include "CmTypes.h"
 
 class ScreenEditor;
 
@@ -42,7 +44,15 @@ public:
     int needsRedraw();      // Check if screen needs refresh
     void clearNeedsRedraw();
 
+    CxString getStatusMessage();   // Get pending status message (thread-safe)
+    void clearStatusMessage();     // Clear the status message
+
+    int isConnected();             // Check if connected to mcp_bridge
+
+    void processPendingRequest();  // Called from main thread to process queued request
+
 private:
+    void setStatusMessage(CxString msg);  // Set status message (called from handlers)
     // Command dispatch
     CxString handleCommand(CxJSONObject *request);
 
@@ -66,12 +76,24 @@ private:
     CxString buildErrorResponse(int id, CxString error);
     CxString escapeJSON(CxString text);
 
+    // Helper to find buffer by path or filename
+    CmEditBuffer* findBuffer(CxString bufferId);
+
     // State
     ScreenEditor *_editor;
     CxSocket *_socket;
     CxMutex _mutex;
+    CxCondition _condition;
     int _needsRedraw;
     int _shutdownRequested;
+    CxString _statusMessage;
+    int _connected;
+
+    // Request queue for main thread execution
+    CxJSONObject *_pendingRequest;
+    CxString _pendingResponse;
+    int _requestReady;
+    int _responseReady;
 };
 
 #endif // _LINUX_ || _OSX_

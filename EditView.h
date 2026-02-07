@@ -133,7 +133,12 @@ class EditView
     
     void toggleJumpScroll( void );
     // turns jump scrolling on and off
-    
+
+#if defined(_LINUX_) || defined(_OSX_)
+    void setMcpConnected( int connected );
+    // set MCP connection status for status bar display
+#endif
+
   private:
 
     void screenResizeCallback( void );
@@ -282,6 +287,11 @@ class EditView
     
     // a boolean that tells the window its too small to draw itself
     int _windowTooSmall;
+
+#if defined(_LINUX_) || defined(_OSX_)
+    int _mcpConnected;
+    // is MCP bridge connected
+#endif
 
 };
 

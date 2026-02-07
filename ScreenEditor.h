@@ -225,6 +225,7 @@ private:
 
 #if defined(_LINUX_) || defined(_OSX_)
     MCPHandler *_mcpHandler;        // MCP socket handler thread
+    void mcpIdleCallback();         // Called during keyboard idle to check for MCP updates
 #endif
 };
 

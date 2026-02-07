@@ -274,6 +274,9 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //---------------------------------------------------------------------------------------------
     _mcpHandler = new MCPHandler(this);
     _mcpHandler->start();
+
+    // Register idle callback to check for MCP screen updates (~100ms intervals)
+    keyboard->addIdleCallback( CxDeferCall( this, &ScreenEditor::mcpIdleCallback ));
 #endif
 
     // Unblock SIGWINCH now that construction is complete
@@ -361,6 +364,44 @@ ScreenEditor::~ScreenEditor(void)
     delete editView;
     // Note: screen and keyboard are owned by main(), not deleted here
 }
+
+
+#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::mcpIdleCallback
+//
+// Called during keyboard idle (~100ms intervals) to check if MCP handler modified buffers
+// and needs a screen refresh. This allows the screen to update without waiting for a keypress.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::mcpIdleCallback(void)
+{
+    if (_mcpHandler != NULL) {
+        // Process any pending MCP request on the main thread
+        // This ensures thread safety - editor data is only accessed from main thread
+        _mcpHandler->processPendingRequest();
+
+        // Update MCP connection status for status bar
+        editView->setMcpConnected(_mcpHandler->isConnected());
+
+        if (_mcpHandler->needsRedraw()) {
+            _mcpHandler->clearNeedsRedraw();
+
+            // Display any status message from MCP command
+            CxString statusMsg = _mcpHandler->getStatusMessage();
+            if (statusMsg.length() > 0) {
+                setMessage(statusMsg);
+                _mcpHandler->clearStatusMessage();
+            }
+
+            editView->reframeAndUpdateScreen();
+            editView->placeCursor();
+            screen->flush();
+        }
+    }
+}
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

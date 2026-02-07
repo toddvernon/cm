@@ -46,6 +46,12 @@ EditView::updateStatusLine(void)
     statusLineTextLeft += editBuffer->getFilePath();
     statusLineTextLeft += " ] ";
 
+#if defined(_LINUX_) || defined(_OSX_)
+    if (_mcpConnected) {
+        statusLineTextLeft += "[MCP] ";
+    }
+#endif
+
     //---------------------------------------------------------------------------------------------
     // do the line part of the status line
     //
@@ -58,7 +64,7 @@ EditView::updateStatusLine(void)
 
         char buffer[100];
 
-        sprintf(buffer, " line(%lu,%lu,%.0lf%%)", row, numberOfLines, percent);
+        sprintf(buffer, " line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
         CxString linePartString = buffer;
 
         //---------------------------------------------------------------------------------------------

@@ -45,7 +45,12 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
     
     // set the jumpScroll variable from defaults
     _jumpScroll = pd->jumpScroll();
-    
+
+#if defined(_LINUX_) || defined(_OSX_)
+    // MCP connection status (updated by ScreenEditor)
+    _mcpConnected = 0;
+#endif
+
     // there is not initial editbuffer, the next step creates it.
     editBuffer = NULL;
 
@@ -227,6 +232,21 @@ EditView::toggleJumpScroll(void)
         _jumpScroll = TRUE;
     }
 }
+
+
+#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::setMcpConnected
+//
+// Set MCP connection status for status bar display
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::setMcpConnected(int connected)
+{
+    _mcpConnected = connected;
+}
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

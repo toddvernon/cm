@@ -51,6 +51,7 @@ ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
 // ScreenEditor::loadNewFile
 //
 // load a new file into a new buffer and make it the viewable buffer
+// Returns: 1 on success, 0 on failure
 //
 //-------------------------------------------------------------------------------------------------
 int
@@ -96,6 +97,9 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 // set the edit buffer in the edit view
                 editView->setEditBuffer( editBuffer );
 
+                commandLineView->updateScreen();
+                return(1);  // Success - existing buffer
+
             // we did not find an edit buffer in the list, so create a new one
             // referencing that file path
             } else {
@@ -125,13 +129,16 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 // set teh editbuffer in the edit view
                 editView->setEditBuffer( editBuffer );
 
+                commandLineView->updateScreen();
+                return(1);  // Success - new buffer created
+
             }
         }
     }
 
     commandLineView->updateScreen();
 
-    return(0);
+    return(0);  // Failure - empty path or checkFile failed
 }
 
 //-------------------------------------------------------------------------------------------------
