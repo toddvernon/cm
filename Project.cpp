@@ -133,9 +133,6 @@ Project::load( CxString fname )
     // read the defaults file
     //
     //---------------------------------------------------------------------------------------------
-    // Store the file path for later retrieval
-    _projectFilePath = fname;
-
     if (readFile( fname ) == false ) {
         return( false );
     }
@@ -318,17 +315,4 @@ CxString
 Project::fileAt( int c )
 {
     return( _fileList.at( c ));
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// Project::projectFilePath
-//
-// Returns the path to the .project file
-//
-//-------------------------------------------------------------------------------------------------
-CxString
-Project::projectFilePath(void)
-{
-    return (_projectFilePath);
 }

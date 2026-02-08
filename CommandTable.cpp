@@ -260,6 +260,13 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_ProjectShow,
       NULL },
 
+    { "show-build",
+      NULL,
+      "Show build output (Ctrl-B)",
+      0,
+      &ScreenEditor::CMD_ShowBuild,
+      NULL },
+
     //---------------------------------------------------------------------------------------------
     // Split screen commands
     //---------------------------------------------------------------------------------------------

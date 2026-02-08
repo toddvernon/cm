@@ -15,8 +15,10 @@
 #include "CommandLineView.h"
 #include "ScreenEditor.h"
 #include "Project.h"
+#include "BuildView.h"
 
 #include <cx/process/process.h>
+#include <cx/buildoutput/buildoutput.h>
 
 #ifdef CM_UTF8_SUPPORT
 #include "UTFSymbols.h"
@@ -479,13 +481,20 @@ ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_ProjectMake
 //
-// Run make (or make <target>) and capture output to *build* buffer.
-// The buffer is created if it doesn't exist, or reused if it does.
+// Run make (or make <target>) with streaming output in BuildView.
+// Uses non-blocking I/O to show output as it arrives.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ScreenEditor::CMD_ProjectMake( CxString commandLine )
 {
+    // Check if a build is already running
+    if (buildOutput->isRunning()) {
+        setMessage("(build already running)");
+        showBuildView();
+        return;
+    }
+
     // Build the command - "make" or "make <target>"
     CxString command = "make";
     if (commandLine.length() > 0) {
@@ -493,107 +502,51 @@ ScreenEditor::CMD_ProjectMake( CxString commandLine )
         command += commandLine;
     }
 
-    setMessage(CxString("(running: ") + command + ")");
-    screen->flush();
-
-    // Run the command
-    CxProcess proc;
-    int result = proc.run(command);
+    // Start the non-blocking build
+    int result = buildOutput->start(command);
 
     if (result != 0) {
         setMessage("(make: failed to execute command)");
         return;
     }
 
-    CxString output = proc.getOutput();
+    // Set the build status prefix for command line
+    _buildStatusPrefix = "(Building...)";
 
-    // Find or create the *build* buffer
-    CmEditBuffer *buildBuffer = editBufferList->findPath("*build*");
-
-    if (buildBuffer == NULL) {
-        // Create new buffer
-        buildBuffer = new CmEditBuffer();
-        buildBuffer->setFilePath("*build*");
-        editBufferList->add(buildBuffer);
-    } else {
-        // Clear existing buffer and reload with new output
-        buildBuffer->reset();
-    }
-
-    // Load output into buffer
-    buildBuffer->loadTextFromString(output);
-
-    // Switch to build buffer
-    activeEditView()->setEditBuffer(buildBuffer);
-    buildBuffer->cursorGotoRequest(0, 0);
-    activeEditView()->reframeAndUpdateScreen();
-
-    // Report result
-    int exitCode = proc.getExitCode();
-    char msg[80];
-    if (exitCode == 0) {
-        sprintf(msg, "(make: success, %lu lines)", buildBuffer->numberOfLines());
-    } else {
-        sprintf(msg, "(make: exit code %d, %lu lines - use goto-error to jump)",
-                exitCode, buildBuffer->numberOfLines());
-    }
-    setMessage(msg);
+    // Show the build view immediately
+    showBuildView();
 }
 
 
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_ProjectClean
 //
-// Run make clean and capture output to *build* buffer.
+// Run make clean with streaming output in BuildView.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ScreenEditor::CMD_ProjectClean( CxString commandLine )
 {
-    setMessage("(running: make clean)");
-    screen->flush();
+    // Check if a build is already running
+    if (buildOutput->isRunning()) {
+        setMessage("(build already running)");
+        showBuildView();
+        return;
+    }
 
-    // Run the command
-    CxProcess proc;
-    int result = proc.run("make clean");
+    // Start the non-blocking clean
+    int result = buildOutput->start("make clean");
 
     if (result != 0) {
         setMessage("(make clean: failed to execute command)");
         return;
     }
 
-    CxString output = proc.getOutput();
+    // Set the build status prefix for command line
+    _buildStatusPrefix = "(Cleaning...)";
 
-    // Find or create the *build* buffer
-    CmEditBuffer *buildBuffer = editBufferList->findPath("*build*");
-
-    if (buildBuffer == NULL) {
-        // Create new buffer
-        buildBuffer = new CmEditBuffer();
-        buildBuffer->setFilePath("*build*");
-        editBufferList->add(buildBuffer);
-    } else {
-        // Clear existing buffer and reload with new output
-        buildBuffer->reset();
-    }
-
-    // Load output into buffer
-    buildBuffer->loadTextFromString(output);
-
-    // Switch to build buffer
-    activeEditView()->setEditBuffer(buildBuffer);
-    buildBuffer->cursorGotoRequest(0, 0);
-    activeEditView()->reframeAndUpdateScreen();
-
-    // Report result
-    int exitCode = proc.getExitCode();
-    char msg[80];
-    if (exitCode == 0) {
-        sprintf(msg, "(make clean: success)");
-    } else {
-        sprintf(msg, "(make clean: exit code %d)", exitCode);
-    }
-    setMessage(msg);
+    // Show the build view immediately
+    showBuildView();
 }
 
 
@@ -607,6 +560,40 @@ void
 ScreenEditor::CMD_ProjectShow( CxString commandLine )
 {
     showProjectView();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ShowBuild
+//
+// Show the build output view (current or previous build results).
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ShowBuild( CxString commandLine )
+{
+    if (buildOutput->lineCount() == 0 && !buildOutput->isRunning()) {
+        setMessage("(no build output to show)");
+        return;
+    }
+    showBuildView();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CTRL_ShowBuild
+//
+// Show the build output view (Ctrl-B shortcut).
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CTRL_ShowBuild(void)
+{
+    if (buildOutput->lineCount() == 0 && !buildOutput->isRunning()) {
+        setMessage("(no build output to show)");
+        return;
+    }
+    showBuildView();
 }
 
 

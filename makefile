@@ -91,6 +91,7 @@ LIB_CX_JSON_NAME=libcx_json.a
 LIB_CX_COMPLETER_NAME=libcx_commandcompleter.a
 LIB_CX_REGEX_NAME=libcx_regex.a
 LIB_CX_PROCESS_NAME=libcx_process.a
+LIB_CX_BUILDOUTPUT_NAME=libcx_buildoutput.a
 
 CX_LIBS = \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_KEYBOARD_NAME)   \
@@ -98,6 +99,7 @@ CX_LIBS = \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_EDITBUFFER_NAME) \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_COMPLETER_NAME)  \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_PROCESS_NAME)    \
+	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_BUILDOUTPUT_NAME) \
 	$(LIB_CX_PLATFORM_LIB_DIR)/$(LIB_CX_JSON_NAME)
 
 # Base library must come last - other libs depend on it (e.g., net uses CxError)
@@ -116,8 +118,9 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/ScreenEditorCore.o \
 	$(APP_OBJECT_DIR)/ProgramDefaults.o		 \
 	$(APP_OBJECT_DIR)/Project.o				 \
-	$(APP_OBJECT_DIR)/FileListView.o		 \
+	$(APP_OBJECT_DIR)/ProjectView.o		 \
 	$(APP_OBJECT_DIR)/HelpTextView.o		 \
+	$(APP_OBJECT_DIR)/BuildView.o            \
 	$(APP_OBJECT_DIR)/MarkUp.o               \
 	$(APP_OBJECT_DIR)/MarkUpColorizers.o     \
 	$(APP_OBJECT_DIR)/MarkUpParsing.o        \
@@ -216,8 +219,9 @@ $(APP_OBJECT_DIR)/ScreenEditor.o	: ScreenEditor.cpp
 $(APP_OBJECT_DIR)/ScreenEditorCommands.o : ScreenEditorCommands.cpp
 $(APP_OBJECT_DIR)/ScreenEditorCore.o : ScreenEditorCore.cpp
 $(APP_OBJECT_DIR)/Project.o			: Project.cpp
-$(APP_OBJECT_DIR)/FileListView.o	: FileListView.cpp
+$(APP_OBJECT_DIR)/ProjectView.o	: ProjectView.cpp
 $(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp
+$(APP_OBJECT_DIR)/BuildView.o		: BuildView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
 $(APP_OBJECT_DIR)/MarkUpColorizers.o: MarkUpColorizers.cpp
 $(APP_OBJECT_DIR)/MarkUpParsing.o	: MarkUpParsing.cpp

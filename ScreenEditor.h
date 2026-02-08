@@ -34,6 +34,8 @@
 #include "HelpTextView.h"
 #include "CommandTable.h"
 #include <cx/commandcompleter/completer.h>
+#include <cx/buildoutput/buildoutput.h>
+#include "BuildView.h"
 
 #if defined(_LINUX_) || defined(_OSX_)
 #include "MCPHandler.h"
@@ -57,7 +59,8 @@ class ScreenEditor {
         COMMANDLINE,
         EDIT,
         PROJECTVIEW,
-		HELPVIEW
+		HELPVIEW,
+        BUILDVIEW
     };
 
     enum CommandInputState {
@@ -78,6 +81,7 @@ class ScreenEditor {
     int  focusEditor(CxKeyAction keyAction);
     void focusProjectView( CxKeyAction keyAction);
     void focusHelpView( CxKeyAction keyAction);
+    void focusBuildView( CxKeyAction keyAction);
 
     // command input methods
     void enterCommandMode( void );
@@ -143,6 +147,7 @@ class ScreenEditor {
     void CMD_ProjectEdit( CxString commandLine );
     void CMD_ProjectMake( CxString commandLine );
     void CMD_ProjectShow( CxString commandLine );
+    void CMD_ShowBuild( CxString commandLine );
     void CMD_Split( CxString commandLine );
     void CMD_Unsplit( CxString commandLine );
 #ifdef CM_UTF8_SUPPORT
@@ -162,6 +167,7 @@ class ScreenEditor {
     void CTRL_UpdateScreen(void);
     void CTRL_Help(void);
     void CTRL_SwitchView(void);
+    void CTRL_ShowBuild(void);
 
     // Control-X subcommand handlers
     void CTRLX_Save(void);
@@ -186,7 +192,9 @@ class ScreenEditor {
     
     ProjectView *projectView;
 	HelpTextView *helpTextView;
-    
+    BuildView *buildView;
+    BuildOutput *buildOutput;
+
     Project *project;
 
 
@@ -196,6 +204,7 @@ class ScreenEditor {
     
     CxString _findString;
     CxString _replaceString;
+    CxString _buildStatusPrefix;    // "Building..." while build is running
 
 private:
     // Dispatch table entry for control commands
@@ -214,6 +223,8 @@ private:
     void setMessageWithLocation(CxString prefix);
     void showProjectView(void);
     void showHelpView(void);
+    void showBuildView(void);
+    void buildIdleCallback(void);       // polls build output during keyboard idle
     void returnToEditMode(void);        // dismiss modal and redraw editors
     void enterCommandLineMode(void);    // EDIT -> COMMANDLINE
     void exitCommandLineMode(void);     // COMMANDLINE -> EDIT

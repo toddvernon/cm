@@ -38,6 +38,7 @@ ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
     { "U",    &ScreenEditor::CTRL_UpdateScreen,         "(Update Screen)" },
     { "<US>", &ScreenEditor::CTRL_Help,                 "(Help)" },
     { "O",    &ScreenEditor::CTRL_SwitchView,           NULL },
+    { "B",    &ScreenEditor::CTRL_ShowBuild,            NULL },
     { NULL,   NULL,                                      NULL }
 };
 
