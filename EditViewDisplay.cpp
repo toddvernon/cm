@@ -12,6 +12,18 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// Status line fill character - use UTF-8 box drawing on Unix/Mac, '=' elsewhere
+//-------------------------------------------------------------------------------------------------
+#if defined(_LINUX_) || defined(_OSX_)
+static const char *STATUS_FILL = "\xe2\x94\x80";  // ─ (U+2500 BOX DRAWINGS LIGHT HORIZONTAL)
+static const int   STATUS_FILL_BYTES = 3;
+#else
+static const char *STATUS_FILL = "=";
+static const int   STATUS_FILL_BYTES = 1;
+#endif
+
+
+//-------------------------------------------------------------------------------------------------
 // EditView::updateStatusLine
 //
 // updates the edit window status line
@@ -46,18 +58,24 @@ EditView::updateStatusLine(void)
     screen->setBackgroundColor(programDefaults->statusBarBackgroundColor() );
 
     CxString statusLineTextLeft;
-    statusLineTextLeft  = "== ";
-    statusLineTextLeft += "cm: Editing [ ";
+    statusLineTextLeft  = STATUS_FILL;
+    statusLineTextLeft += STATUS_FILL;
+    statusLineTextLeft += " cm: Editing [ ";
     statusLineTextLeft += editBuffer->getFilePath();
     statusLineTextLeft += " ] ";
+
+    // Track display width separately from byte length for UTF-8 compatibility
+    // The prefix is 2 fill chars + space + text = 3 display columns for "── " or "== "
+    int leftDisplayWidth = 3 + 14 + editBuffer->getFilePath().length() + 3;
 
     //---------------------------------------------------------------------------------------------
     // do the line part of the status line
     //
     //---------------------------------------------------------------------------------------------
 
-    CxString colPartString = "========";
+    CxString colPartString;
     CxString statusLineTextRight;
+    int rightDisplayWidth = 0;
 
     if (programDefaults->liveStatusLine()) {
 
@@ -67,16 +85,19 @@ EditView::updateStatusLine(void)
         // Add Claude connection indicator on the right side
         if (_mcpConnected) {
             statusLineTextRight += "[ Claude ] ";
+            rightDisplayWidth += 11;
         }
 #endif
 
         sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
         CxString linePartString = buffer;
+        int linePartDisplayWidth = linePartString.length();
 
         // Pad linePartString to fixed width (22 chars for max "line(10000,10000,100%)")
         // so [ Claude ] indicator stays in a fixed position
-        while (linePartString.length() < 22) {
-            linePartString = CxString("=") + linePartString;
+        while (linePartDisplayWidth < 22) {
+            linePartString = CxString(STATUS_FILL) + linePartString;
+            linePartDisplayWidth++;
         }
 
         //---------------------------------------------------------------------------------------------
@@ -87,41 +108,39 @@ EditView::updateStatusLine(void)
 
         sprintf(buffer, "col(%lu)", col);
         colPartString = buffer;
+        int colPartDisplayWidth = colPartString.length();
 
-        while (colPartString.length() < 8) {
-            colPartString += "=";
+        while (colPartDisplayWidth < 8) {
+            colPartString += STATUS_FILL;
+            colPartDisplayWidth++;
         }
 
         statusLineTextRight += linePartString + CxString(" ") + colPartString;
+        rightDisplayWidth += 22 + 1 + 8;  // linePartString + space + colPartString
 
+    } else {
+        // Default 8-column padding when live status line is disabled
+        for (int i = 0; i < 8; i++) {
+            colPartString += STATUS_FILL;
+        }
+        rightDisplayWidth = 8;
     }
 
     //---------------------------------------------------------------------------------------------
-    // now put the two right had parts together
+    // Calculate the number of fill characters needed between left and right
+    // Use display width (column count) instead of byte length for UTF-8 compatibility
     //
     //---------------------------------------------------------------------------------------------
-
-   // CxString statusLineTextRight = linePartString + CxString(" ") + colPartString;
-
-    //---------------------------------------------------------------------------------------------
-    // get the curent length of all the important parts of the status line
-    //
-    //---------------------------------------------------------------------------------------------
-    int statusLineTextLength = statusLineTextLeft.length() + statusLineTextRight.length();
+    int statusLineDisplayWidth = leftDisplayWidth + rightDisplayWidth;
+    int positionsLeft = screen->cols() - statusLineDisplayWidth;
 
     //---------------------------------------------------------------------------------------------
-    // calculate the number of = signs to put between the two
-    //
-    //---------------------------------------------------------------------------------------------
-    int positionsLeft = screen->cols() - statusLineTextLength;
-
-    //---------------------------------------------------------------------------------------------
-    // append that number of equal signs
+    // Build the full status line with fill characters between left and right parts
     //
     //---------------------------------------------------------------------------------------------
     CxString theText = statusLineTextLeft;
-    for (int c=0; c< positionsLeft; c++) {
-        theText.append("=");
+    for (int c = 0; c < positionsLeft; c++) {
+        theText.append(STATUS_FILL);
     }
     theText += statusLineTextRight;
 

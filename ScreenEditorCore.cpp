@@ -37,7 +37,6 @@ ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
     { "P",    &ScreenEditor::CTRL_ProjectList,          "(Project List)" },
     { "U",    &ScreenEditor::CTRL_UpdateScreen,         "(Update Screen)" },
     { "<US>", &ScreenEditor::CTRL_Help,                 "(Help)" },
-    { "O",    &ScreenEditor::CTRL_SwitchView,           NULL },
     { NULL,   NULL,                                      NULL }
 };
 
@@ -96,7 +95,7 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 }
 
                 // set the edit buffer in the edit view
-                activeEditView()->setEditBuffer( editBuffer );
+                editView->setEditBuffer( editBuffer );
 
                 commandLineView->updateScreen();
                 return(1);  // Success - existing buffer
@@ -128,7 +127,7 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 editBufferList->add( editBuffer );
 
                 // set teh editbuffer in the edit view
-                activeEditView()->setEditBuffer( editBuffer );
+                editView->setEditBuffer( editBuffer );
 
                 commandLineView->updateScreen();
                 return(1);  // Success - new buffer created
@@ -197,10 +196,10 @@ ScreenEditor::nextBuffer(void)
     }
 
     // hand it to the edit view to display
-    activeEditView()->setEditBuffer( editBuffer );
+    editView->setEditBuffer( editBuffer );
 
     // redraw the edit view
-    activeEditView()->reframeAndUpdateScreen();
+    editView->reframeAndUpdateScreen();
 
 }
 
@@ -230,10 +229,10 @@ ScreenEditor::previousBuffer(void)
     }
 
     // hand it to the edit view to display
-    activeEditView()->setEditBuffer( editBuffer );
+    editView->setEditBuffer( editBuffer );
 
     // redraw the edit view
-    activeEditView()->reframeAndUpdateScreen();
+    editView->reframeAndUpdateScreen();
 }
 
 
@@ -319,10 +318,7 @@ ScreenEditor::dispatchControlX(void)
     // Control-X, Enter - toggle jump scroll
     if (secondAction.actionType() == CxKeyAction::NEWLINE) {
         CONTROL_ToggleJumpScroll();
-        if (_splitMode == 1 && editViewBottom != NULL) {
-            drawDivider();
-        }
-        activeEditView()->placeCursor();
+        editView->placeCursor();
         screen->flush();
         return 0;
     }
@@ -339,10 +335,7 @@ ScreenEditor::dispatchControlX(void)
                 setMessage(_ctrlXCommands[i].message);
             }
             (this->*_ctrlXCommands[i].handler)();
-            if (_splitMode == 1 && editViewBottom != NULL) {
-                drawDivider();
-            }
-            activeEditView()->placeCursor();
+            editView->placeCursor();
             screen->flush();
 
             // Special case: Control-X Control-C (quit) returns 1
@@ -374,7 +367,7 @@ ScreenEditor::handleControl( CxKeyAction keyAction )
 
     // Control-H (backspace) - special case, routes directly to editView
     if (keyAction.tag() == "H") {
-        activeEditView()->routeKeyAction(keyAction);
+        editView->routeKeyAction(keyAction);
         return 0;
     }
 
@@ -385,11 +378,7 @@ ScreenEditor::handleControl( CxKeyAction keyAction )
                 setMessage(_controlCommands[i].message);
             }
             (this->*_controlCommands[i].handler)();
-            // In split mode, redraw divider after any control command that might update screen
-            if (_splitMode == 1 && editViewBottom != NULL) {
-                drawDivider();
-            }
-            activeEditView()->placeCursor();
+            editView->placeCursor();
             screen->flush();
             return 0;
         }

@@ -22,9 +22,7 @@ EditView::recalcVisibleBufferFromTopEditLine(unsigned long newUpperRow)
 {
     _visibleEditBufferOffset = newUpperRow;
     _visibleFirstEditBufferRow = _visibleEditBufferOffset;
-    // -1 because _visibleLastEditBufferRow is inclusive (the last visible row)
-    // With 10 screen lines and first=0, last should be 9, not 10
-    _visibleLastEditBufferRow  = _visibleFirstEditBufferRow + _screenEditNumberOfLines - 1;
+    _visibleLastEditBufferRow  = _visibleFirstEditBufferRow + _screenEditNumberOfLines;
 }
 
 
@@ -37,9 +35,7 @@ EditView::recalcVisibleBufferFromTopEditLine(unsigned long newUpperRow)
 void
 EditView::recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow)
 {
-    // +1 because _visibleLastEditBufferRow is inclusive
-    // With 10 screen lines and last=10, first should be 1 (rows 1-10 = 10 rows)
-    _visibleEditBufferOffset = newLowerRow - _screenEditNumberOfLines + 1;
+    _visibleEditBufferOffset = newLowerRow - _screenEditNumberOfLines;
     _visibleFirstEditBufferRow = _visibleEditBufferOffset;
     _visibleLastEditBufferRow  = newLowerRow;
 }
@@ -164,12 +160,11 @@ EditView::reframe_jump( void )
 
         //-----------------------------------------------------------------------------------------
         // make sure we don't target a row less than the first row
-        // use _screenEditNumberOfLines for region-aware jump scrolling
         //-----------------------------------------------------------------------------------------
-        if (bufferRow < (_screenEditNumberOfLines/2)) {
+        if (bufferRow < (_screenNumberOfLines/2)) {
             newBufferTargetRow = 0;
         } else {
-            newBufferTargetRow = bufferRow - (_screenEditNumberOfLines/2);
+            newBufferTargetRow = bufferRow - (_screenNumberOfLines/2);
         }
 
         recalcVisibleBufferFromTopEditLine( newBufferTargetRow );
@@ -179,8 +174,7 @@ EditView::reframe_jump( void )
     // visible window down so the line is the last edit line
     if (bufferRow > _visibleLastEditBufferRow) {
 
-        // use _screenEditNumberOfLines for region-aware jump scrolling
-        unsigned long newBufferRowTarget = bufferRow + (_screenEditNumberOfLines/2);
+        unsigned long newBufferRowTarget = bufferRow + (_screenNumberOfLines/2);
         if (newBufferRowTarget > editBuffer->numberOfLines()) {
             newBufferRowTarget = editBuffer->numberOfLines();
         }
@@ -303,7 +297,10 @@ EditView::handleArrows( CxKeyAction keyAction )
             updateScreen();
         }
 
-        placeCursor();
+        screen->placeCursor(
+            bufferRowToScreenRow(editBuffer->cursor.row),
+            bufferColToScreenCol(editBuffer->cursor.col)
+            );
 	}
 
 	if (keyAction.tag() == "<arrow-down>") {
@@ -320,7 +317,10 @@ EditView::handleArrows( CxKeyAction keyAction )
             }
         }
 
-        placeCursor();
+        screen->placeCursor(
+            bufferRowToScreenRow(editBuffer->cursor.row),
+            bufferColToScreenCol(editBuffer->cursor.col)
+            );
 	}
 
 	if (keyAction.tag() == "<arrow-up>") {
@@ -337,7 +337,10 @@ EditView::handleArrows( CxKeyAction keyAction )
             }
         }
 
-        placeCursor();
+        screen->placeCursor(
+            bufferRowToScreenRow(editBuffer->cursor.row),
+            bufferColToScreenCol(editBuffer->cursor.col)
+            );
 	}
 
     return( OK );

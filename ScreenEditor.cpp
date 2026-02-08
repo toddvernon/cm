@@ -24,6 +24,16 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// Status line fill character - use UTF-8 box drawing on Unix/Mac, '=' elsewhere
+//-------------------------------------------------------------------------------------------------
+#if defined(_LINUX_) || defined(_OSX_)
+static const char *STATUS_FILL = "\xe2\x94\x80";  // ─ (U+2500 BOX DRAWINGS LIGHT HORIZONTAL)
+#else
+static const char *STATUS_FILL = "=";
+#endif
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::ScreenEditor (constructor)
 //
 // Creates all the important parts of the program, the editview, the commandline, they keyboard
@@ -616,44 +626,55 @@ ScreenEditor::drawDivider(void)
     screen->setForegroundColor(programDefaults->statusBarTextColor());
     screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
 
-    // Build left part: "== cm: Editing [ filename ] "
+    // Build left part: "── cm: Editing [ filename ] "
     CxString statusLineTextLeft;
-    statusLineTextLeft  = "== ";
-    statusLineTextLeft += "cm: Editing [ ";
+    statusLineTextLeft  = STATUS_FILL;
+    statusLineTextLeft += STATUS_FILL;
+    statusLineTextLeft += " cm: Editing [ ";
     statusLineTextLeft += topBuffer->getFilePath();
     statusLineTextLeft += " ] ";
 
+    // Track display width separately from byte length for UTF-8 compatibility
+    int leftDisplayWidth = 3 + 14 + topBuffer->getFilePath().length() + 3;
+
     // Build right part with line/col info
     CxString statusLineTextRight;
+    int rightDisplayWidth = 0;
+
     if (programDefaults->liveStatusLine()) {
         char buffer[100];
 
         sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
         CxString linePartString = buffer;
+        int linePartDisplayWidth = linePartString.length();
 
         // Pad linePartString to fixed width
-        while (linePartString.length() < 22) {
-            linePartString = CxString("=") + linePartString;
+        while (linePartDisplayWidth < 22) {
+            linePartString = CxString(STATUS_FILL) + linePartString;
+            linePartDisplayWidth++;
         }
 
         sprintf(buffer, "col(%lu)", col);
         CxString colPartString = buffer;
+        int colPartDisplayWidth = colPartString.length();
 
-        while (colPartString.length() < 8) {
-            colPartString += "=";
+        while (colPartDisplayWidth < 8) {
+            colPartString += STATUS_FILL;
+            colPartDisplayWidth++;
         }
 
         statusLineTextRight += linePartString + CxString(" ") + colPartString;
+        rightDisplayWidth = 22 + 1 + 8;  // linePartString + space + colPartString
     }
 
-    // Calculate padding between left and right
-    int statusLineTextLength = statusLineTextLeft.length() + statusLineTextRight.length();
-    int positionsLeft = screen->cols() - statusLineTextLength;
+    // Calculate padding between left and right using display width
+    int statusLineDisplayWidth = leftDisplayWidth + rightDisplayWidth;
+    int positionsLeft = screen->cols() - statusLineDisplayWidth;
 
-    // Build full line with = padding
+    // Build full line with fill character padding
     CxString theText = statusLineTextLeft;
     for (int c = 0; c < positionsLeft; c++) {
-        theText.append("=");
+        theText.append(STATUS_FILL);
     }
     theText += statusLineTextRight;
 
