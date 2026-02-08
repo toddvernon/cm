@@ -92,20 +92,6 @@ HelpTextView::loadHelpText(CxString filePath)
 
 
 //-------------------------------------------------------------------------------------------------
-// HelpTextView::screenResizeCallback (callback)
-//
-// Called with the user resizes the terminal window.  Recalculates key parts of the screen.
-//
-//-------------------------------------------------------------------------------------------------
-void
-HelpTextView::screenResizeCallback( void )
-{
-    // recalculate all the component placements
-    recalcScreenPlacements();
-}
-
-
-//-------------------------------------------------------------------------------------------------
 // HelpTextView::recalcScreenPlacements
 //
 // Given a screen window size, this calculates all the rows that are important to

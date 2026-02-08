@@ -141,28 +141,6 @@ EditView::updateScreen(void)
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView::screenResizeCallback (callback)
-//
-// Called when the user resizes the terminal window. Only recalculates placements.
-// Actual redrawing is coordinated by ScreenEditor's resize callback to ensure
-// proper draw order (editors first, then modal on top if visible).
-//
-//-------------------------------------------------------------------------------------------------
-void
-EditView::screenResizeCallback( void )
-{
-    // recalculate all the component placements
-    recalcScreenPlacements();
-
-    // keep the top line the top line
-    recalcVisibleBufferFromTopEditLine(_visibleFirstEditBufferRow );
-
-    // NOTE: Do NOT redraw here. ScreenEditor's resize callback handles all
-    // redrawing to ensure proper coordination between views and modals.
-}
-
-
-//-------------------------------------------------------------------------------------------------
 // EditView::cursorPosition
 //
 // returns the row and col of the current cursor in the edit buffer.  Its a passthrough to the
@@ -218,7 +196,7 @@ EditView::toggleLineNumbers(void)
     }
     
     recalcLineNumberDigits();
-    screenResizeCallback();
+    recalcForResize();
 }
 
 

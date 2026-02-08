@@ -58,28 +58,6 @@ FileListView::FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project 
 
 
 //-------------------------------------------------------------------------------------------------
-// FileListView::screenResizeCallback (callback)
-//
-// Called when the user resizes the terminal window.  Recalculates key parts of the screen
-// and redraws if the modal is currently visible. The modal draws on top of whatever the
-// editors have drawn, so we don't need to clear the screen.
-//
-//-------------------------------------------------------------------------------------------------
-void
-FileListView::screenResizeCallback( void )
-{
-    // recalculate all the component placements
-    recalcScreenPlacements();
-
-    // if modal is visible, redraw it on top of the editors
-    if (_visible) {
-        screen->hideCursor();
-        redraw();
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
 // FileListView::recalcScreenPlacements
 //
 // Calculate centered modal bounds with 15% margins on each side.

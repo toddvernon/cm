@@ -148,9 +148,6 @@ class EditView
 
   private:
 
-    void screenResizeCallback( void );
-    // callback to receive host window size updates
-
     void recalcScreenPlacements(void);
     // recalcs the key places in the window that parts are placed
 

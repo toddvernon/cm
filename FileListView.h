@@ -66,9 +66,6 @@ class FileListView
 
   private:
 
-    void screenResizeCallback( void );
-    // callback to receive host window size updates
-
     int handleArrows( CxKeyAction keyAction );
     // handle the arrow keys
     
