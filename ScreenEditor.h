@@ -30,7 +30,7 @@
 #include "CommandLineView.h"
 #include "ProgramDefaults.h"
 #include "Project.h"
-#include "FileListView.h"
+#include "ProjectView.h"
 #include "HelpTextView.h"
 #include "CommandTable.h"
 #include <cx/commandcompleter/completer.h>
@@ -56,7 +56,7 @@ class ScreenEditor {
     enum ProgramMode {
         COMMANDLINE,
         EDIT,
-        FILELIST,
+        PROJECTVIEW,
 		HELPVIEW
     };
 
@@ -76,7 +76,7 @@ class ScreenEditor {
 
     void focusCommandPrompt(CxKeyAction keyAction);
     int  focusEditor(CxKeyAction keyAction);
-    void focusFilelist( CxKeyAction keyAction);
+    void focusProjectView( CxKeyAction keyAction);
     void focusHelpView( CxKeyAction keyAction);
 
     // command input methods
@@ -181,7 +181,7 @@ class ScreenEditor {
     CommandLineView *commandLineView;
     CmEditBufferList *editBufferList;
     
-    FileListView *fileListView;
+    ProjectView *projectView;
 	HelpTextView *helpTextView;
     
     Project *project;
@@ -209,8 +209,11 @@ private:
 
     // helper methods to reduce duplication
     void setMessageWithLocation(CxString prefix);
-    void showFileListView(void);
+    void showProjectView(void);
     void showHelpView(void);
+    void returnToEditMode(void);        // dismiss modal and redraw editors
+    void enterCommandLineMode(void);    // EDIT -> COMMANDLINE
+    void exitCommandLineMode(void);     // COMMANDLINE -> EDIT
     void resetCommandInputState(void);
 
     // decomposed command input handlers
