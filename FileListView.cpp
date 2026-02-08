@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  ProjectView.cpp
+//  FileListView.cpp
 //  cmacs
 //
 //  Created by Todd Vernon on 9/15/23.
@@ -11,7 +11,7 @@
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView.cpp
+// FileListView.cpp
 //
 // Edit View the class that handles display of the edit buffer on the screen.  It handles
 // screen sizing and resizing and reframing the visible part of the edit buffer on the
@@ -19,7 +19,7 @@
 //
 //-------------------------------------------------------------------------------------------------
 
-#include "ProjectView.h"
+#include "FileListView.h"
 
 //-------------------------------------------------------------------------------------------------
 // Platform-conditional selection indicator
@@ -32,12 +32,12 @@ static const char *SELECTION_INDICATOR = ">";
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::ProjectView (constructor)
+// FileListView::FileListView (constructor)
 //
 // Constructs an overlay file list view allowing the user to select a file from the edit buffer
 //
 //-------------------------------------------------------------------------------------------------
-ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
+FileListView::FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
 {
     programDefaults = pd;
     editBufferList  = ebl;
@@ -58,14 +58,36 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::recalcScreenPlacements
+// FileListView::screenResizeCallback (callback)
+//
+// Called when the user resizes the terminal window.  Recalculates key parts of the screen
+// and redraws if the modal is currently visible. The modal draws on top of whatever the
+// editors have drawn, so we don't need to clear the screen.
+//
+//-------------------------------------------------------------------------------------------------
+void
+FileListView::screenResizeCallback( void )
+{
+    // recalculate all the component placements
+    recalcScreenPlacements();
+
+    // if modal is visible, redraw it on top of the editors
+    if (_visible) {
+        screen->hideCursor();
+        redraw();
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// FileListView::recalcScreenPlacements
 //
 // Calculate centered modal bounds with 15% margins on each side.
 // Content height is based on buffer count, clamped to min/max limits.
 //
 //-------------------------------------------------------------------------------------------------
 void
-ProjectView::recalcScreenPlacements(void)
+FileListView::recalcScreenPlacements(void)
 {
     // get screen dimensions
     screenNumberOfLines = screen->rows();
@@ -91,51 +113,42 @@ ProjectView::recalcScreenPlacements(void)
 
     int bufferCount = editBufferList->items();
     if (bufferCount < minItems) {
-        screenProjectNumberOfLines = minItems;
+        screenFileListNumberOfLines = minItems;
     } else if (bufferCount > maxItems) {
-        screenProjectNumberOfLines = maxItems;
+        screenFileListNumberOfLines = maxItems;
     } else {
-        screenProjectNumberOfLines = bufferCount;
+        screenFileListNumberOfLines = bufferCount;
     }
 
     // total height = content lines + 6 (top, title, sep, content..., sep, footer, bottom)
-    int totalHeight = screenProjectNumberOfLines + 6;
+    int totalHeight = screenFileListNumberOfLines + 6;
 
     // vertical centering
     int frameTop    = (screenNumberOfLines - totalHeight) / 2;
     int frameBottom = frameTop + totalHeight - 1;
 
     // store column info for redraw
-    screenProjectNumberOfCols = frameRight - frameLeft - 1;  // content width
+    screenFileListNumberOfCols = frameRight - frameLeft - 1;  // content width
 
     // update the frame bounds
     frame->resize(frameTop, frameLeft, frameBottom, frameRight);
 
     // content starts after top border, title, and separator (row + 3)
-    screenProjectTitleBarLine  = frameTop + 1;  // title is on row 1
-    screenProjectFrameLine     = frameTop + 2;  // separator is on row 2
-    screenProjectFirstListLine = frameTop + 3;  // content starts on row 3
-    screenProjectLastListLine  = frameBottom - 3;  // before footer separator
+    screenFileListTitleBarLine  = frameTop + 1;  // title is on row 1
+    screenFileListFrameLine     = frameTop + 2;  // separator is on row 2
+    screenFileListFirstListLine = frameTop + 3;  // content starts on row 3
+    screenFileListLastListLine  = frameBottom - 3;  // before footer separator
 
     // set the first list index visible in the scrolling list
     firstVisibleListIndex = 0;
 
-    // set the selected item in the list (ensure valid bounds)
+    // set the selected item in the list
     selectedListItemIndex = editBufferList->currentItemIndex();
-    if (selectedListItemIndex < 0) {
-        selectedListItemIndex = 0;
-    }
-    if (selectedListItemIndex >= editBufferList->items()) {
-        selectedListItemIndex = editBufferList->items() - 1;
-        if (selectedListItemIndex < 0) {
-            selectedListItemIndex = 0;
-        }
-    }
 }
 
 
 int
-ProjectView::calcLongestName(void)
+FileListView::calcLongestName(void)
 {
     int maxLength = 0;
     
@@ -156,13 +169,13 @@ ProjectView::calcLongestName(void)
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::redraw
+// FileListView::redraw
 //
 // Draw centered modal dialog with box frame, title, content, and footer.
 //
 //-------------------------------------------------------------------------------------------------
 void
-ProjectView::redraw( void )
+FileListView::redraw( void )
 {
     int cursorRow = 0;
 
@@ -179,14 +192,8 @@ ProjectView::redraw( void )
     frame->setFrameColor(programDefaults->statusBarTextColor(),
                          programDefaults->statusBarBackgroundColor());
 
-    // build title string: Project: <name> or Buffer List if no project
-    CxString title;
-    CxString projName = project->projectName();
-    if (projName.length() > 0) {
-        title = CxString("Project: ") + projName;
-    } else {
-        title = "Buffer List";
-    }
+    // build title string: Project: <name>
+    CxString title = CxString("Project: ") + project->projectName();
 
     // build footer string with keyboard hints
     CxString footer = CxString("[Enter] Load   [S] Save   [A] Save All   [Esc] Cancel");
@@ -196,11 +203,11 @@ ProjectView::redraw( void )
     //---------------------------------------------------------------------------------------------
     // draw the file list content
     //---------------------------------------------------------------------------------------------
-    for (int c = 0; c < screenProjectNumberOfLines; c++) {
+    for (int c = 0; c < screenFileListNumberOfLines; c++) {
 
         // get the logical list index
         int logicalItem = firstVisibleListIndex + c;
-        int row = screenProjectFirstListLine + c;
+        int row = screenFileListFirstListLine + c;
 
         // position cursor at start of content area
         screen->placeCursor(row, contentLeft);
@@ -307,13 +314,13 @@ ProjectView::redraw( void )
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::getSelectedItem
+// FileListView::getSelectedItem
 //
 // return the path of the currently selected item
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-ProjectView::getSelectedItem( void )
+FileListView::getSelectedItem( void )
 {
     // get the edit buffer at that index
     CmEditBuffer *eb = editBufferList->at( selectedListItemIndex );
@@ -327,40 +334,40 @@ ProjectView::getSelectedItem( void )
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::getSelectedBuffer
+// FileListView::getSelectedBuffer
 //
 // return the edit buffer for the currently selected item (for save operations)
 //
 //-------------------------------------------------------------------------------------------------
 CmEditBuffer *
-ProjectView::getSelectedBuffer( void )
+FileListView::getSelectedBuffer( void )
 {
     return editBufferList->at( selectedListItemIndex );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::setVisible
+// FileListView::setVisible
 //
 // Set the visibility state for resize handling
 //
 //-------------------------------------------------------------------------------------------------
 void
-ProjectView::setVisible( int visible )
+FileListView::setVisible( int visible )
 {
     _visible = visible;
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::routeKeyAction
+// FileListView::routeKeyAction
 //	
 // Keys passed into routeKeyAction are targeted for the edit view changing the text buffer
 // and then the screen is updated to reflect.
 //
 //-------------------------------------------------------------------------------------------------
 void
-ProjectView::routeKeyAction( CxKeyAction keyAction )
+FileListView::routeKeyAction( CxKeyAction keyAction )
 {
 	//---------------------------------------------------------------------------------------------
 	// based on the kind of key
@@ -395,36 +402,22 @@ ProjectView::routeKeyAction( CxKeyAction keyAction )
  
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::selectedItemVisible
+// FileListView::selectedItemVisible
 //
 // if selected item isn't visible move the text in the visible window
 //
 //-------------------------------------------------------------------------------------------------
 int
-ProjectView::reframe( )
+FileListView::reframe( )
 {
     int changeMade = false;
-
-    // safety: ensure firstVisibleListIndex is never negative
-    if (firstVisibleListIndex < 0) {
-        firstVisibleListIndex = 0;
-    }
-
-    // safety: ensure selectedListItemIndex is valid
-    if (selectedListItemIndex < 0) {
-        selectedListItemIndex = 0;
-    }
-
+    
     while ( selectedListItemIndex < firstVisibleListIndex ) {
         changeMade = true;
         firstVisibleListIndex--;
-        if (firstVisibleListIndex < 0) {
-            firstVisibleListIndex = 0;
-            break;
-        }
     }
-
-    while (selectedListItemIndex >= firstVisibleListIndex + screenProjectNumberOfLines) {
+    
+    while (selectedListItemIndex >= firstVisibleListIndex + screenFileListNumberOfLines) {
         changeMade = true;
         firstVisibleListIndex++;
     }
@@ -436,14 +429,14 @@ ProjectView::reframe( )
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::handleArrows
+// FileListView::handleArrows
 //
 // moves the cursor according to the desired direction and what is valid in the
 // edit buffer
 //
 //-------------------------------------------------------------------------------------------------
 int
-ProjectView::handleArrows( CxKeyAction keyAction )
+FileListView::handleArrows( CxKeyAction keyAction )
 {
     if (keyAction.tag() == "<arrow-down>") {
         

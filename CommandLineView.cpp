@@ -83,9 +83,32 @@ CommandLineView::CommandLineView(
 
 
 //---------------------------------------------------------------------------------------------------------
-// CommandLineView::calculatePlacements
+// CommandLineView::screenResizeCallback (callback)
 //
-// Calculate positions and sizes for the command line components.
+// Called with the user resizes the terminal window.  Recalculates key parts of the screen.
+//
+//---------------------------------------------------------------------------------------------------------
+void
+CommandLineView::screenResizeCallback( void )
+{
+    _screenWidth  = CxScreen::cols();
+    _screenHeight = CxScreen::rows();
+    
+    _screenRow    = _screen->rows()-1;
+    _screenCol    = 0;
+    
+    _totalWidth   = _screenWidth -1;
+
+    calculatePlacements();
+    
+    updateScreen();
+}
+
+
+//---------------------------------------------------------------------------------------------------------
+// CommandLineView::screenResizeCallback (callback)
+//
+// Called with the user resizes the terminal window.  Recalculates key parts of the screen.
 //
 //---------------------------------------------------------------------------------------------------------
 void

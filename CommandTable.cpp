@@ -73,13 +73,6 @@ CommandEntry commandTable[] = {
     //---------------------------------------------------------------------------------------------
     // Build commands
     //---------------------------------------------------------------------------------------------
-    { "make",
-      "[target]",
-      "Run make and capture output to *build* buffer",
-      CMD_FLAG_OPTIONAL_ARG,
-      &ScreenEditor::CMD_Make,
-      NULL },
-
     { "goto-error",
       NULL,
       "Jump to file:line from error message under cursor",
@@ -232,11 +225,56 @@ CommandEntry commandTable[] = {
     //---------------------------------------------------------------------------------------------
     // Project commands
     //---------------------------------------------------------------------------------------------
-    { "project-list",
+    { "project-clean",
       NULL,
-      "Show project file list",
+      "Run make clean",
       0,
-      &ScreenEditor::CMD_ListProjectFiles,
+      &ScreenEditor::CMD_ProjectClean,
+      NULL },
+
+    { "project-create",
+      "<name>",
+      "Create new project file",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_ProjectCreate,
+      NULL },
+
+    { "project-edit",
+      NULL,
+      "Edit project file",
+      0,
+      &ScreenEditor::CMD_ProjectEdit,
+      NULL },
+
+    { "project-make",
+      "[target]",
+      "Build project",
+      CMD_FLAG_OPTIONAL_ARG,
+      &ScreenEditor::CMD_ProjectMake,
+      NULL },
+
+    { "project-show",
+      NULL,
+      "Show project/buffer list",
+      0,
+      &ScreenEditor::CMD_ProjectShow,
+      NULL },
+
+    //---------------------------------------------------------------------------------------------
+    // Split screen commands
+    //---------------------------------------------------------------------------------------------
+    { "split",
+      NULL,
+      "Split screen horizontally",
+      0,
+      &ScreenEditor::CMD_Split,
+      NULL },
+
+    { "unsplit",
+      NULL,
+      "Return to single view",
+      0,
+      &ScreenEditor::CMD_Unsplit,
       NULL },
 
     //---------------------------------------------------------------------------------------------

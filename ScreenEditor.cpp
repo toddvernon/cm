@@ -65,7 +65,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     editViewBottom = NULL;
     commandLineView = NULL;
     editBufferList = NULL;
-    projectView = NULL;
+    fileListView = NULL;
     helpTextView = NULL;
     project = NULL;
     _activeCompleter = NULL;
@@ -238,20 +238,20 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
         // if (dbg) { fprintf(dbg, "13: loadNewFile complete\n"); fflush(dbg); }
     }
 
-    // if (dbg) { fprintf(dbg, "14: about to create ProjectView\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "14: about to create FileListView\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a file list view for the project
     //
     //---------------------------------------------------------------------------------------------
 
-    projectView = new ProjectView(programDefaults,
+    fileListView = new FileListView(programDefaults,
                                     editBufferList,
                                     project,
                                     screen
                                     );
 
-    // if (dbg) { fprintf(dbg, "15: ProjectView created\n"); fflush(dbg); }
+    // if (dbg) { fprintf(dbg, "15: FileListView created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a help view for editor help
@@ -298,7 +298,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 #endif
 
     //---------------------------------------------------------------------------------------------
-    // Register ScreenEditor's resize callback LAST so it fires after EditView/ProjectView
+    // Register ScreenEditor's resize callback LAST so it fires after EditView/FileListView
     // This allows ScreenEditor to coordinate final redraw based on programMode
     //
     //---------------------------------------------------------------------------------------------
@@ -666,9 +666,9 @@ ScreenEditor::screenResizeCallback(void)
     // 1d. CommandLineView recalc
     commandLineView->recalcScreenPlacements();
 
-    // 1e. ProjectView recalc (if in PROJECTVIEW mode)
-    if (programMode == PROJECTVIEW) {
-        projectView->recalcScreenPlacements();
+    // 1e. FileListView recalc (if in FILELIST mode)
+    if (programMode == FILELIST) {
+        fileListView->recalcScreenPlacements();
     }
 
     // 1f. HelpTextView recalc (if in HELPVIEW mode)
@@ -695,10 +695,10 @@ ScreenEditor::screenResizeCallback(void)
     commandLineView->updateScreen();
 
     // 2f. Draw modal on top (if applicable)
-    if (programMode == PROJECTVIEW) {
+    if (programMode == FILELIST) {
         screen->hideCursor();
-        projectView->redraw();
-        // Note: projectView->redraw() includes flush
+        fileListView->redraw();
+        // Note: fileListView->redraw() includes flush
         return;
     }
 
@@ -776,22 +776,22 @@ ScreenEditor::setMessageWithLocation(CxString prefix)
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::showProjectView
+// ScreenEditor::showFileListView
 //
 // Helper: recalculates, redraws and switches to the file list view.
 //
 //-------------------------------------------------------------------------------------------------
 void
-ScreenEditor::showProjectView(void)
+ScreenEditor::showFileListView(void)
 {
     // flush any pending output before drawing modal
     screen->flush();
 
     screen->hideCursor();
-    projectView->setVisible(1);
-    projectView->recalcScreenPlacements();
-    projectView->redraw();  // draws modal on top of existing screen content
-    programMode = PROJECTVIEW;
+    fileListView->setVisible(1);
+    fileListView->recalcScreenPlacements();
+    fileListView->redraw();  // draws modal on top of existing screen content
+    programMode = FILELIST;
 }
 
 
@@ -807,62 +807,6 @@ ScreenEditor::showHelpView(void)
     helpTextView->recalcScreenPlacements();
     helpTextView->redraw();
     programMode = HELPVIEW;
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::returnToEditMode
-//
-// Helper: dismisses any modal view and redraws all editors.
-// Handles split screen mode correctly.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::returnToEditMode(void)
-{
-    screen->showCursor();
-    programMode = ScreenEditor::EDIT;
-
-    screen->clearScreen();
-    editView->updateScreen();
-    if (_splitMode == 1 && editViewBottom != NULL) {
-        editViewBottom->updateScreen();
-    }
-    activeEditView()->placeCursor();
-    screen->flush();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::enterCommandLineMode
-//
-// Helper: transitions from EDIT mode to COMMANDLINE mode.
-// Sets up the command input state and places cursor on command line.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::enterCommandLineMode(void)
-{
-    resetPrompt();
-    programMode = ScreenEditor::COMMANDLINE;
-    enterCommandMode();
-    commandLineView->placeCursor();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::exitCommandLineMode
-//
-// Helper: transitions from COMMANDLINE mode back to EDIT mode.
-// Places cursor back on the edit view and flushes screen.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::exitCommandLineMode(void)
-{
-    programMode = ScreenEditor::EDIT;
-    activeEditView()->placeCursor();
-    screen->flush();
 }
 
 
@@ -952,9 +896,9 @@ ScreenEditor::run(void)
             //-------------------------------------------------------------------------------------
             // current focus is the project file list
             //-------------------------------------------------------------------------------------
-            case ScreenEditor::PROJECTVIEW:
+            case ScreenEditor::FILELIST:
             {
-                focusProjectView( keyAction );
+                focusFilelist( keyAction );
             }
             break;
 
@@ -990,11 +934,18 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
-        // handle escape key - enter command input mode
+        // handle escape key - enter new command input mode
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
         {
-            enterCommandLineMode();
+            resetPrompt();
+            programMode = ScreenEditor::COMMANDLINE;
+
+            //-------------------------------------------------------------------------------------
+            // enter the new command input mode with tab completion
+            //-------------------------------------------------------------------------------------
+            enterCommandMode();
+            commandLineView->placeCursor();
         }
         break;
             
@@ -1043,7 +994,7 @@ ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::focusProjectView
+// ScreenEditor::focusFilelist
 //
 // When the filelist is the focus this handles the routing of keys.  Most keys are passed through
 // to the file list view but a few are intercepted.  newline selects a new file to edit and esc
@@ -1051,54 +1002,88 @@ ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
 //
 //-------------------------------------------------------------------------------------------------
 void
-ScreenEditor::focusProjectView( CxKeyAction keyAction )
+ScreenEditor::focusFilelist( CxKeyAction keyAction )
 {
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
-        // handle escape key - dismiss without loading
+        // handle escape key
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
         {
-            projectView->setVisible(0);
-            returnToEditMode();
+            fileListView->setVisible(0);
+            screen->showCursor();
+            programMode = ScreenEditor::EDIT;
+
+            // redraw all editors (handles split screen mode)
+            screen->clearScreen();
+            editView->updateScreen();
+            if (_splitMode == 1 && editViewBottom != NULL) {
+                editViewBottom->updateScreen();
+            }
+            activeEditView()->placeCursor();
+            screen->flush();
         }
         break;
 
         //-----------------------------------------------------------------------------------------
-        // handle a newline - load selected file
+        // handle a newline
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::NEWLINE:
         {
-            projectView->setVisible(0);
-            loadNewFile(projectView->getSelectedItem(), TRUE);
-            returnToEditMode();
+            fileListView->setVisible(0);
+            screen->showCursor();
+            programMode = ScreenEditor::EDIT;
+            CxString pathName = fileListView->getSelectedItem();
+            loadNewFile( pathName, TRUE );
+
+            // redraw all editors (handles split screen mode)
+            screen->clearScreen();
+            editView->updateScreen();
+            if (_splitMode == 1 && editViewBottom != NULL) {
+                editViewBottom->updateScreen();
+            }
+            activeEditView()->placeCursor();
+            screen->flush();
         }
         break;
 
+
         //-----------------------------------------------------------------------------------------
         // normal input characters
+        //
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::LOWERCASE_ALPHA:
         case CxKeyAction::UPPERCASE_ALPHA:
         {
             // load the highlighted file
-            if (keyAction.tag() == 'l' || keyAction.tag() == 'L')
+            if ( keyAction.tag() == 'l' || keyAction.tag() == 'L')
             {
-                projectView->setVisible(0);
-                loadNewFile(projectView->getSelectedItem(), TRUE);
-                returnToEditMode();
+                fileListView->setVisible(0);
+                screen->showCursor();
+                programMode = ScreenEditor::EDIT;
+                CxString pathName = fileListView->getSelectedItem();
+                loadNewFile( pathName, TRUE );
+
+                // redraw all editors (handles split screen mode)
+                screen->clearScreen();
+                editView->updateScreen();
+                if (_splitMode == 1 && editViewBottom != NULL) {
+                    editViewBottom->updateScreen();
+                }
+                activeEditView()->placeCursor();
+                screen->flush();
             }
 
             // save the highlighted file
-            if (keyAction.tag() == 's' || keyAction.tag() == 'S')
+            if ( keyAction.tag() == 's' || keyAction.tag() == 'S')
             {
-                CmEditBuffer *buffer = projectView->getSelectedBuffer();
+                CmEditBuffer *buffer = fileListView->getSelectedBuffer();
                 if (buffer != NULL && buffer->isTouched()) {
                     buffer->saveText(buffer->getFilePath());
                     setMessage("(Saved)");
                 }
-                projectView->redraw();
+                fileListView->redraw();
             }
 
             // save all modified files
@@ -1118,7 +1103,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                 } else {
                     setMessage("(No modified files to save)");
                 }
-                projectView->redraw();
+                fileListView->redraw();
             }
         }
         break;
@@ -1128,7 +1113,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
         //-----------------------------------------------------------------------------------------
         default:
         {
-            projectView->routeKeyAction( keyAction );
+            fileListView->routeKeyAction( keyAction );
         }
         break;
     }
@@ -1136,10 +1121,11 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::focusHelpView
+// ScreenEditor::focusFilelist
 //
-// When the help view is the focus this handles the routing of keys. ESC or ENTER dismisses
-// the help view and returns to editing.
+// When the filelist is the focus this handles the routing of keys.  Most keys are passed through
+// to the file list view but a few are intercepted.  newline selects a new file to edit and esc
+// dismisses the window without loading a new buffer (like a cancel button)
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -1148,15 +1134,50 @@ ScreenEditor::focusHelpView( CxKeyAction keyAction )
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
-        // handle escape key or newline - dismiss help view
+        // handle escape key
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
-        case CxKeyAction::NEWLINE:
         {
-            returnToEditMode();
+            programMode = ScreenEditor::EDIT;
+            editView->updateScreen();
         }
         break;
+                            
+        //-----------------------------------------------------------------------------------------
+        // handle a newline
+        //-----------------------------------------------------------------------------------------
+        case CxKeyAction::NEWLINE:
+        {
+            programMode = ScreenEditor::EDIT;
+//            CxString pathName = fileListView->getSelectedItem();
+  //          loadNewFile( pathName, TRUE );
+            editView->updateScreen();
+        }
+        break;
+            
+            
+        //-----------------------------------------------------------------------------------------
+        // normal input characters
+        //
+        //-----------------------------------------------------------------------------------------
+        case CxKeyAction::LOWERCASE_ALPHA:
+        case CxKeyAction::UPPERCASE_ALPHA:
+        {
+            
+            // load the highlighted file
+            if ( keyAction.tag() == 'l')
+            {
+                programMode = ScreenEditor::EDIT;
+      //          CxString pathName = fileListView->getSelectedItem();
+    //            loadNewFile( pathName, TRUE );
+                editView->updateScreen();
+            }
+            
+            
 
+        }
+        break;
+            
         //-----------------------------------------------------------------------------------------
         // handle all other keys
         //-----------------------------------------------------------------------------------------
@@ -1277,12 +1298,13 @@ void
 ScreenEditor::cancelCommandInput( void )
 {
     resetCommandInputState();
+    programMode = ScreenEditor::EDIT;
 
     commandLineView->setText("");
     commandLineView->setPrompt("");
     commandLineView->updateScreen();
-
-    exitCommandLineMode();
+    editView->placeCursor();
+    screen->flush();
 }
 
 
@@ -1828,7 +1850,7 @@ ScreenEditor::executeCurrentCommand( void )
     if (_currentCommand == NULL) {
         setMessage( "(no command)" );
         resetCommandInputState();
-        exitCommandLineMode();
+        programMode = ScreenEditor::EDIT;
         return;
     }
 
@@ -1836,7 +1858,9 @@ ScreenEditor::executeCurrentCommand( void )
     if (_currentCommand->handler == NULL) {
         setMessage( "(command not implemented)" );
         resetCommandInputState();
-        exitCommandLineMode();
+        programMode = ScreenEditor::EDIT;
+        editView->placeCursor();
+        screen->flush();
         return;
     }
 
@@ -1848,9 +1872,11 @@ ScreenEditor::executeCurrentCommand( void )
     resetCommandInputState();
 
     // only return to edit mode if handler didn't switch to a different mode
-    // (e.g., CMD_Help switches to HELPVIEW, CMD_BufferList switches to PROJECTVIEW)
+    // (e.g., CMD_Help switches to HELPVIEW, CMD_BufferList switches to FILELIST)
     if (programMode == ScreenEditor::COMMANDLINE) {
-        exitCommandLineMode();
+        programMode = ScreenEditor::EDIT;
+        editView->placeCursor();
+        screen->flush();
     }
 }
 

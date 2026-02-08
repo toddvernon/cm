@@ -110,6 +110,9 @@ class CommandLineView
     void calculatePlacements();
     // calculate different screen areas
 
+	void screenResizeCallback( void );
+    // callback to receive host window size updates
+
     void reframe(void);
     // adjusts the content on the line scrolling left or right to make
     // the cursor visible if it is not

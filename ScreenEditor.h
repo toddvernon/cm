@@ -128,7 +128,6 @@ class ScreenEditor {
     void CMD_SystemPaste( CxString commandLine );
 	void CMD_CommentBlock( CxString commandLine );
     void CMD_NewBuffer( CxString commandLine );
-    void CMD_ListProjectFiles( CxString commandLine );
     void CMD_BufferNext( CxString commandLine );
     void CMD_BufferPrev( CxString commandLine );
     void CMD_BufferList( CxString commandLine );
@@ -138,8 +137,12 @@ class ScreenEditor {
     void CMD_Entab( CxString commandLine );
     void CMD_Detab( CxString commandLine );
     void CMD_TrimTrailing( CxString commandLine );
-    void CMD_Make( CxString commandLine );
     void CMD_GotoError( CxString commandLine );
+    void CMD_ProjectClean( CxString commandLine );
+    void CMD_ProjectCreate( CxString commandLine );
+    void CMD_ProjectEdit( CxString commandLine );
+    void CMD_ProjectMake( CxString commandLine );
+    void CMD_ProjectShow( CxString commandLine );
     void CMD_Split( CxString commandLine );
     void CMD_Unsplit( CxString commandLine );
 #ifdef CM_UTF8_SUPPORT

@@ -37,7 +37,10 @@ public:
 
 	CxString projectMakefile(void);
 	// is the UI in color
-    
+
+    CxString projectFilePath(void);
+    // returns path to .project file
+
     int numberOfFiles( void );
     // returns the number of files in the project
     
@@ -58,6 +61,7 @@ private:
 
     CxString _projectName;
     CxString _projectMakefile;
+    CxString _projectFilePath;
     
     CxSList< CxString > _fileList;
 

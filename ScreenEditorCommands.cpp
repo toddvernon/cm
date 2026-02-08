@@ -370,19 +370,6 @@ ScreenEditor::CMD_BufferList( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ListProjectFiles:
-//
-// Show project file list (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ListProjectFiles( CxString commandLine )
-{
-    showProjectView();
-}
-
-
-//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Quit:
 //
 // Quit editor (ESC command wrapper)
@@ -490,14 +477,14 @@ ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_Make
+// ScreenEditor::CMD_ProjectMake
 //
 // Run make (or make <target>) and capture output to *build* buffer.
 // The buffer is created if it doesn't exist, or reused if it does.
 //
 //-------------------------------------------------------------------------------------------------
 void
-ScreenEditor::CMD_Make( CxString commandLine )
+ScreenEditor::CMD_ProjectMake( CxString commandLine )
 {
     // Build the command - "make" or "make <target>"
     CxString command = "make";
@@ -551,6 +538,157 @@ ScreenEditor::CMD_Make( CxString commandLine )
                 exitCode, buildBuffer->numberOfLines());
     }
     setMessage(msg);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ProjectClean
+//
+// Run make clean and capture output to *build* buffer.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ProjectClean( CxString commandLine )
+{
+    setMessage("(running: make clean)");
+    screen->flush();
+
+    // Run the command
+    CxProcess proc;
+    int result = proc.run("make clean");
+
+    if (result != 0) {
+        setMessage("(make clean: failed to execute command)");
+        return;
+    }
+
+    CxString output = proc.getOutput();
+
+    // Find or create the *build* buffer
+    CmEditBuffer *buildBuffer = editBufferList->findPath("*build*");
+
+    if (buildBuffer == NULL) {
+        // Create new buffer
+        buildBuffer = new CmEditBuffer();
+        buildBuffer->setFilePath("*build*");
+        editBufferList->add(buildBuffer);
+    } else {
+        // Clear existing buffer and reload with new output
+        buildBuffer->reset();
+    }
+
+    // Load output into buffer
+    buildBuffer->loadTextFromString(output);
+
+    // Switch to build buffer
+    activeEditView()->setEditBuffer(buildBuffer);
+    buildBuffer->cursorGotoRequest(0, 0);
+    activeEditView()->reframeAndUpdateScreen();
+
+    // Report result
+    int exitCode = proc.getExitCode();
+    char msg[80];
+    if (exitCode == 0) {
+        sprintf(msg, "(make clean: success)");
+    } else {
+        sprintf(msg, "(make clean: exit code %d)", exitCode);
+    }
+    setMessage(msg);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ProjectShow
+//
+// Show project/buffer list (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ProjectShow( CxString commandLine )
+{
+    showProjectView();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ProjectCreate
+//
+// Create a new project file or edit existing one if project already loaded.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ProjectCreate( CxString commandLine )
+{
+    CxString projectName = commandLine;
+    projectName = projectName.stripLeading(" \t\n\r");
+    projectName = projectName.stripTrailing(" \t\n\r");
+
+    if (projectName.length() == 0) {
+        setMessage("(project name required)");
+        return;
+    }
+
+    // Check if project already loaded
+    if (project->projectName().length() > 0) {
+        // Project exists - load it into buffer
+        CxString projectPath = project->projectFilePath();
+        loadNewFile(projectPath, TRUE);
+        activeEditView()->reframeAndUpdateScreen();
+        setMessage("(Project already active - editing project file)");
+        return;
+    }
+
+    // Create new project file
+    CxString projectPath = projectName + ".project";
+
+    // Build JSON content
+    CxString content = "{\n";
+    content += "    \"projectName\": \"";
+    content += projectName;
+    content += "\",\n";
+    content += "    \"projectMakefile\": \"makefile\",\n";
+    content += "    \"files\": [\n";
+    content += "    ]\n";
+    content += "}\n";
+
+    // Write file
+    CxFile file;
+    if (!file.open(projectPath, "w")) {
+        setMessage("(Failed to create project file)");
+        return;
+    }
+    file.printf("%s", content.data());
+    file.close();
+
+    // Load into project and buffer
+    project->load(projectPath);
+    loadNewFile(projectPath, TRUE);
+    activeEditView()->reframeAndUpdateScreen();
+
+    char msg[200];
+    sprintf(msg, "(Created project '%s')", projectName.data());
+    setMessage(msg);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ProjectEdit
+//
+// Edit the current project file.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ProjectEdit( CxString commandLine )
+{
+    if (project->projectName().length() == 0) {
+        setMessage("(No project loaded)");
+        return;
+    }
+
+    CxString projectPath = project->projectFilePath();
+    loadNewFile(projectPath, TRUE);
+    activeEditView()->reframeAndUpdateScreen();
+    setMessage("(Editing project file)");
 }
 
 
