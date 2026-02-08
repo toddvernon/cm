@@ -89,7 +89,7 @@ static CxString pasteFromSystemClipboard( void )
 void
 ScreenEditor::CONTROL_ReplaceAgain( void )
 {
-    if (editView->replaceAgain( _findString, _replaceString )  == TRUE ) {
+    if (activeEditView()->replaceAgain( _findString, _replaceString )  == TRUE ) {
         setMessageWithLocation("(replace again found)");
     } else {
         setMessageWithLocation("(replace again not found)");
@@ -106,7 +106,7 @@ ScreenEditor::CONTROL_ReplaceAgain( void )
 void
 ScreenEditor::CONTROL_ToggleLineNumbers( void )
 {
-    editView->toggleLineNumbers();
+    activeEditView()->toggleLineNumbers();
     setMessage("(toggled line numbers)");
 }
 
@@ -120,7 +120,7 @@ ScreenEditor::CONTROL_ToggleLineNumbers( void )
 void
 ScreenEditor::CONTROL_ToggleJumpScroll( void )
 {
-    editView->toggleJumpScroll();
+    activeEditView()->toggleJumpScroll();
     setMessage("(toggled jump scrolling)");
 }
 
@@ -135,13 +135,13 @@ ScreenEditor::CONTROL_ToggleJumpScroll( void )
 void
 ScreenEditor::CONTROL_FindAgain( void )
 {
-    if (editView->findAgain( _findString ) == TRUE ) {
+    if (activeEditView()->findAgain( _findString ) == TRUE ) {
         setMessageWithLocation("(found)");
     } else {
         setMessageWithLocation("(not found)");
     }
 
-    editView->placeCursor();
+    activeEditView()->placeCursor();
     screen->flush();
 }
 
@@ -162,7 +162,7 @@ ScreenEditor::CMD_NewBuffer( CxString commandLine )
 
     setMessage( CxString(buffer));
 
-    editView->updateScreen();
+    activeEditView()->updateScreen();
 }
 
 
@@ -182,8 +182,8 @@ ScreenEditor::CMD_CommentBlock( CxString commandLine )
     sprintf(buffer, "(comment block to column %lu inserted)", lastCol);
 
     setMessage( CxString(buffer));
-    editView->insertCommentBlock( lastCol );
-    editView->updateScreen();
+    activeEditView()->insertCommentBlock( lastCol );
+    activeEditView()->updateScreen();
 }
 
 
@@ -198,7 +198,7 @@ ScreenEditor::CMD_PasteText( CxString commandLine )
 {
     commandLineView->setText("");
     commandLineView->setPrompt("(text pasted)");
-    editView->pasteText( _cutBuffer );
+    activeEditView()->pasteText( _cutBuffer );
 }
 
 
@@ -214,7 +214,7 @@ ScreenEditor::CMD_SystemPaste( CxString commandLine )
 #if defined(_OSX_) || defined(_LINUX_)
     CxString clipboardText = pasteFromSystemClipboard();
     if (clipboardText.length() > 0) {
-        editView->pasteText( clipboardText );
+        activeEditView()->pasteText( clipboardText );
         setMessage("(pasted from system clipboard)");
     } else {
         setMessage("(system clipboard empty)");
@@ -236,7 +236,7 @@ ScreenEditor::CMD_CutToMark( CxString commandLine )
 {
     commandLineView->setText("");
     commandLineView->setPrompt("(text cut)");
-    _cutBuffer = editView->cutToMark();
+    _cutBuffer = activeEditView()->cutToMark();
 #if defined(_OSX_) || defined(_LINUX_)
     copyToSystemClipboard(_cutBuffer);
 #endif
@@ -254,7 +254,7 @@ ScreenEditor::CMD_SetMark( CxString commandLine )
 {
     commandLineView->setText("");
     commandLineView->setPrompt("(mark set)");
-    editView->setMark();
+    activeEditView()->setMark();
 }
 
 
@@ -276,7 +276,7 @@ ScreenEditor::CMD_GotoLine( CxString commandLine )
     sprintf(buffer, "(goto-line %lu)", lineNumber);
 
     setMessage( CxString(buffer));
-    editView->cursorGotoLine( lineNumber - 1 );
+    activeEditView()->cursorGotoLine( lineNumber - 1 );
 }
 
 
@@ -296,7 +296,7 @@ ScreenEditor::CMD_LoadFile( CxString commandLine )
     loadNewFile( newFileName, TRUE );
 
     // redraw the edit view
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     char buffer[200];
     sprintf( buffer, "(load %s)", newFileName.data());
@@ -337,7 +337,7 @@ ScreenEditor::CMD_BufferNext( CxString commandLine )
 {
     nextBuffer();
     setMessage("(next buffer)");
-    editView->updateScreen();
+    activeEditView()->updateScreen();
 }
 
 
@@ -352,7 +352,7 @@ ScreenEditor::CMD_BufferPrev( CxString commandLine )
 {
     previousBuffer();
     setMessage("(previous buffer)");
-    editView->updateScreen();
+    activeEditView()->updateScreen();
 }
 
 
@@ -427,7 +427,7 @@ ScreenEditor::CMD_Help( CxString commandLine )
 void
 ScreenEditor::CMD_Count( CxString commandLine )
 {
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
 
     unsigned long lineCount = editBuffer->numberOfLines();
     unsigned long charCount = editBuffer->characterCount();
@@ -447,9 +447,9 @@ ScreenEditor::CMD_Count( CxString commandLine )
 void
 ScreenEditor::CMD_Entab( CxString commandLine )
 {
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     editBuffer->entab();
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
     setMessage("(entab complete)");
 }
 
@@ -463,9 +463,9 @@ ScreenEditor::CMD_Entab( CxString commandLine )
 void
 ScreenEditor::CMD_Detab( CxString commandLine )
 {
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     editBuffer->detab();
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
     setMessage("(detab complete)");
 }
 
@@ -479,9 +479,9 @@ ScreenEditor::CMD_Detab( CxString commandLine )
 void
 ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 {
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     int removed = editBuffer->trimTrailing();
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     char msg[80];
     sprintf(msg, "(%d trailing character%s removed)", removed, removed == 1 ? "" : "s");
@@ -537,9 +537,9 @@ ScreenEditor::CMD_Make( CxString commandLine )
     buildBuffer->loadTextFromString(output);
 
     // Switch to build buffer
-    editView->setEditBuffer(buildBuffer);
+    activeEditView()->setEditBuffer(buildBuffer);
     buildBuffer->cursorGotoRequest(0, 0);
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     // Report result
     int exitCode = proc.getExitCode();
@@ -564,7 +564,7 @@ ScreenEditor::CMD_Make( CxString commandLine )
 void
 ScreenEditor::CMD_GotoError( CxString commandLine )
 {
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
 
     // Get current line
     unsigned long cursorRow = editBuffer->cursor.row;
@@ -607,10 +607,10 @@ ScreenEditor::CMD_GotoError( CxString commandLine )
             setMessage(CxString("(cannot open file: ") + err.filename + ")");
             return;
         }
-        targetBuffer = editView->getEditBuffer();
+        targetBuffer = activeEditView()->getEditBuffer();
     } else {
         // Switch to the buffer
-        editView->setEditBuffer(targetBuffer);
+        activeEditView()->setEditBuffer(targetBuffer);
     }
 
     // Go to the line (convert 1-based to 0-based)
@@ -618,7 +618,7 @@ ScreenEditor::CMD_GotoError( CxString commandLine )
     unsigned long targetCol = (err.column > 0) ? err.column - 1 : 0;
 
     targetBuffer->cursorGotoRequest(targetLine, targetCol);
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     char msg[120];
     sprintf(msg, "(%s:%d)", err.filename.data(), err.line);
@@ -679,10 +679,10 @@ ScreenEditor::insertUTFSymbolHelper( CxString commandLine, const char *symbolTyp
     }
 
     // insert the UTF-8 character at cursor (as a single character)
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     editBuffer->addCharacter( CxString(symbol->utf8) );
 
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     char buffer[200];
     sprintf(buffer, "(inserted %s)", symbol->name);
@@ -720,7 +720,7 @@ ScreenEditor::CMD_Find( CxString commandLine )
     _findString = _findString.stripTrailing(" \t\n\r");
     _findString.replaceAll( CxString("/n"), CxString("\n") );
 
-    if (editView->findString( _findString ) == TRUE ) {
+    if (activeEditView()->findString( _findString ) == TRUE ) {
         setMessageWithLocation("(found)");
     } else {
         setMessage("(not found)");
@@ -744,7 +744,7 @@ ScreenEditor::CMD_Replace(CxString commandLine)
     _replaceString = _replaceString.stripTrailing(" \t\n\r");
     _replaceString.replaceAll( CxString("/n"), CxString("\n") );
 
-    if (editView->replaceString( _findString, _replaceString ) == TRUE ) {
+    if (activeEditView()->replaceString( _findString, _replaceString ) == TRUE ) {
         setMessageWithLocation("(replace found)");
     } else {
         setMessageWithLocation("(replace not found)");
@@ -775,7 +775,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
     _replaceString.replaceAll( CxString("/n"), CxString("\n") );
 
     // get direct access to editBuffer to avoid per-replacement screen updates
-    CmEditBuffer *editBuffer = editView->getEditBuffer();
+    CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
 
     // move cursor to beginning of buffer
     editBuffer->cursorGotoRequest(0, 0);
@@ -787,7 +787,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
     }
 
     // single screen refresh after all replacements
-    editView->reframeAndUpdateScreen();
+    activeEditView()->reframeAndUpdateScreen();
 
     // report results
     char buffer[200];
@@ -808,7 +808,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
 
 void ScreenEditor::CTRL_Cut(void)
 {
-    _cutBuffer = editView->cutToMark();
+    _cutBuffer = activeEditView()->cutToMark();
 #if defined(_OSX_) || defined(_LINUX_)
     copyToSystemClipboard(_cutBuffer);
 #endif
@@ -816,12 +816,12 @@ void ScreenEditor::CTRL_Cut(void)
 
 void ScreenEditor::CTRL_Paste(void)
 {
-    editView->pasteText(_cutBuffer);
+    activeEditView()->pasteText(_cutBuffer);
 }
 
 void ScreenEditor::CTRL_CutToEndOfLine(void)
 {
-    _cutBuffer = editView->cutTextToEndOfLine();
+    _cutBuffer = activeEditView()->cutTextToEndOfLine();
 #if defined(_OSX_) || defined(_LINUX_)
     copyToSystemClipboard(_cutBuffer);
 #endif
@@ -829,12 +829,12 @@ void ScreenEditor::CTRL_CutToEndOfLine(void)
 
 void ScreenEditor::CTRL_PageDown(void)
 {
-    editView->pageDown();
+    activeEditView()->pageDown();
 }
 
 void ScreenEditor::CTRL_PageUp(void)
 {
-    editView->pageUp();
+    activeEditView()->pageUp();
 }
 
 void ScreenEditor::CTRL_NextBuffer(void)
@@ -849,12 +849,17 @@ void ScreenEditor::CTRL_ProjectList(void)
 
 void ScreenEditor::CTRL_UpdateScreen(void)
 {
-    editView->updateScreen();
+    activeEditView()->updateScreen();
 }
 
 void ScreenEditor::CTRL_Help(void)
 {
     showHelpView();
+}
+
+void ScreenEditor::CTRL_SwitchView(void)
+{
+    switchActiveView();
 }
 
 void ScreenEditor::CTRLX_Save(void)
@@ -875,4 +880,32 @@ void ScreenEditor::CTRLX_Quit(void)
     if (programDefaults->autoSaveOnBufferChange()) {
         saveCurrentEditBufferOnSwitch();
     }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Split
+//
+// Split screen horizontally (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Split( CxString commandLine )
+{
+    splitHorizontal();
+    setMessage("(split screen)");
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_Unsplit
+//
+// Return to single view (ESC command wrapper)
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_Unsplit( CxString commandLine )
+{
+    unsplit();
+    setMessage("(unsplit screen)");
 }

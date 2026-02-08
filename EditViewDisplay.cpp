@@ -20,6 +20,11 @@
 void
 EditView::updateStatusLine(void)
 {
+    // Skip if flag is set (top view in split mode - ScreenEditor handles divider)
+    if (_skipStatusLineUpdate) {
+        return;
+    }
+
     unsigned long row = editBuffer->cursor.row;
     unsigned long col = editBuffer->cursor.col;
     unsigned long numberOfLines = editBuffer->numberOfLines();
@@ -142,13 +147,14 @@ EditView::updateStatusLine(void)
 // EditView::bufferRowToScreenRow
 //
 // transforms a editbuffer index into a screen index (zero based).
+// In split screen mode, _screenEditFirstRow offsets the result to the correct region.
 //
 //-------------------------------------------------------------------------------------------------
 unsigned long
 EditView::bufferRowToScreenRow(unsigned long bufferRow)
 {
-    // get the physical screen line (zero based)
-    unsigned long screenLine = bufferRow - _visibleFirstEditBufferRow;
+    // get the physical screen line, offset by the region start row
+    unsigned long screenLine = bufferRow - _visibleFirstEditBufferRow + _screenEditFirstRow;
     return(screenLine);
 }
 
@@ -226,19 +232,25 @@ EditView::formatEditorLine(unsigned long bufferRow )
     int isIncludeLine = FALSE;
 
     //---------------------------------------------------------------------------------------------
-    // place the cursor at the correct place on the screen
-    //---------------------------------------------------------------------------------------------
-    CxString lineNumberString = CxCursor::locateTerminalString(
-                bufferRowToScreenRow(bufferRow),
-                0);
-
-
-    //---------------------------------------------------------------------------------------------
     // check the the logical row is visible return if not
     //
     //---------------------------------------------------------------------------------------------
-    if (bufferRow < _visibleFirstEditBufferRow) return(lineNumberString);
-    if (bufferRow > _visibleLastEditBufferRow)  return(lineNumberString);
+    if (bufferRow < _visibleFirstEditBufferRow) return("");
+    if (bufferRow > _visibleLastEditBufferRow)  return("");
+
+    //---------------------------------------------------------------------------------------------
+    // In region mode, ensure we don't draw past the region boundary
+    //---------------------------------------------------------------------------------------------
+    unsigned long screenRow = bufferRowToScreenRow(bufferRow);
+    if (_regionStartRow != -1 || _regionEndRow != -1) {
+        // Region mode - check screen row is within bounds
+        if (screenRow > _screenEditLastRow) return("");
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // place the cursor at the correct place on the screen
+    //---------------------------------------------------------------------------------------------
+    CxString lineNumberString = CxCursor::locateTerminalString(screenRow, 0);
 
     //---------------------------------------------------------------------------------------------
     // if we are showing line numbers, then build up the line number string

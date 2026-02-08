@@ -52,6 +52,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     screen = NULL;
     keyboard = NULL;
     editView = NULL;
+    editViewBottom = NULL;
     commandLineView = NULL;
     editBufferList = NULL;
     fileListView = NULL;
@@ -60,6 +61,11 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _activeCompleter = NULL;
     _currentCommand = NULL;
     _quitRequested = FALSE;
+
+    // initialize split screen state
+    _splitMode = 0;     // single view mode
+    _splitRow = 0;      // no split
+    _activeView = 0;    // top/only view is active
 #if defined(_LINUX_) || defined(_OSX_)
     _mcpHandler = NULL;
 #endif
@@ -267,6 +273,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
 
+#if 0 // MCP disabled for debugging
 #if defined(_LINUX_) || defined(_OSX_)
     //---------------------------------------------------------------------------------------------
     // Start MCP handler thread for Claude Desktop integration
@@ -277,6 +284,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // Register idle callback to check for MCP screen updates (~100ms intervals)
     keyboard->addIdleCallback( CxDeferCall( this, &ScreenEditor::mcpIdleCallback ));
+#endif
 #endif
 
     // Unblock SIGWINCH now that construction is complete
@@ -362,6 +370,9 @@ ScreenEditor::~ScreenEditor(void)
     delete programDefaults;
     delete commandLineView;
     delete editView;
+    if (editViewBottom != NULL) {
+        delete editViewBottom;
+    }
     // Note: screen and keyboard are owned by main(), not deleted here
 }
 
@@ -395,13 +406,296 @@ ScreenEditor::mcpIdleCallback(void)
                 _mcpHandler->clearStatusMessage();
             }
 
-            editView->reframeAndUpdateScreen();
-            editView->placeCursor();
+            // Update active view only
+            activeEditView()->reframeAndUpdateScreen();
+            if (_splitMode == 1) {
+                drawDivider();
+            }
+            activeEditView()->placeCursor();
             screen->flush();
         }
     }
 }
 #endif
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::activeEditView
+//
+// Returns the currently active EditView. In single view mode, returns editView.
+// In split mode, returns editView (top) or editViewBottom based on _activeView.
+//
+//-------------------------------------------------------------------------------------------------
+EditView*
+ScreenEditor::activeEditView(void)
+{
+    if (_splitMode == 0 || editViewBottom == NULL) {
+        return editView;
+    }
+    return (_activeView == 0) ? editView : editViewBottom;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::splitHorizontal
+//
+// Splits the screen horizontally, creating a bottom view. The top view keeps the current
+// buffer, the bottom view gets the *build* buffer or current buffer if *build* doesn't exist.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::splitHorizontal(void)
+{
+    if (_splitMode == 1) {
+        // already split
+        return;
+    }
+
+    // calculate split position (middle of screen, leaving room for status/command)
+    int totalRows = screen->rows();
+    // Divider row is in the middle of the editable area
+    // Leave 2 rows at bottom for status+command
+    int editableRows = totalRows - 2;
+    _splitRow = editableRows / 2;
+
+    // create bottom view if it doesn't exist
+    if (editViewBottom == NULL) {
+        editViewBottom = new EditView(programDefaults, screen);
+    }
+
+    // set regions for both views
+    // top view: row 0 to splitRow-1 (splitRow is the divider, so exclude it)
+    editView->setRegion(0, _splitRow);
+    editView->setSkipStatusLineUpdate(1);  // ScreenEditor handles divider as top view's status
+
+    // bottom view: row splitRow+1 to totalRows-2 (skip divider, before status line)
+    editViewBottom->setRegion(_splitRow + 1, totalRows - 2);
+    editViewBottom->setSkipStatusLineUpdate(0);  // bottom view updates its own status line
+
+    // Bottom view gets a different buffer if available, otherwise an empty buffer
+    // Skip .project files since they're just metadata
+    CmEditBuffer *bottomBuffer = NULL;
+    int numBuffers = editBufferList->items();
+
+    if (numBuffers > 1) {
+        int currentIdx = editBufferList->currentItemIndex();
+        // Search for a suitable buffer (not current, not .project)
+        for (int i = 1; i < numBuffers; i++) {
+            int idx = (currentIdx + i) % numBuffers;
+            CmEditBuffer *candidate = editBufferList->at(idx);
+            if (candidate != NULL) {
+                CxString path = candidate->getFilePath();
+                // Skip .project files
+                int projIdx = path.index(".project");
+                if (projIdx >= 0 && projIdx == (int)path.length() - 8) {
+                    continue;  // Skip this one
+                }
+                bottomBuffer = candidate;
+                break;
+            }
+        }
+    }
+
+    if (bottomBuffer != NULL) {
+        if (!bottomBuffer->isInMemory()) {
+            bottomBuffer->loadText(bottomBuffer->getFilePath(), TRUE);
+        }
+        editViewBottom->setEditBuffer(bottomBuffer);
+    } else {
+        // No suitable buffer found, create an empty one
+        CmEditBuffer *emptyBuffer = new CmEditBuffer();
+        emptyBuffer->setFilePath("*scratch*");
+        editBufferList->add(emptyBuffer);
+        editViewBottom->setEditBuffer(emptyBuffer);
+    }
+
+    _splitMode = 1;
+    _activeView = 0;  // top view is active
+
+    // redraw everything
+    screen->clearScreen();
+    editView->updateScreen();
+    editViewBottom->updateScreen();
+    drawDivider();  // Draw divider LAST so it's not overwritten
+    activeEditView()->placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::unsplit
+//
+// Returns to single view mode, destroying the bottom view.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::unsplit(void)
+{
+    if (_splitMode == 0) {
+        // not split
+        return;
+    }
+
+    _splitMode = 0;
+    _splitRow = 0;
+    _activeView = 0;
+
+    // reset top view to full screen
+    editView->setRegion(-1, -1);
+    editView->setSkipStatusLineUpdate(0);  // re-enable status line updates
+
+    // redraw
+    screen->clearScreen();
+    editView->reframeAndUpdateScreen();
+    editView->placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::switchActiveView
+//
+// Toggles focus between top and bottom views in split mode.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::switchActiveView(void)
+{
+    if (_splitMode == 0 || editViewBottom == NULL) {
+        // not split, nothing to switch
+        return;
+    }
+
+    _activeView = (_activeView == 0) ? 1 : 0;
+
+    // Update the inactive view first (no cursor placement needed)
+    if (_activeView == 0) {
+        editViewBottom->updateScreen();
+    } else {
+        editView->updateScreen();
+    }
+
+    drawDivider();
+
+    // Update and reframe the active view (ensures cursor is visible and correctly placed)
+    activeEditView()->reframeAndUpdateScreen();
+
+    // Final explicit cursor placement in the active view
+    activeEditView()->placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::drawDivider
+//
+// Draws a horizontal divider line between the top and bottom views.
+// Formatted as a full status line for the top view's buffer.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::drawDivider(void)
+{
+    if (_splitMode == 0) {
+        return;
+    }
+
+    // Get top view's buffer info
+    CmEditBuffer *topBuffer = editView->getEditBuffer();
+    unsigned long row = topBuffer->cursor.row;
+    unsigned long col = topBuffer->cursor.col;
+    unsigned long numberOfLines = topBuffer->numberOfLines();
+
+    double percent = 0;
+    if (row > 0) {
+        percent = (double) row / (double) numberOfLines;
+    }
+    percent = percent * 100;
+
+    // set colors to match status bar
+    screen->setForegroundColor(programDefaults->statusBarTextColor());
+    screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+
+    // Build left part: "== cm: Editing [ filename ] "
+    CxString statusLineTextLeft;
+    statusLineTextLeft  = "== ";
+    statusLineTextLeft += "cm: Editing [ ";
+    statusLineTextLeft += topBuffer->getFilePath();
+    statusLineTextLeft += " ] ";
+
+    // Build right part with line/col info
+    CxString statusLineTextRight;
+    if (programDefaults->liveStatusLine()) {
+        char buffer[100];
+
+        sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
+        CxString linePartString = buffer;
+
+        // Pad linePartString to fixed width
+        while (linePartString.length() < 22) {
+            linePartString = CxString("=") + linePartString;
+        }
+
+        sprintf(buffer, "col(%lu)", col);
+        CxString colPartString = buffer;
+
+        while (colPartString.length() < 8) {
+            colPartString += "=";
+        }
+
+        statusLineTextRight += linePartString + CxString(" ") + colPartString;
+    }
+
+    // Calculate padding between left and right
+    int statusLineTextLength = statusLineTextLeft.length() + statusLineTextRight.length();
+    int positionsLeft = screen->cols() - statusLineTextLength;
+
+    // Build full line with = padding
+    CxString theText = statusLineTextLeft;
+    for (int c = 0; c < positionsLeft; c++) {
+        theText.append("=");
+    }
+    theText += statusLineTextRight;
+
+    screen->writeTextAt(_splitRow, 0, theText, true);
+    screen->resetColors();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::recalcSplitRegions
+//
+// Recalculates the regions for both views after a terminal resize.
+// Called from the screen resize callback.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::recalcSplitRegions(void)
+{
+    if (_splitMode == 0) {
+        return;
+    }
+
+    // recalculate split position
+    int totalRows = screen->rows();
+    _splitRow = (totalRows - 2) / 2;
+
+    // update regions
+    editView->setRegion(0, _splitRow);
+    if (editViewBottom != NULL) {
+        editViewBottom->setRegion(_splitRow + 1, totalRows - 2);
+    }
+
+    // redraw
+    screen->clearScreen();
+    editView->updateScreen();
+    drawDivider();
+    if (editViewBottom != NULL) {
+        editViewBottom->updateScreen();
+    }
+    activeEditView()->placeCursor();
+    screen->flush();
+}
 
 
 //-------------------------------------------------------------------------------------------------
@@ -419,7 +713,7 @@ ScreenEditor::resetPrompt(void)
         commandLineView->setPrompt("");
         commandLineView->setText("");
         commandLineView->updateScreen();
-        editView->placeCursor();
+        activeEditView()->placeCursor();
         screen->flush();
     }
 }
@@ -453,7 +747,7 @@ ScreenEditor::setMessage(CxString message)
 void
 ScreenEditor::setMessageWithLocation(CxString prefix)
 {
-    CxEditBufferPosition loc = editView->cursorPosition();
+    CxEditBufferPosition loc = activeEditView()->cursorPosition();
     char buffer[200];
     sprintf(buffer, "loc=(%lu,%lu)", loc.row, loc.col);
     setMessage(prefix + " " + CxString(buffer));
@@ -529,16 +823,21 @@ ScreenEditor::run(void)
         //-----------------------------------------------------------------------------------------
         CxKeyAction keyAction = keyboard->getAction();
 
+#if 0 // MCP disabled for debugging
 #if defined(_LINUX_) || defined(_OSX_)
         //-----------------------------------------------------------------------------------------
         // check if MCP handler modified buffers and needs a redraw
         //-----------------------------------------------------------------------------------------
         if (_mcpHandler != NULL && _mcpHandler->needsRedraw()) {
             _mcpHandler->clearNeedsRedraw();
-            editView->reframeAndUpdateScreen();
-            editView->placeCursor();
+            activeEditView()->reframeAndUpdateScreen();
+            if (_splitMode == 1) {
+                drawDivider();
+            }
+            activeEditView()->placeCursor();
             screen->flush();
         }
+#endif
 #endif
 
         //-----------------------------------------------------------------------------------------
@@ -635,22 +934,27 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
             if (handleControl( keyAction )) {
                 return(1);
             }
-            editView->placeCursor();
+            activeEditView()->placeCursor();
         }
         break;
-            
+
         //-----------------------------------------------------------------------------------------
         // handle all other keys
         //-----------------------------------------------------------------------------------------
         default:
         {
             resetPrompt();
-            editView->routeKeyAction( keyAction );
+            activeEditView()->routeKeyAction( keyAction );
+
+            // In split mode, always update the divider (shows top view's buffer status)
+            if (_splitMode == 1) {
+                drawDivider();
+            }
         }
         break;
-            
+
     }
-    
+
     return(0);
 }
 

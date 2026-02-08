@@ -46,6 +46,13 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
     // set the jumpScroll variable from defaults
     _jumpScroll = pd->jumpScroll();
 
+    // initialize region to full screen (-1 means use screen dimensions)
+    _regionStartRow = -1;
+    _regionEndRow = -1;
+
+    // don't skip status line updates by default
+    _skipStatusLineUpdate = 0;
+
 #if defined(_LINUX_) || defined(_OSX_)
     // MCP connection status (updated by ScreenEditor)
     _mcpConnected = 0;
@@ -250,6 +257,39 @@ EditView::setMcpConnected(int connected)
 
 
 //-------------------------------------------------------------------------------------------------
+// EditView::setRegion
+//
+// Sets the screen region this view occupies. Use -1 for either parameter to indicate
+// "use full screen" behavior. When both are -1, the view uses the entire screen.
+// When set to specific values, the view only uses rows from startRow to endRow.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::setRegion(int startRow, int endRow)
+{
+    _regionStartRow = startRow;
+    _regionEndRow = endRow;
+    recalcScreenPlacements();
+    // Recalculate visible buffer range based on new _screenEditNumberOfLines
+    recalcVisibleBufferFromTopEditLine(_visibleFirstEditBufferRow);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::setSkipStatusLineUpdate
+//
+// Sets whether to skip status line updates. Used for the top view in split mode
+// where ScreenEditor handles updating the divider as the status line.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::setSkipStatusLineUpdate(int skip)
+{
+    _skipStatusLineUpdate = skip;
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // EditView::recalcLineNumberDigits
 //
 // Calculates the space needed for the line numbers ahead of of each line of text.
@@ -280,7 +320,8 @@ EditView::recalcLineNumberDigits( void )
 // EditView::recalcScreenPlacements
 //
 // Given a screen window size, this calculates all the rows that are important to
-// to the editor.
+// to the editor. Supports both full-screen mode (region == -1) and split-screen mode
+// where this view only occupies a portion of the screen.
 //
 // TODO: have to fix the calculations on firstScreenLine and firstScreenCol for buffer
 //       switches.
@@ -292,41 +333,74 @@ EditView::recalcScreenPlacements(void)
     // get the number of lines
     _screenNumberOfLines = screen->rows();
     _screenNumberOfCols  = screen->cols();
-    
+
     // set the first visible edit column
     _visibleFirstEditBufferCol = 0;         // TODO: I think this one needs to change
 
 	// set the last visible edit column
     if (_showLineNumbers == TRUE) {
-		_screenEditNumberOfCols    = _screenNumberOfCols - _lineNumberOffset;     
-	   	_visibleLastEditBufferCol  = _screenNumberOfCols - _lineNumberOffset -1;     
+		_screenEditNumberOfCols    = _screenNumberOfCols - _lineNumberOffset;
+	   	_visibleLastEditBufferCol  = _screenNumberOfCols - _lineNumberOffset -1;
     } else {
         _screenEditNumberOfCols    = _screenNumberOfCols;
         _visibleLastEditBufferCol  = _screenNumberOfCols;
     }
-    
-  	// set the number of edit lines
-    _screenEditNumberOfLines = _screenNumberOfLines - 3;
 
-    // if window is too small to support the app, just bail
-    if ((screen->rows() < 6) || (_screenNumberOfCols < 10)) {
-        _windowTooSmall = true;
-        return;
+    // Check if using region mode or full screen mode
+    if (_regionStartRow == -1 && _regionEndRow == -1) {
+        //-------------------------------------------------------------------------------------
+        // Full screen mode - use original calculations exactly
+        //-------------------------------------------------------------------------------------
+
+        // set the number of edit lines (subtract 2 for status and command rows)
+        _screenEditNumberOfLines = _screenNumberOfLines - 2;
+
+        // if window is too small to support the app, just bail
+        if ((screen->rows() < 6) || (_screenNumberOfCols < 10)) {
+            _windowTooSmall = true;
+            return;
+        }
+
+        // upper left is always zero (zero based screen coordinates)
+        _screenEditFirstRow = 0;
+
+        // the last edit row is always three up from the bottom of screen
+        _screenEditLastRow  = _screenNumberOfLines - 3;
+
+        // the status row is always 2 up
+        _screenStatusRow    = _screenNumberOfLines - 2;
+
+        // the command row is always the last row
+        _screenCommandRow   = _screenNumberOfLines - 1;
+
+    } else {
+        //-------------------------------------------------------------------------------------
+        // Region mode - use specified bounds for split screen
+        //-------------------------------------------------------------------------------------
+        int effectiveStartRow = (_regionStartRow == -1) ? 0 : _regionStartRow;
+        int effectiveEndRow = (_regionEndRow == -1) ? (int)_screenNumberOfLines - 2 : _regionEndRow;
+
+        // all rows in region are for editing
+        _screenEditNumberOfLines = effectiveEndRow - effectiveStartRow;
+
+        // if region is too small, bail
+        if (_screenEditNumberOfLines < 3 || _screenNumberOfCols < 10) {
+            _windowTooSmall = true;
+            return;
+        }
+
+        // first edit row is start of region
+        _screenEditFirstRow = effectiveStartRow;
+
+        // last edit row is end of region minus 1
+        _screenEditLastRow = effectiveEndRow - 1;
+
+        // status/command still at global positions (shared in split mode)
+        _screenStatusRow = _screenNumberOfLines - 2;
+        _screenCommandRow = _screenNumberOfLines - 1;
     }
 
-    // upper left is always zero (zero based screen coordinates)
-    _screenEditFirstRow = 0;
-
-    // the last edit row is always three up from the bottom of screen
-    _screenEditLastRow  = _screenEditNumberOfLines - 3;
-
-    // the status row is always 2 up
-    _screenStatusRow    = _screenNumberOfLines - 2;
-
-    // the command row is always the last row
-    _screenCommandRow   = _screenNumberOfLines - 1;
-
-    // Screen Locations key
+    // Screen Locations key (full screen mode)
     //-----------------------------------------
     // 0 TEXT          = _screenFirstEditRow;
     // 1 TEXT          = _screenLastEditRow;
@@ -555,25 +629,25 @@ EditView::cursorGotoPosition( CxEditBufferPosition loc )
 void
 EditView::pageDown( void )
 {
-    // get the physical screen row the cursor is on
-    unsigned long screenRowOfCursor = bufferRowToScreenRow( editBuffer->cursor.row  );
+    // get the cursor's relative position within this view's region
+    unsigned long screenRowOfCursor = bufferRowToScreenRow(editBuffer->cursor.row) - _screenEditFirstRow;
 
-    // computer the new logical row number
-    unsigned long newBufferRow = editBuffer->cursor.row + _screenNumberOfLines;
+    // compute the new logical row number (use _screenEditNumberOfLines for region-aware paging)
+    unsigned long newBufferRow = editBuffer->cursor.row + _screenEditNumberOfLines;
 
     // compute the new logical row plus the offset of the cursor screen row
     unsigned long newBufferRowWithOffset = newBufferRow + (_screenEditNumberOfLines - screenRowOfCursor);
 
     // jump in the logical buffer ahead to to new cursor location plus the offset
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
-    
+
     // update the screen
     if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
 		if (reframe()) {
 			updateScreen();
 		}
     }
-    
+
     // now put the cursor back to the orginal physical screen location
     editBuffer->cursorGotoLine( newBufferRow );
 }
@@ -601,39 +675,40 @@ EditView::insertCommentBlock( unsigned long lastCol )
 void
 EditView::pageUp( void )
 {
-    // get the physical screen row the cursor is on
-    unsigned long screenRowOfCursor = bufferRowToScreenRow( editBuffer->cursor.row  );
-    
-    // computer the new logical row number, and make sure we can still page up
+    // get the cursor's relative position within this view's region
+    unsigned long screenRowOfCursor = bufferRowToScreenRow(editBuffer->cursor.row) - _screenEditFirstRow;
+
+    // compute the new logical row number, and make sure we can still page up
+    // use _screenEditNumberOfLines for region-aware paging
     unsigned long newBufferRow = 0;
-    if (editBuffer->cursor.row <= _screenNumberOfLines ) {
-        
+    if (editBuffer->cursor.row <= _screenEditNumberOfLines ) {
+
         // we are on the first page, so just jump the cursor to the top of it
         editBuffer->cursorGotoLine( newBufferRow );
         return;
     }
-    
+
     // compute the new buffer row number
-    newBufferRow = editBuffer->cursor.row - _screenNumberOfLines;
- 
+    newBufferRow = editBuffer->cursor.row - _screenEditNumberOfLines;
+
     // compute a new jump with offset for the current cursor line
     unsigned long newBufferRowWithOffset = 0;
     if ( newBufferRow >= screenRowOfCursor) {
         newBufferRowWithOffset = newBufferRow - screenRowOfCursor;
     }
-    
+
     // jump in the logical buffer back to to new cursor location minus the offset
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
-    
+
     // update the screen
     if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
         if (reframe()) {
             updateScreen();
         }
     }
-    
+
     // now put the cursor back to the orginal physical screen location
-    editBuffer->cursorGotoLine( newBufferRow );    
+    editBuffer->cursorGotoLine( newBufferRow );
 }
 
 
