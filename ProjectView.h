@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  FileListView.h
+//  ProjectView.h
 //  cmacs
 //
 //  Created by Todd Vernon on 9/15/23.
@@ -29,18 +29,18 @@
 #include "Project.h"
 
 
-#ifndef _FileListView_h_
-#define _FileListView_h_
+#ifndef _ProjectView_h_
+#define _ProjectView_h_
 
 //---------------------------------------------------------------------------------------------------------
 //
 //
 //---------------------------------------------------------------------------------------------------------
-class FileListView
+class ProjectView
 {
   public:
 
-    FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screen );
+    ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screen );
     // Constructor
 
     void routeKeyAction( CxKeyAction keyAction );
@@ -65,9 +65,6 @@ class FileListView
     // set visibility state for resize handling
 
   private:
-
-    void screenResizeCallback( void );
-    // callback to receive host window size updates
 
     int handleArrows( CxKeyAction keyAction );
     // handle the arrow keys
@@ -94,12 +91,12 @@ class FileListView
     int  screenNumberOfLines;
     int  screenNumberOfCols;
     
-    int  screenFileListTitleBarLine;
-    int  screenFileListFrameLine;
-    int  screenFileListNumberOfLines;
-	int  screenFileListNumberOfCols;
-    int  screenFileListFirstListLine;  // index of the first visible edit row (zero based)
-    int  screenFileListLastListLine;   // index of the last visible edit row (zero based)
+    int  screenProjectTitleBarLine;
+    int  screenProjectFrameLine;
+    int  screenProjectNumberOfLines;
+	int  screenProjectNumberOfCols;
+    int  screenProjectFirstListLine;  // index of the first visible edit row (zero based)
+    int  screenProjectLastListLine;   // index of the last visible edit row (zero based)
    
 	// need list visible bounds 
 
