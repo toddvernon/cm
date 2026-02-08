@@ -32,10 +32,6 @@ static const int   STATUS_FILL_BYTES = 1;
 void
 EditView::updateStatusLine(void)
 {
-    // Skip if flag is set (top view in split mode - ScreenEditor handles divider)
-    if (_skipStatusLineUpdate) {
-        return;
-    }
 
     unsigned long row = editBuffer->cursor.row;
     unsigned long col = editBuffer->cursor.col;

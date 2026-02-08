@@ -22,6 +22,16 @@
 #include "FileListView.h"
 
 //-------------------------------------------------------------------------------------------------
+// Platform-conditional selection indicator
+//-------------------------------------------------------------------------------------------------
+#if defined(_LINUX_) || defined(_OSX_)
+static const char *SELECTION_INDICATOR = "\xe2\x96\xb6";  // ▶ (UTF-8)
+#else
+static const char *SELECTION_INDICATOR = ">";
+#endif
+
+
+//-------------------------------------------------------------------------------------------------
 // FileListView::FileListView (constructor)
 //
 // Constructs an overlay file list view allowing the user to select a file from the edit buffer
@@ -33,11 +43,16 @@ FileListView::FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project 
     editBufferList  = ebl;
     screen          = screenPtr;
     project         = proj;
-    
-    // setup the resize callback
-    screen->addScreenSizeCallback( CxDeferCall( this, &FileListView::screenResizeCallback ));
-    
-    // recalc where everything should disolay
+
+    // create the box frame for modal display
+    frame = new CxBoxFrame(screen);
+
+    // initially not visible
+    _visible = 0;
+
+    // NOTE: No resize callback here - ScreenEditor owns all resize handling
+
+    // recalc where everything should display
     recalcScreenPlacements();
 }
 
@@ -45,7 +60,9 @@ FileListView::FileListView( ProgramDefaults *pd, CmEditBufferList *ebl, Project 
 //-------------------------------------------------------------------------------------------------
 // FileListView::screenResizeCallback (callback)
 //
-// Called with the user resizes the terminal window.  Recalculates key parts of the screen.
+// Called when the user resizes the terminal window.  Recalculates key parts of the screen
+// and redraws if the modal is currently visible. The modal draws on top of whatever the
+// editors have drawn, so we don't need to clear the screen.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -53,46 +70,79 @@ FileListView::screenResizeCallback( void )
 {
     // recalculate all the component placements
     recalcScreenPlacements();
+
+    // if modal is visible, redraw it on top of the editors
+    if (_visible) {
+        screen->hideCursor();
+        redraw();
+    }
 }
 
 
 //-------------------------------------------------------------------------------------------------
 // FileListView::recalcScreenPlacements
 //
-// Given a screen window size, this calculates all the rows that are important to
-// to the editor.
-//
+// Calculate centered modal bounds with 15% margins on each side.
+// Content height is based on buffer count, clamped to min/max limits.
 //
 //-------------------------------------------------------------------------------------------------
 void
 FileListView::recalcScreenPlacements(void)
 {
-    // number of lines on the screen
+    // get screen dimensions
     screenNumberOfLines = screen->rows();
-
-	// number of cols on the screen
     screenNumberOfCols  = screen->cols();
 
-	double maxPossibleListItems = (double) screenNumberOfLines * 0.5;
+    // calculate horizontal margins (15% on each side)
+    int marginCols = (int)(screenNumberOfCols * 0.15);
+    int frameLeft  = marginCols;
+    int frameRight = screenNumberOfCols - marginCols - 1;
 
-	if (editBufferList->items() < maxPossibleListItems) {
-		screenFileListNumberOfLines = editBufferList->items();
-	} else {
-		screenFileListNumberOfLines = maxPossibleListItems;
-	}
-    
-    // number of line to show, start with all of them
-    //screenFileListNumberOfLines = 10;
-        
-    // the title bar on the file list window
-    screenFileListTitleBarLine = screenNumberOfLines - screenFileListNumberOfLines - 3;
-    
-    screenFileListFirstListLine = screenFileListTitleBarLine +1;
+    // ensure minimum width
+    int frameWidth = frameRight - frameLeft + 1;
+    if (frameWidth < 40) {
+        frameLeft  = (screenNumberOfCols - 40) / 2;
+        frameRight = frameLeft + 39;
+    }
 
-	// set the first list index visible in the scrolling list
-	firstVisibleListIndex = 0;
-    
-    // set the selected item in the list, zero by default
+    // calculate content height
+    // Frame layout: top border + title + separator + content + separator + footer + bottom border = 6 + content
+    int minItems = 5;
+    int maxItems = (int)(screenNumberOfLines * 0.6) - 6;  // reserve 6 for frame rows
+    if (maxItems < minItems) maxItems = minItems;
+
+    int bufferCount = editBufferList->items();
+    if (bufferCount < minItems) {
+        screenFileListNumberOfLines = minItems;
+    } else if (bufferCount > maxItems) {
+        screenFileListNumberOfLines = maxItems;
+    } else {
+        screenFileListNumberOfLines = bufferCount;
+    }
+
+    // total height = content lines + 6 (top, title, sep, content..., sep, footer, bottom)
+    int totalHeight = screenFileListNumberOfLines + 6;
+
+    // vertical centering
+    int frameTop    = (screenNumberOfLines - totalHeight) / 2;
+    int frameBottom = frameTop + totalHeight - 1;
+
+    // store column info for redraw
+    screenFileListNumberOfCols = frameRight - frameLeft - 1;  // content width
+
+    // update the frame bounds
+    frame->resize(frameTop, frameLeft, frameBottom, frameRight);
+
+    // content starts after top border, title, and separator (row + 3)
+    screenFileListTitleBarLine  = frameTop + 1;  // title is on row 1
+    screenFileListFrameLine     = frameTop + 2;  // separator is on row 2
+    screenFileListFirstListLine = frameTop + 3;  // content starts on row 3
+    screenFileListLastListLine  = frameBottom - 3;  // before footer separator
+
+    // set the first list index visible in the scrolling list
+    firstVisibleListIndex = 0;
+
+    // set the selected item in the list
     selectedListItemIndex = editBufferList->currentItemIndex();
 }
 
@@ -121,155 +171,143 @@ FileListView::calcLongestName(void)
 //-------------------------------------------------------------------------------------------------
 // FileListView::redraw
 //
-// Moves the visible window indexes so the cursor is visible and updates the screen
+// Draw centered modal dialog with box frame, title, content, and footer.
 //
 //-------------------------------------------------------------------------------------------------
 void
 FileListView::redraw( void )
 {
     int cursorRow = 0;
-    int longestName = calcLongestName();
-    
+
     reframe();
-    
-    CxString pointerText = "> ";
-    CxString afterFileNameText = "  ";
-    CxString borderText = " ";
-    CxString statusBarTextColorCode = programDefaults->statusBarTextColor()->terminalString();
-    CxString statusBarBackgroundColorCode = programDefaults->statusBarBackgroundColor()->terminalString();
-    CxString statusBarTextColorResetCode = programDefaults->statusBarTextColor()->resetTerminalString();
-    CxString statusBarBackgroundColorResetCode = programDefaults->statusBarBackgroundColor()->resetTerminalString();
+
+    // get frame content bounds
+    int contentLeft  = frame->contentLeft();
+    int contentRight = frame->contentRight();
+    int contentWidth = frame->contentWidth();
 
     //---------------------------------------------------------------------------------------------
-    // draw the title bar
+    // set frame colors and draw the frame with title and footer
     //---------------------------------------------------------------------------------------------
-    // set the status bar foreground and background colors
-    screen->setForegroundColor(programDefaults->statusBarTextColor() );
-    screen->setBackgroundColor(programDefaults->statusBarBackgroundColor() );
-    
-    CxString header = CxString("-- PROJECT: ") + project->projectName() + CxString(" ");
-    while( header.length() < screenNumberOfCols ) header += CxString("-");
-    
-    screen->writeTextAt( screenFileListTitleBarLine, 0, header, false );
-    screen->resetColors();
-    
+    frame->setFrameColor(programDefaults->statusBarTextColor(),
+                         programDefaults->statusBarBackgroundColor());
+
+    // build title string: Project: <name>
+    CxString title = CxString("Project: ") + project->projectName();
+
+    // build footer string with keyboard hints
+    CxString footer = CxString("[Enter] Load   [S] Save   [A] Save All   [Esc] Cancel");
+
+    frame->drawWithTitleAndFooter(title, footer);
+
     //---------------------------------------------------------------------------------------------
-    // draw the window lines
+    // draw the file list content
     //---------------------------------------------------------------------------------------------
-    // looping on visible  items
-    for (int c=0; c<screenFileListNumberOfLines; c++) {
-        
-        // get the logical list index that is the first visible item on the screen
+    for (int c = 0; c < screenFileListNumberOfLines; c++) {
+
+        // get the logical list index
         int logicalItem = firstVisibleListIndex + c;
-        
-        //CxColor resetColor;
-        CxString text;
-        int realTextLength = 0;
-        
-        
-        // if the logical Item is less than the number of items in the buffer list
+        int row = screenFileListFirstListLine + c;
+
+        // position cursor at start of content area
+        screen->placeCursor(row, contentLeft);
+
+        // if this item exists in the buffer list
         if (logicalItem < editBufferList->items()) {
-            
-            // get the edit buffer at that index
+
             CmEditBuffer *eb = editBufferList->at(logicalItem);
-            
-            CxString touchedText  = "";
-            CxString inMemoryText = "";
-            
+
+            // build status text
+            CxString statusText = "";
             if (eb->isTouched()) {
-                touchedText = " /text-modified";
-            }
-            
-            if (eb->isInMemory()) {
-                inMemoryText = " /in-memory";
+                statusText = "/modified";
+            } else if (eb->isInMemory()) {
+                statusText = "/in-memory";
             }
 
-			CxString postFixText = touchedText + inMemoryText;
+            // get file path
+            CxString filePath = eb->getFilePath();
 
+            // Layout: " X path...padding...status "
+            // where X is indicator (▶) for selected, space for unselected
+            // Total display width = contentWidth
+            // Indicator area = 3 columns (" X ")
+            // Status area = status length + 1 trailing space
+            // Path area = remaining space
 
-            // get the file path for this edit buffer
-            CxString filePath = eb->getFilePath( );
-            
-            // debug
-            //filePath = filePath + CxString("  "); // + CxString( logicalItem );
-            
-            while( filePath.length() < longestName) {
+            int indicatorDisplayLen = 3;  // " X " display columns
+            int statusDisplayLen = statusText.length() + 1;  // status + trailing space
+            int pathAreaLen = contentWidth - indicatorDisplayLen - statusDisplayLen;
+
+            // truncate path if needed
+            if ((int)filePath.length() > pathAreaLen) {
+                filePath = filePath.subString(0, pathAreaLen - 3);
+                filePath += "...";
+            }
+
+            // pad path to fill path area
+            while ((int)filePath.length() < pathAreaLen) {
                 filePath += " ";
             }
-            
-            // buffer
-            filePath += "     ";
-            
-            
+
             //-------------------------------------------------------------------------------------
-            // draw a selected list item
+            // draw selected item
             //-------------------------------------------------------------------------------------
             if (selectedListItemIndex == logicalItem) {
-                
-                text + CxString("");
-                realTextLength = 0;
-                
-                text += statusBarTextColorCode + statusBarBackgroundColorCode;
-            
-                // add the file pointer text
-                text += pointerText; realTextLength += pointerText.length();
-                
-                // add the file path string
-                text += filePath; realTextLength += filePath.length();
-                
-                // add the highlight padding after the file name
-                text += afterFileNameText; realTextLength += afterFileNameText.length();
-                 
-                text += statusBarTextColorResetCode + statusBarBackgroundColorResetCode;
-                
-                
-                
-                text += postFixText; realTextLength += postFixText.length();
-                
-                // write out the string
-                screen->writeTextAt( screenFileListFirstListLine + c, 0, text, TRUE );
-                
-                cursorRow = screenFileListFirstListLine + c;
+
+                // set selection colors
+                screen->setForegroundColor(programDefaults->statusBarTextColor());
+                screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+
+                // build the line: " ▶ " + padded_path + status + " "
+                CxString line = " ";
+                line += SELECTION_INDICATOR;
+                line += " ";
+                line += filePath;
+                line += statusText;
+                line += " ";
+
+                screen->writeText(line);
+                screen->resetColors();
+
+                cursorRow = row;
 
             //-------------------------------------------------------------------------------------
-            // draw an unselected list item
+            // draw unselected item
             //-------------------------------------------------------------------------------------
             } else {
-                
-                text + CxString("");
-                realTextLength = 0;
-                
-                // add space text before filename
-                text += statusBarTextColorResetCode + statusBarBackgroundColorResetCode;
-                text += CxString("  "); realTextLength += 2;
 
-                // add the file path string
-                text += filePath; realTextLength += filePath.length();
-                
-                // add the highlight padding after the file name
-                text += afterFileNameText; realTextLength += afterFileNameText.length();
-                
-                text += postFixText; realTextLength += postFixText.length();
-                
-                screen->writeTextAt( screenFileListFirstListLine + c, 0, text, TRUE );
-                
+                // use modal content colors (dark background for overlay effect)
+                screen->setForegroundColor(programDefaults->modalContentTextColor());
+                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+
+                // build the line: "   " + padded_path + status + " "
+                CxString line = "   ";
+                line += filePath;
+                line += statusText;
+                line += " ";
+
+                screen->writeText(line);
+                screen->resetColors();
             }
-            
+
         //-----------------------------------------------------------------------------------------
-        // draw list items beyond the the list if the window is larger than the list
+        // draw empty line if beyond buffer list
         //-----------------------------------------------------------------------------------------
         } else {
-            
-            text + CxString("");
-            realTextLength = 0;
-                
-            screen->writeTextAt( screenFileListFirstListLine + c, 0, text, TRUE );
+            // fill empty lines with modal background
+            screen->setForegroundColor(programDefaults->modalContentTextColor());
+            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+            CxString emptyLine;
+            for (int i = 0; i < contentWidth; i++) {
+                emptyLine += " ";
+            }
+            screen->writeText(emptyLine);
+            screen->resetColors();
         }
-        
     }
-        
-    screen->placeCursor(cursorRow,0);
- 
+
+    screen->placeCursor(cursorRow, contentLeft);
     screen->resetColors();
     screen->flush();
 }
@@ -286,12 +324,38 @@ FileListView::getSelectedItem( void )
 {
     // get the edit buffer at that index
     CmEditBuffer *eb = editBufferList->at( selectedListItemIndex );
-    
+
     // get the file assuming we haven't made a mistake
     CxString filePath = eb->getFilePath( );
-    
+
     // return the name of the path
     return(filePath);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// FileListView::getSelectedBuffer
+//
+// return the edit buffer for the currently selected item (for save operations)
+//
+//-------------------------------------------------------------------------------------------------
+CmEditBuffer *
+FileListView::getSelectedBuffer( void )
+{
+    return editBufferList->at( selectedListItemIndex );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// FileListView::setVisible
+//
+// Set the visibility state for resize handling
+//
+//-------------------------------------------------------------------------------------------------
+void
+FileListView::setVisible( int visible )
+{
+    _visible = visible;
 }
 
 

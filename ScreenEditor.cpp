@@ -297,6 +297,13 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 #endif
 #endif
 
+    //---------------------------------------------------------------------------------------------
+    // Register ScreenEditor's resize callback LAST so it fires after EditView/FileListView
+    // This allows ScreenEditor to coordinate final redraw based on programMode
+    //
+    //---------------------------------------------------------------------------------------------
+    screen->addScreenSizeCallback( CxDeferCall( this, &ScreenEditor::screenResizeCallback ));
+
     // Unblock SIGWINCH now that construction is complete
     sigprocmask(SIG_SETMASK, &oldSet, NULL);
 
@@ -418,9 +425,6 @@ ScreenEditor::mcpIdleCallback(void)
 
             // Update active view only
             activeEditView()->reframeAndUpdateScreen();
-            if (_splitMode == 1) {
-                drawDivider();
-            }
             activeEditView()->placeCursor();
             screen->flush();
         }
@@ -474,13 +478,11 @@ ScreenEditor::splitHorizontal(void)
     }
 
     // set regions for both views
-    // top view: row 0 to splitRow-1 (splitRow is the divider, so exclude it)
+    // top view: row 0 to splitRow (status line of top view)
     editView->setRegion(0, _splitRow);
-    editView->setSkipStatusLineUpdate(1);  // ScreenEditor handles divider as top view's status
 
-    // bottom view: row splitRow+1 to totalRows-2 (skip divider, before status line)
+    // bottom view: row splitRow+1 to totalRows-2 (before command line)
     editViewBottom->setRegion(_splitRow + 1, totalRows - 2);
-    editViewBottom->setSkipStatusLineUpdate(0);  // bottom view updates its own status line
 
     // Bottom view gets a different buffer if available, otherwise an empty buffer
     // Skip .project files since they're just metadata
@@ -526,7 +528,6 @@ ScreenEditor::splitHorizontal(void)
     screen->clearScreen();
     editView->updateScreen();
     editViewBottom->updateScreen();
-    drawDivider();  // Draw divider LAST so it's not overwritten
     activeEditView()->placeCursor();
     screen->flush();
 }
@@ -552,7 +553,6 @@ ScreenEditor::unsplit(void)
 
     // reset top view to full screen
     editView->setRegion(-1, -1);
-    editView->setSkipStatusLineUpdate(0);  // re-enable status line updates
 
     // redraw
     screen->clearScreen();
@@ -585,101 +585,12 @@ ScreenEditor::switchActiveView(void)
         editView->updateScreen();
     }
 
-    drawDivider();
-
     // Update and reframe the active view (ensures cursor is visible and correctly placed)
     activeEditView()->reframeAndUpdateScreen();
 
     // Final explicit cursor placement in the active view
     activeEditView()->placeCursor();
     screen->flush();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::drawDivider
-//
-// Draws a horizontal divider line between the top and bottom views.
-// Formatted as a full status line for the top view's buffer.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::drawDivider(void)
-{
-    if (_splitMode == 0) {
-        return;
-    }
-
-    // Get top view's buffer info
-    CmEditBuffer *topBuffer = editView->getEditBuffer();
-    unsigned long row = topBuffer->cursor.row;
-    unsigned long col = topBuffer->cursor.col;
-    unsigned long numberOfLines = topBuffer->numberOfLines();
-
-    double percent = 0;
-    if (row > 0) {
-        percent = (double) row / (double) numberOfLines;
-    }
-    percent = percent * 100;
-
-    // set colors to match status bar
-    screen->setForegroundColor(programDefaults->statusBarTextColor());
-    screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-
-    // Build left part: "── cm: Editing [ filename ] "
-    CxString statusLineTextLeft;
-    statusLineTextLeft  = STATUS_FILL;
-    statusLineTextLeft += STATUS_FILL;
-    statusLineTextLeft += " cm: Editing [ ";
-    statusLineTextLeft += topBuffer->getFilePath();
-    statusLineTextLeft += " ] ";
-
-    // Track display width separately from byte length for UTF-8 compatibility
-    int leftDisplayWidth = 3 + 14 + topBuffer->getFilePath().length() + 3;
-
-    // Build right part with line/col info
-    CxString statusLineTextRight;
-    int rightDisplayWidth = 0;
-
-    if (programDefaults->liveStatusLine()) {
-        char buffer[100];
-
-        sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
-        CxString linePartString = buffer;
-        int linePartDisplayWidth = linePartString.length();
-
-        // Pad linePartString to fixed width
-        while (linePartDisplayWidth < 22) {
-            linePartString = CxString(STATUS_FILL) + linePartString;
-            linePartDisplayWidth++;
-        }
-
-        sprintf(buffer, "col(%lu)", col);
-        CxString colPartString = buffer;
-        int colPartDisplayWidth = colPartString.length();
-
-        while (colPartDisplayWidth < 8) {
-            colPartString += STATUS_FILL;
-            colPartDisplayWidth++;
-        }
-
-        statusLineTextRight += linePartString + CxString(" ") + colPartString;
-        rightDisplayWidth = 22 + 1 + 8;  // linePartString + space + colPartString
-    }
-
-    // Calculate padding between left and right using display width
-    int statusLineDisplayWidth = leftDisplayWidth + rightDisplayWidth;
-    int positionsLeft = screen->cols() - statusLineDisplayWidth;
-
-    // Build full line with fill character padding
-    CxString theText = statusLineTextLeft;
-    for (int c = 0; c < positionsLeft; c++) {
-        theText.append(STATUS_FILL);
-    }
-    theText += statusLineTextRight;
-
-    screen->writeTextAt(_splitRow, 0, theText, true);
-    screen->resetColors();
 }
 
 
@@ -710,11 +621,100 @@ ScreenEditor::recalcSplitRegions(void)
     // redraw
     screen->clearScreen();
     editView->updateScreen();
-    drawDivider();
     if (editViewBottom != NULL) {
         editViewBottom->updateScreen();
     }
     activeEditView()->placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::screenResizeCallback
+//
+// THE SINGLE resize callback for the entire application.
+// ScreenEditor owns all resize handling and coordinates redrawing in correct order.
+//
+// Architecture: ALL region math first, THEN all drawing in correct z-order.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::screenResizeCallback(void)
+{
+    //=============================================================================================
+    // PHASE 1: ALL RECALC / REGION MATH
+    //=============================================================================================
+
+    // 1a. Split regions (if split mode)
+    if (_splitMode == 1) {
+        int totalRows = screen->rows();
+        _splitRow = (totalRows - 2) / 2;
+        editView->setRegion(0, _splitRow);
+        if (editViewBottom != NULL) {
+            editViewBottom->setRegion(_splitRow + 1, totalRows - 2);
+        }
+    }
+
+    // 1b. EditView recalc (handles screen size change + reframe)
+    editView->recalcForResize();
+
+    // 1c. EditViewBottom recalc (if split)
+    if (_splitMode == 1 && editViewBottom != NULL) {
+        editViewBottom->recalcForResize();
+    }
+
+    // 1d. CommandLineView recalc
+    commandLineView->recalcScreenPlacements();
+
+    // 1e. FileListView recalc (if in FILELIST mode)
+    if (programMode == FILELIST) {
+        fileListView->recalcScreenPlacements();
+    }
+
+    // 1f. HelpTextView recalc (if in HELPVIEW mode)
+    if (programMode == HELPVIEW) {
+        helpTextView->recalcScreenPlacements();
+    }
+
+    //=============================================================================================
+    // PHASE 2: ALL DRAWING IN CORRECT Z-ORDER
+    //=============================================================================================
+
+    // 2a. Clear screen
+    screen->clearScreen();
+
+    // 2b. Draw editView (top/only editor - each EditView draws its own status bar)
+    editView->updateScreen();
+
+    // 2c. Draw editViewBottom (if split)
+    if (_splitMode == 1 && editViewBottom != NULL) {
+        editViewBottom->updateScreen();
+    }
+
+    // 2e. Draw commandLineView
+    commandLineView->updateScreen();
+
+    // 2f. Draw modal on top (if applicable)
+    if (programMode == FILELIST) {
+        screen->hideCursor();
+        fileListView->redraw();
+        // Note: fileListView->redraw() includes flush
+        return;
+    }
+
+    if (programMode == HELPVIEW) {
+        helpTextView->redraw();
+        return;
+    }
+
+    // 2g. Place cursor (EDIT or COMMANDLINE mode)
+    if (programMode == COMMANDLINE) {
+        commandLineView->placeCursor();
+    } else {
+        activeEditView()->placeCursor();
+    }
+
+    // 2h. Flush
     screen->flush();
 }
 
@@ -784,8 +784,13 @@ ScreenEditor::setMessageWithLocation(CxString prefix)
 void
 ScreenEditor::showFileListView(void)
 {
+    // flush any pending output before drawing modal
+    screen->flush();
+
+    screen->hideCursor();
+    fileListView->setVisible(1);
     fileListView->recalcScreenPlacements();
-    fileListView->redraw();
+    fileListView->redraw();  // draws modal on top of existing screen content
     programMode = FILELIST;
 }
 
@@ -852,9 +857,6 @@ ScreenEditor::run(void)
         if (_mcpHandler != NULL && _mcpHandler->needsRedraw()) {
             _mcpHandler->clearNeedsRedraw();
             activeEditView()->reframeAndUpdateScreen();
-            if (_splitMode == 1) {
-                drawDivider();
-            }
             activeEditView()->placeCursor();
             screen->flush();
         }
@@ -966,11 +968,6 @@ ScreenEditor::focusEditor( CxKeyAction keyAction)
         {
             resetPrompt();
             activeEditView()->routeKeyAction( keyAction );
-
-            // In split mode, always update the divider (shows top view's buffer status)
-            if (_splitMode == 1) {
-                drawDivider();
-            }
         }
         break;
 
@@ -1014,24 +1011,44 @@ ScreenEditor::focusFilelist( CxKeyAction keyAction )
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
         {
+            fileListView->setVisible(0);
+            screen->showCursor();
             programMode = ScreenEditor::EDIT;
+
+            // redraw all editors (handles split screen mode)
+            screen->clearScreen();
             editView->updateScreen();
+            if (_splitMode == 1 && editViewBottom != NULL) {
+                editViewBottom->updateScreen();
+            }
+            activeEditView()->placeCursor();
+            screen->flush();
         }
         break;
-                            
+
         //-----------------------------------------------------------------------------------------
         // handle a newline
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::NEWLINE:
         {
+            fileListView->setVisible(0);
+            screen->showCursor();
             programMode = ScreenEditor::EDIT;
             CxString pathName = fileListView->getSelectedItem();
             loadNewFile( pathName, TRUE );
+
+            // redraw all editors (handles split screen mode)
+            screen->clearScreen();
             editView->updateScreen();
+            if (_splitMode == 1 && editViewBottom != NULL) {
+                editViewBottom->updateScreen();
+            }
+            activeEditView()->placeCursor();
+            screen->flush();
         }
         break;
-            
-            
+
+
         //-----------------------------------------------------------------------------------------
         // normal input characters
         //
@@ -1039,18 +1056,55 @@ ScreenEditor::focusFilelist( CxKeyAction keyAction )
         case CxKeyAction::LOWERCASE_ALPHA:
         case CxKeyAction::UPPERCASE_ALPHA:
         {
-            
             // load the highlighted file
-            if ( keyAction.tag() == 'l')
+            if ( keyAction.tag() == 'l' || keyAction.tag() == 'L')
             {
+                fileListView->setVisible(0);
+                screen->showCursor();
                 programMode = ScreenEditor::EDIT;
                 CxString pathName = fileListView->getSelectedItem();
                 loadNewFile( pathName, TRUE );
-                editView->updateScreen();
-            }
-            
-            
 
+                // redraw all editors (handles split screen mode)
+                screen->clearScreen();
+                editView->updateScreen();
+                if (_splitMode == 1 && editViewBottom != NULL) {
+                    editViewBottom->updateScreen();
+                }
+                activeEditView()->placeCursor();
+                screen->flush();
+            }
+
+            // save the highlighted file
+            if ( keyAction.tag() == 's' || keyAction.tag() == 'S')
+            {
+                CmEditBuffer *buffer = fileListView->getSelectedBuffer();
+                if (buffer != NULL && buffer->isTouched()) {
+                    buffer->saveText(buffer->getFilePath());
+                    setMessage("(Saved)");
+                }
+                fileListView->redraw();
+            }
+
+            // save all modified files
+            if ( keyAction.tag() == 'a' || keyAction.tag() == 'A')
+            {
+                int savedCount = 0;
+                for (int i = 0; i < editBufferList->items(); i++) {
+                    CmEditBuffer *buffer = editBufferList->at(i);
+                    if (buffer != NULL && buffer->isTouched()) {
+                        buffer->saveText(buffer->getFilePath());
+                        savedCount++;
+                    }
+                }
+                if (savedCount > 0) {
+                    CxString msg = CxString("(Saved ") + CxString(savedCount) + CxString(" files)");
+                    setMessage(msg);
+                } else {
+                    setMessage("(No modified files to save)");
+                }
+                fileListView->redraw();
+            }
         }
         break;
             

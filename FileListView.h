@@ -21,6 +21,7 @@
 
 #include <cx/keyboard/keyboard.h>
 #include <cx/screen/screen.h>
+#include <cx/screen/boxframe.h>
 #include <cx/functor/defercall.h>
 
 #include "ProgramDefaults.h"
@@ -55,8 +56,14 @@ class FileListView
     int calcLongestName(void);
     
     CxString getSelectedItem( void );
-    // get the selected item in the lsit
-    
+    // get the selected item in the list
+
+    CmEditBuffer *getSelectedBuffer( void );
+    // get the selected edit buffer (for save operation)
+
+    void setVisible( int visible );
+    // set visibility state for resize handling
+
   private:
 
     void screenResizeCallback( void );
@@ -76,7 +83,10 @@ class FileListView
 
     CxScreen *screen;
     // pointer to the screen object
-    
+
+    CxBoxFrame *frame;
+    // box frame for modal display
+
     Project *project;
     
     // these hold the key screen locations (zero based) for the editor all in screen
@@ -98,6 +108,8 @@ class FileListView
     
     int firstVisibleListIndex;
 	int selectedListItemIndex;
+
+    int _visible;  // whether modal is currently displayed
 
 };
 

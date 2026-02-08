@@ -140,6 +140,8 @@ class ScreenEditor {
     void CMD_TrimTrailing( CxString commandLine );
     void CMD_Make( CxString commandLine );
     void CMD_GotoError( CxString commandLine );
+    void CMD_Split( CxString commandLine );
+    void CMD_Unsplit( CxString commandLine );
 #ifdef CM_UTF8_SUPPORT
     void CMD_InsertUTFBox( CxString commandLine );
     void CMD_InsertUTFSymbol( CxString commandLine );
@@ -156,10 +158,18 @@ class ScreenEditor {
     void CTRL_ProjectList(void);
     void CTRL_UpdateScreen(void);
     void CTRL_Help(void);
+    void CTRL_SwitchView(void);
 
     // Control-X subcommand handlers
     void CTRLX_Save(void);
     void CTRLX_Quit(void);
+
+    // Split screen methods
+    void splitHorizontal(void);         // split screen in half
+    void unsplit(void);                 // return to single view
+    void switchActiveView(void);        // toggle between top/bottom
+    EditView* activeEditView(void);     // return currently active view
+    void recalcSplitRegions(void);      // recalculate regions after resize
 
     ProgramMode programMode;
 
@@ -167,6 +177,7 @@ class ScreenEditor {
     CxScreen   *screen;
     CxKeyboard *keyboard;
     EditView   *editView;
+    EditView   *editViewBottom;         // bottom view when split (NULL if not split)
     CommandLineView *commandLineView;
     CmEditBufferList *editBufferList;
     
@@ -225,6 +236,14 @@ private:
     CxString _argBuffer;            // freeform argument text
     CommandEntry *_currentCommand;  // selected command (after completion)
     int _quitRequested;             // set by CMD_Quit to signal exit
+
+    // split screen state
+    int _splitMode;                 // 0 = single view, 1 = horizontal split
+    int _splitRow;                  // screen row where divider sits
+    int _activeView;                // 0 = top/only, 1 = bottom
+
+    // resize callback - coordinates all redrawing based on programMode
+    void screenResizeCallback(void);
 
 #if defined(_LINUX_) || defined(_OSX_)
     MCPHandler *_mcpHandler;        // MCP socket handler thread

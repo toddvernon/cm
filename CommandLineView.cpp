@@ -67,8 +67,7 @@ CommandLineView::CommandLineView(
 
     _commandLineInputDone = true;
 
-    // setup the resize callback
-	_screen->addScreenSizeCallback( CxDeferCall( this, &CommandLineView::screenResizeCallback ));
+    // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
     // calculate where the parts go
     calculatePlacements();
@@ -131,6 +130,23 @@ CommandLineView::calculatePlacements()
 
     // the last col that is visible in the scrolling area
     _lastVisibleEditBufferCol  = _firstVisibleEditBufferCol + _editWidth;
+}
+
+
+//---------------------------------------------------------------------------------------------------------
+// CommandLineView::recalcScreenPlacements
+//
+// Public wrapper for calculatePlacements, called by ScreenEditor during resize.
+//
+//---------------------------------------------------------------------------------------------------------
+void
+CommandLineView::recalcScreenPlacements(void)
+{
+    _screenWidth  = CxScreen::cols();
+    _screenHeight = CxScreen::rows();
+    _screenRow    = _screenHeight - 1;
+    _totalWidth   = _screenWidth - _screenCol;
+    calculatePlacements();
 }
 
 

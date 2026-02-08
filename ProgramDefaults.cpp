@@ -51,6 +51,14 @@ ProgramDefaults::ProgramDefaults(void)
     _lineNumberTextColor         = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
 	_commandLineMessageTextColor = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
 
+    // Modal dialog colors - default to status bar colors
+    _modalFrameTextColor         = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    _modalFrameBackgroundColor   = new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+    _modalContentTextColor       = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    _modalContentBackgroundColor = new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+    _modalSelectionTextColor     = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
+    _modalSelectionBackgroundColor = new CxAnsiBackgroundColor( CxAnsiBackgroundColor::NONE );
+
     // legacy colors for backward compatibility
     _commentTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _includeTextColor            = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
@@ -484,6 +492,46 @@ CxColor *
 ProgramDefaults::commandLineMessageTextColor(void)
 {
     return( _commandLineMessageTextColor );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Modal dialog color accessors
+//-------------------------------------------------------------------------------------------------
+CxColor *
+ProgramDefaults::modalFrameTextColor(void)
+{
+    return( _modalFrameTextColor );
+}
+
+CxColor *
+ProgramDefaults::modalFrameBackgroundColor(void)
+{
+    return( _modalFrameBackgroundColor );
+}
+
+CxColor *
+ProgramDefaults::modalContentTextColor(void)
+{
+    return( _modalContentTextColor );
+}
+
+CxColor *
+ProgramDefaults::modalContentBackgroundColor(void)
+{
+    return( _modalContentBackgroundColor );
+}
+
+CxColor *
+ProgramDefaults::modalSelectionTextColor(void)
+{
+    return( _modalSelectionTextColor );
+}
+
+CxColor *
+ProgramDefaults::modalSelectionBackgroundColor(void)
+{
+    return( _modalSelectionBackgroundColor );
 }
 
 

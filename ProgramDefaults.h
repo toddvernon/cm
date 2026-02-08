@@ -65,6 +65,14 @@ public:
     CxColor *lineNumberTextColor(void);
 	CxColor *commandLineMessageTextColor(void);
 
+    // Modal dialog colors
+    CxColor *modalFrameTextColor(void);
+    CxColor *modalFrameBackgroundColor(void);
+    CxColor *modalContentTextColor(void);
+    CxColor *modalContentBackgroundColor(void);
+    CxColor *modalSelectionTextColor(void);
+    CxColor *modalSelectionBackgroundColor(void);
+
     // legacy color accessors (use default language colors)
     CxColor *commentTextColor(void);
     CxColor *includeTextColor(void);
@@ -130,6 +138,14 @@ private:
     CxColor *_statusBarBackgroundColor;
     CxColor *_lineNumberTextColor;
 	CxColor *_commandLineMessageTextColor;
+
+    // Modal dialog colors
+    CxColor *_modalFrameTextColor;
+    CxColor *_modalFrameBackgroundColor;
+    CxColor *_modalContentTextColor;
+    CxColor *_modalContentBackgroundColor;
+    CxColor *_modalSelectionTextColor;
+    CxColor *_modalSelectionBackgroundColor;
 
     // legacy colors (for backward compatibility with old config format)
     CxColor *_cppLanguageMethodDefinitionTextColor;

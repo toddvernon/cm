@@ -102,7 +102,8 @@ class CommandLineView
     void typeText( CxString text );
 	// type the text into the command line
 
-     
+    void recalcScreenPlacements(void);
+    // recalculate screen placements after resize
 
   private:
 

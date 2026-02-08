@@ -38,6 +38,17 @@ make
 - `ProgramDefaults.*` - configuration handling
 - `Project.*` - project management
 
+## Screen Resize Architecture
+
+**ScreenEditor owns the single resize callback.** Sub-elements (EditView, CommandLineView, FileListView, HelpTextView) do NOT register their own callbacks with the OS.
+
+- ScreenEditor registers ONE callback via `screen->addScreenSizeCallback()`
+- On resize, ScreenEditor coordinates ALL recalcs first, THEN all redraws in correct z-order
+- Sub-elements expose public `recalcScreenPlacements()` or `recalcForResize()` methods for ScreenEditor to call
+- Each visual element (e.g., EditView) owns its own sub-elements (e.g., status bar) - no separate drawing by parent
+
+**NEVER** add resize callbacks to sub-elements. All resize coordination goes through ScreenEditor.
+
 ## Non-negotiable constraints
 - DO NOT use the C++ Standard Library: no `std::` anywhere.
 - DO NOT introduce templates, including template-based third-party libs.

@@ -44,10 +44,9 @@ HelpTextView::HelpTextView( ProgramDefaults *pd, Project *proj, CxScreen *screen
 
     if (dbg) { fprintf(dbg, "  HelpTextView ctor: eb created\n"); fflush(dbg); }
 
-    // setup the resize callback
-    screen->addScreenSizeCallback( CxDeferCall( this, &HelpTextView::screenResizeCallback ));
+    // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
-    if (dbg) { fprintf(dbg, "  HelpTextView ctor: callback added\n"); fflush(dbg); }
+    if (dbg) { fprintf(dbg, "  HelpTextView ctor: continuing\n"); fflush(dbg); }
 
     // recalc where everything should disolay
     recalcScreenPlacements();

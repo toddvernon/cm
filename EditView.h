@@ -134,6 +134,13 @@ class EditView
     void toggleJumpScroll( void );
     // turns jump scrolling on and off
 
+    void setRegion( int startRow, int endRow );
+    // set the screen region this view occupies (-1 means use full screen)
+
+
+    void recalcForResize( void );
+    // recalculate placements after screen resize (called by ScreenEditor)
+
 #if defined(_LINUX_) || defined(_OSX_)
     void setMcpConnected( int connected );
     // set MCP connection status for status bar display
@@ -284,9 +291,14 @@ class EditView
 
     int _jumpScroll;
     // sould editor do jump scrolling or smooth scrolling
-    
+
     // a boolean that tells the window its too small to draw itself
     int _windowTooSmall;
+
+    // region bounds for split screen support (-1 means use full screen)
+    int _regionStartRow;
+    int _regionEndRow;
+
 
 #if defined(_LINUX_) || defined(_OSX_)
     int _mcpConnected;
