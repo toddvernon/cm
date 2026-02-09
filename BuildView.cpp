@@ -24,12 +24,14 @@
 #include "BuildView.h"
 
 //-------------------------------------------------------------------------------------------------
-// Platform-conditional selection indicator
+// Platform-conditional indicators
 //-------------------------------------------------------------------------------------------------
 #if defined(_LINUX_) || defined(_OSX_)
-static const char *SELECTION_INDICATOR = "\xe2\x96\xb6";  // UTF-8
+static const char *SELECTION_INDICATOR = "\xe2\x96\xb6";  // ▶ (UTF-8)
+static const char *SEPARATOR_DASH     = "\xe2\x94\x80";   // ─ (UTF-8)
 #else
 static const char *SELECTION_INDICATOR = ">";
+static const char *SEPARATOR_DASH     = "-";
 #endif
 
 
@@ -190,73 +192,116 @@ BuildView::drawLine( int screenRow, int logicalIndex )
         BuildOutputLine *line = buildOutput->lineAt(logicalIndex);
         if (line == NULL) return;
 
-        // get line text
-        CxString lineText = line->text;
-
-        // Layout: " X text...padding "
-        // where X is indicator for selected, space for unselected
-        int indicatorDisplayLen = 3;  // " X " display columns
-        int textAreaLen = contentWidth - indicatorDisplayLen - 1;
-
-        // truncate text if needed
-        if ((int)lineText.length() > textAreaLen) {
-            lineText = lineText.subString(0, textAreaLen - 3);
-            lineText += "...";
-        }
-
-        // pad text to fill area
-        while ((int)lineText.length() < textAreaLen) {
-            lineText += " ";
-        }
-
         //---------------------------------------------------------------------------------
-        // draw selected item
+        // separator lines: centered text with frame colors
         //---------------------------------------------------------------------------------
-        if (selectedLineIndex == logicalIndex) {
+        if (line->type == BUILD_LINE_SEPARATOR) {
 
-            // set selection colors
             screen->setForegroundColor(programDefaults->statusBarTextColor());
             screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
 
-            // build the line: " > " + padded_text + " "
+            CxString text = line->text;
+
+            // Layout: " ── text ── " with dashes filling to content width
+            // Reserve: 1 space + dashes + 1 space + text + 1 space + dashes + 1 space
+            int textLen = (int)text.length();
+            int availForDashes = contentWidth - textLen - 4;  // 4 = " " + " " + " " + " "
+            if (availForDashes < 2) {
+                availForDashes = 2;
+            }
+            int leftDashes = availForDashes / 2;
+            int rightDashes = availForDashes - leftDashes;
+
             CxString displayLine = " ";
-            displayLine += SELECTION_INDICATOR;
+            for (int i = 0; i < leftDashes; i++) {
+                displayLine += SEPARATOR_DASH;
+            }
             displayLine += " ";
-            displayLine += lineText;
+            displayLine += text;
+            displayLine += " ";
+            for (int i = 0; i < rightDashes; i++) {
+                displayLine += SEPARATOR_DASH;
+            }
             displayLine += " ";
 
             screen->writeText(displayLine);
             screen->resetColors();
 
-        //---------------------------------------------------------------------------------
-        // draw unselected item
-        // Note: Color coding by type (error=red, warning=yellow) could be added
-        // later by using CxAnsiForegroundColor objects
-        //---------------------------------------------------------------------------------
         } else {
 
-            // use modal content colors
-            screen->setForegroundColor(programDefaults->modalContentTextColor());
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-
-            // Prefix with indicator for errors/warnings
-            CxString displayLine;
-            switch (line->type) {
-                case BUILD_LINE_ERROR:
-                    displayLine = " ! ";  // error marker
-                    break;
-                case BUILD_LINE_WARNING:
-                    displayLine = " ? ";  // warning marker
-                    break;
-                default:
-                    displayLine = "   ";
-                    break;
+            // get line text, expanding tabs to spaces for correct width calculation
+            CxString lineText;
+            for (int t = 0; t < (int)line->text.length(); t++) {
+                if (line->text.charAt(t) == '\t') {
+                    lineText += "    ";
+                } else {
+                    lineText += line->text.subString(t, 1);
+                }
             }
-            displayLine += lineText;
-            displayLine += " ";
 
-            screen->writeText(displayLine);
-            screen->resetColors();
+            // Layout: " X text...padding "
+            // where X is indicator for selected, space for unselected
+            int indicatorDisplayLen = 3;  // " X " display columns
+            int textAreaLen = contentWidth - indicatorDisplayLen - 1;
+
+            // truncate text if needed
+            if ((int)lineText.length() > textAreaLen) {
+                lineText = lineText.subString(0, textAreaLen - 3);
+                lineText += "...";
+            }
+
+            // pad text to fill area
+            while ((int)lineText.length() < textAreaLen) {
+                lineText += " ";
+            }
+
+            //-----------------------------------------------------------------------------
+            // draw selected item
+            //-----------------------------------------------------------------------------
+            if (selectedLineIndex == logicalIndex) {
+
+                // set selection colors
+                screen->setForegroundColor(programDefaults->statusBarTextColor());
+                screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+
+                // build the line: " > " + padded_text + " "
+                CxString displayLine = " ";
+                displayLine += SELECTION_INDICATOR;
+                displayLine += " ";
+                displayLine += lineText;
+                displayLine += " ";
+
+                screen->writeText(displayLine);
+                screen->resetColors();
+
+            //-----------------------------------------------------------------------------
+            // draw unselected item
+            //-----------------------------------------------------------------------------
+            } else {
+
+                // use modal content colors
+                screen->setForegroundColor(programDefaults->modalContentTextColor());
+                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+
+                // Prefix with indicator for errors/warnings
+                CxString displayLine;
+                switch (line->type) {
+                    case BUILD_LINE_ERROR:
+                        displayLine = " ! ";  // error marker
+                        break;
+                    case BUILD_LINE_WARNING:
+                        displayLine = " ? ";  // warning marker
+                        break;
+                    default:
+                        displayLine = "   ";
+                        break;
+                }
+                displayLine += lineText;
+                displayLine += " ";
+
+                screen->writeText(displayLine);
+                screen->resetColors();
+            }
         }
 
     //-----------------------------------------------------------------------------------------

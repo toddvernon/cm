@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  ProgramDefaults.cpp
+//  Cm.cpp
 //  cmacs
 //
 //  Created by Todd Vernon on 6/24/22.
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     }
     
 	int row=0;
-	int col=0;
+ 	int col=0;
 
 	// create the keyboard object
 	CxKeyboard *keyboard = new CxKeyboard();

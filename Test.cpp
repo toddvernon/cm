@@ -10,9 +10,10 @@
 //-------------------------------------------------------------------------------------------------
 
 
+
 //-------------------------------------------------------------------------------------------------
 // EditView.cpp
-// 
+//
 // Edit View the class that handles display of the edit buffer on the screen.  It handles
 // screen sizing and resizing and reframing the visible part of the edit buffer on the
 // visible screen.
@@ -26,13 +27,13 @@
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::EditView (constructor)
+// MyEditView::EditView (constructor)
 //
 // Constructs an edit window object and registers a callback with the passed in screen
 // object so it knows of terminal window size changes.
 //
 //-------------------------------------------------------------------------------------------------
-EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
+MyEditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
 {
     programDefaults = pd;
 	screen          = scre
@@ -40,55 +41,55 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
 
 
     // todd the resize callback
-		screen->addScreenSizeCallback( CxDeferCall( this, &EditView::screenResizeCallback ));
+		screen->addScreenSizeCallback( CxDeferCall( this, &MyEditView::screenResizeCallback ));
 
 	// set the default for showing line numbers or not
 	showLineNumbers = pd->showLineNumbers();
-    
+
     // set the jumpScroll variable from defaults
     _jumpScroll = pd->jumpScroll();
-    
+
     // there is not initial editbuffer, the next step creates it.
     editBuffer = NULL;
-    
+
     // create a new edit buffer
     setEditBuffer( new CxEditBuffer( pd->getTabSize() ));
-    
+
     // redraw the screen
     reframeAndUpdateScreen();
-    
+
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::setEditBuffer 
+// MyEditView::setEditBuffer
 //
 // Sets a pointer to the underlying edit buffer that the EditView will use.
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::setEditBuffer( CxEditBuffer *eb)
+MyEditView::setEditBuffer( CxEditBuffer *eb)
 {
     if (editBuffer != NULL) {
         // remember the first visual line in the current edit buffer before changing edit buffers
         editBuffer->setVisualFirstScreenLine( _visibleEditBufferOffset );
         editBuffer->setVisualFirstScreenCol( _visibleFirstEditBufferCol );
     }
-    
+
     // change the edit buffer
     editBuffer = eb;
-    
+
     // recalc some information
     _windowTooSmall = false;
 
     _screenNumberOfCols = screen->cols();
 
     // the offset into the edit buffer of the visible part
-    
+
     // get these from the editbuffer which the values were stored in from last context switch
     _visibleEditBufferOffset   = editBuffer->getVisualFirstScreenLine( );
     _visibleFirstEditBufferCol = editBuffer->getVisualFirstScreenCol( );
-    
+
     // everything else is calculated
     _visibleLastEditBufferCol  = _screenNumberOfCols;
     _lineNumberOffset          = 6;
@@ -109,12 +110,12 @@ EditView::setEditBuffer( CxEditBuffer *eb)
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView::reframeAndUpdateScreen(void)
+// MyEditView::reframeAndUpdateScreen(void)
 //
 // redraw the editview after reframing the buffer
 //-------------------------------------------------------------------------------------------------
 void
-EditView::reframeAndUpdateScreen(void)
+MyEditView::reframeAndUpdateScreen(void)
 {
     // update the entire window
     reframe();
@@ -122,13 +123,13 @@ EditView::reframeAndUpdateScreen(void)
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView::updateScreen
+// MyEditView::updateScreen
 //
 // Updates the screen using all the existing calculated geometry.
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::updateScreen(void)
+MyEditView::updateScreen(void)
 {
     updateRemainderOfWindow(0,0);
     updateStatusLine();
@@ -136,13 +137,13 @@ EditView::updateScreen(void)
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView::screenResizeCallback (callback)
+// MyEditView::screenResizeCallback (callback)
 //
 // Called with the user resizes the terminal window.  Recalculates key parts of the screen.
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::screenResizeCallback( void )
+MyEditView::screenResizeCallback( void )
 {
     // recalculate all the component placements
     recalcScreenPlacements();
@@ -152,77 +153,77 @@ EditView::screenResizeCallback( void )
 
     // recalc and redraw
     reframeAndUpdateScreen();
-    
+
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::cursorPosition
+// MyEditView::cursorPosition
 //
 // returns the row and col of the current cursor in the edit buffer.  Its a passthrough to the
 // underlying editbuffer structure
 //
 //-------------------------------------------------------------------------------------------------
 CxEditBufferPosition
-EditView::cursorPosition(void)
+MyEditView::cursorPosition(void)
 {
     return( editBuffer->cursor );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::currentFilePath
-// 
+// MyEditView::currentFilePath
+//
 // returns the filepath of the current file being edited.
-// 
+//
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::currentFilePath(void)
+MyEditView::currentFilePath(void)
 {
     return( editBuffer->getFilePath() );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::setCurrentFilePath
-// 
+// MyEditView::setCurrentFilePath
+//
 // sets the file path that will be used to save the file
-// 
+//
 //-------------------------------------------------------------------------------------------------
 void
-EditView::setCurrentFilePath( CxString path)
+MyEditView::setCurrentFilePath( CxString path)
 {
     editBuffer->setFilePath( path );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::toggleLineNumbers
-// 
+// MyEditView::toggleLineNumbers
+//
 // toggle line numbers on/off
-// 
+//
 //-------------------------------------------------------------------------------------------------
 toddvoid
-EditView::toggleLineNumbers(void)
+MyEditView::toggleLineNumbers(void)
 {
     if (_showLineNumbers == TRUE) {
         _showLineNumbers = FALSE;
     } else {
         _showLineNumbers = TRUE;
     }
-    
+
     recalcLineNumberDigits();
     screenResizeCallback();
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView::toggleJumpScroll
+// MyEditView::toggleJumpScroll
 //
 // toggle line numbers on/off
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::toggleJumpScroll(void)
+MyEditView::toggleJumpScroll(void)
 {
     if (_jumpScroll == TRUE) {
         _jumpScroll = FALSE;
@@ -233,14 +234,14 @@ EditView::toggleJumpScroll(void)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcLineNumberDigits
+// MyEditView::recalcLineNumberDigits
 //
 // Calculates the space needed for the line numbers ahead of of each line of text.
-// 
+//
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcLineNumberDigits( void )
+MyEditView::recalcLineNumberDigits( void )
 {
     char buffer[20];
     sprintf(buffer, "%lu| ", editBuffer->numberOfLines());
@@ -252,7 +253,7 @@ EditView::recalcLineNumberDigits( void )
     if (_lineNumberOffset != length) {
         _lineNumberOffset = length;
     }
-    
+
     if (_showLineNumbers == FALSE) {
         _lineNumberOffset = 0;
     }
@@ -260,7 +261,7 @@ EditView::recalcLineNumberDigits( void )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcScreenPlacements
+// MyEditView::recalcScreenPlacements
 //
 // Given a screen window size, this calculates all the rows that are important to
 // to the editor.
@@ -270,24 +271,24 @@ EditView::recalcLineNumberDigits( void )
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcScreenPlacements(void)
+MyEditView::recalcScreenPlacements(void)
 {
     // get the number of lines
     _screenNumberOfLines = screen->rows();
     _screenNumberOfCols  = screen->cols();
-    
+
     // set the first visible edit column
     _visibleFirstEditBufferCol = 0;         // TODO: I think this one needs to change
 
 	// set the last visible edit column
     if (_showLineNumbers == TRUE) {
-		_screenEditNumberOfCols    = _screenNumberOfCols - _lineNumberOffset;     
-	   	_visibleLastEditBufferCol  = _screenNumberOfCols - _lineNumberOffset -1;     
+		_screenEditNumberOfCols    = _screenNumberOfCols - _lineNumberOffset;
+	   	_visibleLastEditBufferCol  = _screenNumberOfCols - _lineNumberOffset -1;
     } else {
         _screenEditNumberOfCols    = _screenNumberOfCols;
         _visibleLastEditBufferCol  = _screenNumberOfCols;
     }
-    
+
   	// set the number of edit lines
     _screenEditNumberOfLines = _screenNumberOfLines - 3;
 
@@ -320,50 +321,50 @@ EditView::recalcScreenPlacements(void)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::findString
-// 
+// MyEditView::findString
+//
 // find the first occurance of the find string in the buffer past or at the current cursor
 // location.
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::findString( CxString findString )
+MyEditView::findString( CxString findString )
 {
     // try and find the string starting at loc
 	int result = editBuffer->findString( findString );
-    
+
     if (result == TRUE) {
         CxEditBufferPosition loc = editBuffer->cursor;
         cursorGotoPosition( loc );
     }
-    
+
     return( result );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::findAgain
+// MyEditView::findAgain
 //
 // repeasts the last find command.  If the cursor is on the location of the last successul find
 // it will advance the cursor and do another find to avoid finding the same string over and over
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::findAgain( CxString findString  )
+MyEditView::findAgain( CxString findString  )
 {
     int result = editBuffer->findAgain( findString, TRUE );
-    
+
     if (result == TRUE) {
         CxEditBufferPosition loc = editBuffer->cursor;
         cursorGotoPosition( loc );
     }
-    
+
     return( result );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView:: replaceString
+// MyEditView:: replaceString
 //
 // replace the current findString with the replaceString.  Note this only replaces if the cursor
 // is located at the begining of the find string in the buffer.  If not it just repeats the last
@@ -375,73 +376,73 @@ EditView::findAgain( CxString findString  )
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::replaceString( CxString findString, CxString replaceString )
+MyEditView::replaceString( CxString findString, CxString replaceString )
 {
     // remember the location of the last find
     CxEditBufferPosition loc = editBuffer->cursor;
-    
+
     // call replace
     int result = editBuffer->replaceString( findString, replaceString );
 
     // if the replacement worked
     if (result == TRUE) {
-        
+
         // update the remembered line.  The cursor was moved as a result of the replacement
         // to the next find location
         updateEntireWindowLine(loc.row);
-        
+
         // now get the resulting cursor line
         loc = editBuffer->cursor;
 
         // move the screen cursor to that line
         cursorGotoPosition( loc );
     }
-    
+
     return( result );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::replaceAgain
+// MyEditView::replaceAgain
 //
 // Do the same replacement we did last time
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::replaceAgain( CxString findString, CxString replaceString )
+MyEditView::replaceAgain( CxString findString, CxString replaceString )
 {
     // remember the location of the last find
     CxEditBufferPosition loc = editBuffer->cursor;
 
     // replace the string again, if its at the cursor
     int result = editBuffer->replaceAgain( findString, replaceString );
-    
+
     // if replacement happened (it might not if the cursor was not on the find string) then
     // update the remembered line
     if (result == TRUE) {
-        
+
         // update the line on the screen we just changed
         updateEntireWindowLine(loc.row);
-        
+
         // get the current location
         loc = editBuffer->cursor;
-        
+
         // put the screen cursor there
         cursorGotoPosition( loc );
     }
-    
+
     return( result );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::pageUp
+// MyEditView::pageUp
 //
 // Move the cursor up a page and reframe the page
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::cursorGotoLine( unsigned long row )
+MyEditView::cursorGotoLine( unsigned long row )
 {
     if (editBuffer->numberOfLines() == 0) return;
 
@@ -460,13 +461,13 @@ EditView::cursorGotoLine( unsigned long row )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::cursorGotoPosition
+// MyEditView::cursorGotoPosition
 //
 // Move the cursor up a page and reframe the page
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::cursorGotoPosition( CxEditBufferPosition loc )
+MyEditView::cursorGotoPosition( CxEditBufferPosition loc )
 {
     if (editBuffer->numberOfLines() == 0) return;
 
@@ -475,7 +476,7 @@ EditView::cursorGotoPosition( CxEditBufferPosition loc )
     }
 
     editBuffer->cursorGotoRequest( loc.row, loc.col );
-	
+
     if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
         if (reframe()) {
             updateScreen();
@@ -485,13 +486,13 @@ EditView::cursorGotoPosition( CxEditBufferPosition loc )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::pageDown
+// MyEditView::pageDown
 //
 // Move the cursor down a page and the reframe the page
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::pageDown( void )
+MyEditView::pageDown( void )
 {
     // get the physical screen row the cursor is on
     unsigned long screenRowOfCursor = bufferRowToScreenRow( editBuffer->cursor.row  );
@@ -504,86 +505,86 @@ EditView::pageDown( void )
 
     // jump in the logical buffer ahead to to new cursor location plus the offset
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
-    
+
     // update the screen
     if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
 		if (reframe()) {
 			updateScreen();
 		}
     }
-    
+
     // now put the cursor back to the orginal physical screen location
     editBuffer->cursorGotoLine( newBufferRow );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::insertCommentBlock
+// MyEditView::insertCommentBlock
 //
 //
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::insertCommentBlock( unsigned long lastCol )
+MyEditView::insertCommentBlock( unsigned long lastCol )
 {
 	editBuffer->insertCommentBlock( lastCol ) ;
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::pageUp
+// MyEditView::pageUp
 //
 // performs the page up command the reframes the edit buffer on the physical screen
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::pageUp( void )
+MyEditView::pageUp( void )
 {
     // get the physical screen row the cursor is on
     unsigned long screenRowOfCursor = bufferRowToScreenRow( editBuffer->cursor.row  );
-    
+
     // computer the new logical row number, and make sure we can still page up
     unsigned long newBufferRow = 0;
     if (editBuffer->cursor.row <= _screenNumberOfLines ) {
-        
+
         // we are on the first page, so just jump the cursor to the top of it
         editBuffer->cursorGotoLine( newBufferRow );
         return;
     }
-    
+
     // compute the new buffer row number
     newBufferRow = editBuffer->cursor.row - _screenNumberOfLines;
- 
+
     // compute a new jump with offset for the current cursor line
     unsigned long newBufferRowWithOffset = 0;
     if ( newBufferRow >= screenRowOfCursor) {
         newBufferRowWithOffset = newBufferRow - screenRowOfCursor;
     }
-    
+
     // jump in the logical buffer back to to new cursor location minus the offset
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
-    
+
     // update the screen
     if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
         if (reframe()) {
             updateScreen();
         }
     }
-    
+
     // now put the cursor back to the orginal physical screen location
-    editBuffer->cursorGotoLine( newBufferRow );    
+    editBuffer->cursorGotoLine( newBufferRow );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::cutTextCursorToEndOfLine
+// MyEditView::cutTextCursorToEndOfLine
 //
 // performs the cut text from cursor to end of line function, first calling the edit buffer
 // version to perform the logical operation, then updating the screen as required.
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::cutTextCursorToEndOfLine( void )
+MyEditView::cutTextCursorToEndOfLine( void )
 {
     CxString cutText = editBuffer->cutTextToEndOfLine();
     updateScreen();
@@ -592,13 +593,13 @@ EditView::cutTextCursorToEndOfLine( void )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::pasteText
+// MyEditView::pasteText
 //
 // calls the pasteText edit buffer function then updates the screen
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::pasteText( CxString text)
+MyEditView::pasteText( CxString text)
 {
     editBuffer->pasteFromCutBuffer( text );
     updateScreen();
@@ -606,58 +607,58 @@ EditView::pasteText( CxString text)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::setMark
+// MyEditView::setMark
 //
 // calls the setMark edit buffer function
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::setMark( void )
+MyEditView::setMark( void )
 {
     editBuffer->setMark();
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::cutToMark
+// MyEditView::cutToMark
 //
 // calls the cutToMark edit buffer function then updates the screen
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::cutToMark( void )
+MyEditView::cutToMark( void )
 {
     CxString text = editBuffer->cutToMark();
     updateScreen();
-    
+
     return(text);
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::cutTextToEndOfLine
+// MyEditView::cutTextToEndOfLine
 //
 // calls the cutTextToEndOfLine edit buffer function then updates the screen
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::cutTextToEndOfLine(void)
+MyEditView::cutTextToEndOfLine(void)
 {
     CxString text = editBuffer->cutTextToEndOfLine();
     updateScreen();
-    
+
     return( text );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcVisibleBufferFromTopEditLine
+// MyEditView::recalcVisibleBufferFromTopEditLine
 //
 // Recalculate the visible buffer based on a new offset into the edit buffer
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromTopEditLine(unsigned long newUpperRow)
+MyEditView::recalcVisibleBufferFromTopEditLine(unsigned long newUpperRow)
 {
     _visibleEditBufferOffset = newUpperRow;
     _visibleFirstEditBufferRow = _visibleEditBufferOffset;
@@ -666,13 +667,13 @@ EditView::recalcVisibleBufferFromTopEditLine(unsigned long newUpperRow)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcVisibleBufferFromBottomEditLine
+// MyEditView::recalcVisibleBufferFromBottomEditLine
 //
 // Recalculate the visible buffer based on a new last visible line index
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow)
+MyEditView::recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow)
 {
     _visibleEditBufferOffset = newLowerRow - _screenEditNumberOfLines;
     _visibleFirstEditBufferRow = _visibleEditBufferOffset;
@@ -681,14 +682,14 @@ EditView::recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcVisibleBufferFromLeft
+// MyEditView::recalcVisibleBufferFromLeft
 //
 // calculate the visible area based on a left most buffer column
 //
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromLeft( unsigned long bufferCol )
+MyEditView::recalcVisibleBufferFromLeft( unsigned long bufferCol )
 {
     _visibleFirstEditBufferCol = bufferCol; //todd
     _visibleLastEditBufferCol  = _visibleFirstEditBufferCol + _screenEditNumberOfCols;
@@ -696,14 +697,14 @@ EditView::recalcVisibleBufferFromLeft( unsigned long bufferCol )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::recalcVisibleBufferFromRight
+// MyEditView::recalcVisibleBufferFromRight
 //
 // calculate the visible area based on a right most buffer column
 //
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromRight( unsigned long bufferCol )
+MyEditView::recalcVisibleBufferFromRight( unsigned long bufferCol )
 {
     _visibleLastEditBufferCol  = bufferCol;
     _visibleFirstEditBufferCol = _visibleLastEditBufferCol - _screenEditNumberOfCols;
@@ -711,13 +712,13 @@ EditView::recalcVisibleBufferFromRight( unsigned long bufferCol )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::reframe
+// MyEditView::reframe
 //
 // Moves the visible window indexes so the cursor is visible and updates the screen
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::reframe( void )
+MyEditView::reframe( void )
 {
     unsigned long bufferRow = editBuffer->cursor.row;
     unsigned long bufferCol = editBuffer->cursor.col;
@@ -729,7 +730,7 @@ EditView::reframe( void )
     if (rowVisible(bufferRow) && (colVisible(bufferCol))) {
         return( FALSE );
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // check if the cursor position is outside the visible area, if it is reframe the visible
     // part of the buffer
@@ -758,14 +759,14 @@ EditView::reframe( void )
     if (bufferCol > _visibleLastEditBufferCol) {
         recalcVisibleBufferFromRight( bufferCol );
     }
-    
+
     return( TRUE );
-    
+
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::reframe_jump
+// MyEditView::reframe_jump
 //
 // Moves the visible window indexes so the cursor is visible. Unlike the non jump version this
 // method jumps the screen up or down have a visible screen to speed scrolling on slower
@@ -773,11 +774,11 @@ EditView::reframe( void )
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::reframe_jump( void )
+MyEditView::reframe_jump( void )
 {
     unsigned long bufferRow = editBuffer->cursor.row;
     unsigned long bufferCol = editBuffer->cursor.col;
-    
+
     //---------------------------------------------------------------------------------------------
     // if cursor is visible on he screen, then bail out and don't calculate any
     // thing or redraw
@@ -785,7 +786,7 @@ EditView::reframe_jump( void )
     if (rowVisible(bufferRow) && (colVisible(bufferCol))) {
         return(FALSE);
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // check if the cursor position is outside the visible area, if it is reframe the visible
     // part of the buffer
@@ -794,9 +795,9 @@ EditView::reframe_jump( void )
     // if cursor row is above the first edit row, move
     // window up so its visible
     if (bufferRow < _visibleFirstEditBufferRow) {
-        
+
         unsigned long newBufferTargetRow = 0;
-        
+
         //-----------------------------------------------------------------------------------------
         // make sure we don't target a row less than the first row
         //-----------------------------------------------------------------------------------------
@@ -805,19 +806,19 @@ EditView::reframe_jump( void )
         } else {
             newBufferTargetRow = bufferRow - (_screenNumberOfLines/2);
         }
-        
+
         recalcVisibleBufferFromTopEditLine( newBufferTargetRow );
     }
 
     // if cursor row is below the last edit row, move the
     // visible window down so the line is the last edit line
     if (bufferRow > _visibleLastEditBufferRow) {
-        
+
         unsigned long newBufferRowTarget = bufferRow + (_screenNumberOfLines/2);
         if (newBufferRowTarget > editBuffer->numberOfLines()) {
             newBufferRowTarget = editBuffer->numberOfLines();
         }
-        
+
         recalcVisibleBufferFromBottomEditLine( newBufferRowTarget );
     }
 
@@ -832,38 +833,38 @@ EditView::reframe_jump( void )
     if (bufferCol > _visibleLastEditBufferCol) {
         recalcVisibleBufferFromRight( bufferCol );
     }
-    
+
     return( TRUE );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::placeCursor
+// MyEditView::placeCursor
 //
 // Makes sure the cursor is in the correct location on the screen
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::placeCursor(void)
+MyEditView::placeCursor(void)
 {
     // put the cursor back
     screen->placeCursor(
         bufferRowToScreenRow(editBuffer->cursor.row),
         bufferColToScreenCol(editBuffer->cursor.col)
         );
-    
+
     //screen->flush();
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::rowVisible
+// MyEditView::rowVisible
 //
 // returns true if the edit buffer line is currently visible, false if it is not
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::rowVisible( unsigned long bufferRow )
+MyEditView::rowVisible( unsigned long bufferRow )
 {
     if ((bufferRow >= _visibleFirstEditBufferRow) &&
         (bufferRow <= _visibleLastEditBufferRow)) {
@@ -882,7 +883,7 @@ EditView::rowVisible( unsigned long bufferRow )
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::colVisible( unsigned long bufferCol )
+MyEditView::colVisible( unsigned long bufferCol )
 {
     if ((bufferCol >= _visibleFirstEditBufferCol) &&
         (bufferCol < _visibleLastEditBufferCol-10)) {
@@ -894,47 +895,47 @@ EditView::colVisible( unsigned long bufferCol )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::updateStatusLine
+// MyEditView::updateStatusLine
 //
 // updates the edit window status line
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::updateStatusLine(void)
+MyEditView::updateStatusLine(void)
 {
     unsigned long row = editBuffer->cursor.row;
     unsigned long col = editBuffer->cursor.col;
     unsigned long numberOfLines = editBuffer->numberOfLines();
 
     double percent = 0;
-    
+
     if (row == 0) {
         percent = 0;
     } else {
         percent = (double) row / (double) numberOfLines;
     }
-        
+
     percent = percent * 100;
 
     screen->placeCursor( _screenStatusRow, 0);
 
-	// set the status bar foreground and background colors    
+	// set the status bar foreground and background colors
     screen->setForegroundColor(programDefaults->statusBarTextColor() );
     screen->setBackgroundColor(programDefaults->statusBarBackgroundColor() );
-    
+
     CxString statusLineTextLeft;
     statusLineTextLeft  = "== ";
     statusLineTextLeft += "cm: Editing [ ";
     statusLineTextLeft += editBuffer->getFilePath();
     statusLineTextLeft += " ] ";
-    
+
     //---------------------------------------------------------------------------------------------
     // do the line part of the status line
     //
     //---------------------------------------------------------------------------------------------
-    
+
     char buffer[100];
-    
+
     sprintf(buffer, " line(%lu,%lu,%.0lf%%)", row, numberOfLines, percent);
     CxString linePartString = buffer;
 
@@ -946,7 +947,7 @@ EditView::updateStatusLine(void)
 
     sprintf(buffer, "col(%lu)", col);
     CxString colPartString = buffer;
-    
+
     while (colPartString.length() < 8) {
         colPartString += "=";
     }
@@ -955,9 +956,9 @@ EditView::updateStatusLine(void)
     // now put the two right had parts together
     //
     //---------------------------------------------------------------------------------------------
-    
+
     CxString statusLineTextRight = linePartString + CxString(" ") + colPartString;
-    
+
     //---------------------------------------------------------------------------------------------
     // get the curent length of all the important parts of the status line
     //
@@ -979,14 +980,14 @@ EditView::updateStatusLine(void)
         theText.append("=");
     }
     theText += statusLineTextRight;
-    
-    
+
+
     //---------------------------------------------------------------------------------------------
     // finally write out the status line
     //
     //---------------------------------------------------------------------------------------------
     screen->writeTextAt( _screenStatusRow, 0, theText, true );
-    
+
     // put cursor back
     screen->placeCursor(
         bufferRowToScreenRow(editBuffer->cursor.row),
@@ -999,13 +1000,13 @@ EditView::updateStatusLine(void)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::bufferRowToScreenRow
+// MyEditView::bufferRowToScreenRow
 //
 // transforms a editbuffer index into a screen index (zero based).
 //
 //-------------------------------------------------------------------------------------------------
 unsigned long
-EditView::bufferRowToScreenRow(unsigned long bufferRow)
+MyEditView::bufferRowToScreenRow(unsigned long bufferRow)
 {
     // get the physical screen line (zero based)
     unsigned long screenLine = bufferRow - _visibleFirstEditBufferRow;
@@ -1020,7 +1021,7 @@ EditView::bufferRowToScreenRow(unsigned long bufferRow)
 //
 //-------------------------------------------------------------------------------------------------
 unsigned long
-EditView::bufferColToScreenCol(unsigned long bufferCol)
+MyEditView::bufferColToScreenCol(unsigned long bufferCol)
 {
     // get the physical screen line (zero based)
     unsigned long screenCol = bufferCol - _visibleFirstEditBufferCol + _lineNumberOffset;
@@ -1032,18 +1033,18 @@ EditView::bufferColToScreenCol(unsigned long bufferCol)
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::updateRemainderOfWindow
+// MyEditView::updateRemainderOfWindow
 //
 // updates the entire window
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::updateRemainderOfWindow(unsigned long bufferRow, unsigned long bufferCol )
+MyEditView::updateRemainderOfWindow(unsigned long bufferRow, unsigned long bufferCol )
 {
     CxString windowText;
-    
+
     screen->hideCursor();
-    
+
     // update each line, this also includes lines beyond the buffer but are
     // handled by the called function
     for (unsigned long r=bufferRow; r<=_visibleLastEditBufferRow; r++)
@@ -1054,14 +1055,14 @@ EditView::updateRemainderOfWindow(unsigned long bufferRow, unsigned long bufferC
             windowText += windowLineTerminalString( r );
         }
     }
-    
+
     windowText += CxCursor::locateTerminalString(bufferRowToScreenRow(editBuffer->cursor.row),
                                                  bufferColToScreenCol(editBuffer->cursor.col)
                                                  );
-    
+
     fputs(windowText.data(), stdout);
-    
-    
+
+
     // put the cursor back
     /*
     screen->placeCursor(
@@ -1069,9 +1070,9 @@ EditView::updateRemainderOfWindow(unsigned long bufferRow, unsigned long bufferC
         bufferColToScreenCol(editBuffer->cursor.col)
         );
 */
-    
+
     screen->flush();
-    
+
     screen->showCursor();
 
 }
@@ -1080,39 +1081,39 @@ EditView::updateRemainderOfWindow(unsigned long bufferRow, unsigned long bufferC
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::updateEntireWindowLine
+// MyEditView::updateEntireWindowLine
 //
 // updates from the 0 position in the buffer to the right on the specified line
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::windowLineTerminalString(unsigned long bufferRow )
+MyEditView::windowLineTerminalString(unsigned long bufferRow )
 {
     int isCommentLine = FALSE;
     int isIncludeLine = FALSE;
-    
+
     CxString lineNumberString;
-    
+
     //---------------------------------------------------------------------------------------------
     // check the the logical row is visible return if not
     //
     //---------------------------------------------------------------------------------------------
     if (bufferRow < _visibleFirstEditBufferRow) return(lineNumberString);
     if (bufferRow > _visibleLastEditBufferRow)  return(lineNumberString);
-    
+
     //---------------------------------------------------------------------------------------------
     // if we are showing line numbers, then build up the line number string
     //---------------------------------------------------------------------------------------------
-    
+
     if (_showLineNumbers) {
-        
+
         CxString bufferRowNumberString( bufferRow+1 );
         bufferRowNumberString = bufferRowNumberString + "| ";
 
         while (bufferRowNumberString.length() < _lineNumberOffset) {
             bufferRowNumberString = CxString(" ") + bufferRowNumberString;
         }
-        
+
         lineNumberString += programDefaults->lineNumberTextColor()->terminalString();
         lineNumberString += bufferRowNumberString;
         lineNumberString += programDefaults->lineNumberTextColor()->resetTerminalString();
@@ -1123,7 +1124,7 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
     //
     //---------------------------------------------------------------------------------------------
     if (bufferRow >= editBuffer->numberOfLines()) {
-        
+
         lineNumberString  = "";
         lineNumberString += CxCursor::locateTerminalString(
                                                            editBuffer->cursor.row,
@@ -1132,21 +1133,21 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
         CxCursor::placeCursorTerminalString(
                             editBuffer->cursor.row,
                             editBuffer->cursor.col );
-        
-        
+
+
         screen->writeTextAt(
             bufferRowToScreenRow(bufferRow),
             0,
             lineNumberString,
             true );
 */
-            
+
                                                            return(lineNumberString);
 //        fputs( lineNumberString.data(), stdout);
-                                                           
+
         //return;
     }
-    
+
 
 	//---------------------------------------------------------------------------------------------
     // get the line of text
@@ -1165,7 +1166,7 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
     //---------------------------------------------------------------------------------------------
     CxString fullText    = *textPtr;
     CxString visibleText = fullText.subString(_visibleFirstEditBufferCol, _screenEditNumberOfCols );
-    
+
     //---------------------------------------------------------------------------------------------
     // now colorize the text
     //
@@ -1173,13 +1174,13 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
     if (programDefaults->colorizeSyntax() ) {
         visibleText = colorizeText( fullText, visibleText );
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // turn off any text attributes that might have terminated the text
     //
     //---------------------------------------------------------------------------------------------
     visibleText += programDefaults->lineNumberTextColor()->resetTerminalString();
-    
+
     //---------------------------------------------------------------------------------------------
     // prepend the line number string if there is one
     //
@@ -1197,7 +1198,7 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
         visibleText,
         true );
      */
-    
+
     //---------------------------------------------------------------------------------------------
     // place the cursor
     //---------------------------------------------------------------------------------------------
@@ -1206,9 +1207,9 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
         bufferColToScreenCol(editBuffer->cursor.col)
         );
     */
-    
+
 //    fputs( visibleText.data(), stdout);
-    
+
 /*
     visibleText += CxCursor::locateTerminalString(
                         editBuffer->cursor.row,
@@ -1219,39 +1220,39 @@ EditView::windowLineTerminalString(unsigned long bufferRow )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::updateEntireWindowLine
+// MyEditView::updateEntireWindowLine
 //
 // updates from the 0 position in the buffer to the right on the specified line
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::updateEntireWindowLine(unsigned long bufferRow )
+MyEditView::updateEntireWindowLine(unsigned long bufferRow )
 {
     int isCommentLine = FALSE;
     int isIncludeLine = FALSE;
-    
+
     CxString lineNumberString;
-    
+
     //---------------------------------------------------------------------------------------------
     // check the the logical row is visible return if not
     //
     //---------------------------------------------------------------------------------------------
     if (bufferRow < _visibleFirstEditBufferRow) return;
     if (bufferRow > _visibleLastEditBufferRow)  return;
-    
+
     //---------------------------------------------------------------------------------------------
     // if we are showing line numbers, then build up the line number string
     //---------------------------------------------------------------------------------------------
-    
+
     if (_showLineNumbers) {
-        
+
         CxString bufferRowNumberString( bufferRow+1 );
         bufferRowNumberString = bufferRowNumberString + "| ";
 
         while (bufferRowNumberString.length() < _lineNumberOffset) {
             bufferRowNumberString = CxString(" ") + bufferRowNumberString;
         }
-        
+
         lineNumberString += programDefaults->lineNumberTextColor()->terminalString();
         lineNumberString += bufferRowNumberString;
         lineNumberString += programDefaults->lineNumberTextColor()->resetTerminalString();
@@ -1262,17 +1263,17 @@ EditView::updateEntireWindowLine(unsigned long bufferRow )
     //
     //---------------------------------------------------------------------------------------------
     if (bufferRow >= editBuffer->numberOfLines()) {
-        
+
         lineNumberString = "";
         screen->writeTextAt(
             bufferRowToScreenRow(bufferRow),
             0,
             lineNumberString,
             true );
-        
+
         return;
     }
-    
+
 
     //---------------------------------------------------------------------------------------------
     // get the line of text
@@ -1291,7 +1292,7 @@ EditView::updateEntireWindowLine(unsigned long bufferRow )
     //---------------------------------------------------------------------------------------------
     CxString fullText    = *textPtr;
     CxString visibleText = fullText.subString(_visibleFirstEditBufferCol, _screenEditNumberOfCols );
-    
+
     //---------------------------------------------------------------------------------------------
     // now colorize the text
     //
@@ -1299,13 +1300,13 @@ EditView::updateEntireWindowLine(unsigned long bufferRow )
     if (programDefaults->colorizeSyntax() ) {
         visibleText = colorizeText( fullText, visibleText );
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // turn off any text attributes that might have terminated the text
     //
     //---------------------------------------------------------------------------------------------
     visibleText += programDefaults->lineNumberTextColor()->resetTerminalString();
-    
+
     //---------------------------------------------------------------------------------------------
     // prepend the line number string if there is one
     //
@@ -1321,7 +1322,7 @@ EditView::updateEntireWindowLine(unsigned long bufferRow )
         0,
         visibleText,
         true );
-        
+
     //---------------------------------------------------------------------------------------------
     // place the cursor
     //---------------------------------------------------------------------------------------------
@@ -1342,33 +1343,33 @@ EditView::updateEntireWindowLine(unsigned long bufferRow )
 //-------------------------------------------------------------------------------------------------
 
 void
-EditView::updateRemainderOfWindowLine(unsigned long bufferRow, unsigned long bufferCol )
+MyEditView::updateRemainderOfWindowLine(unsigned long bufferRow, unsigned long bufferCol )
 {
     // check the the logical row is visible return if not
     if (bufferRow < _visibleFirstEditBufferRow) return;
     if (bufferRow > _visibleLastEditBufferRow)  return;
-    
+
 //    updateEntireWindowLine( bufferRow );
-  
+
     CxString line = windowLineTerminalString( bufferRow );
             fputs( line.data(), stdout);
-            
-            
+
+
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::handleArrows
+// MyEditView::handleArrows
 //
 // moves the cursor according to the desired direction and what is valid in the
 // edit buffer
 //
 //-------------------------------------------------------------------------------------------------
-EditView::EditStatus
-EditView::handleArrows( CxKeyAction keyAction )
+MyEditView::EditStatus
+MyEditView::handleArrows( CxKeyAction keyAction )
 {
 	if (keyAction.tag() == "<arrow-left>") {
-		
+
         CxEditHint hint = editBuffer->cursorLeftRequest();
 
         if (reframe()) {
@@ -1396,7 +1397,7 @@ EditView::handleArrows( CxKeyAction keyAction )
 	}
 
 	if (keyAction.tag() == "<arrow-down>") {
-        
+
         CxEditHint hint = editBuffer->cursorDownRequest();
 
         if (_jumpScroll) {
@@ -1408,7 +1409,7 @@ EditView::handleArrows( CxKeyAction keyAction )
                 updateScreen();
             }
         }
-        
+
         screen->placeCursor(
             bufferRowToScreenRow(editBuffer->cursor.row),
             bufferColToScreenCol(editBuffer->cursor.col)
@@ -1418,7 +1419,7 @@ EditView::handleArrows( CxKeyAction keyAction )
 	if (keyAction.tag() == "<arrow-up>") {
 
 		CxEditHint hint = editBuffer->cursorUpRequest();
-        
+
         if (_jumpScroll) {
             if (reframe_jump()) {
                 updateScreen();
@@ -1428,7 +1429,7 @@ EditView::handleArrows( CxKeyAction keyAction )
                 updateScreen();
             }
         }
-        
+
         screen->placeCursor(
             bufferRowToScreenRow(editBuffer->cursor.row),
             bufferColToScreenCol(editBuffer->cursor.col)
@@ -1441,14 +1442,14 @@ EditView::handleArrows( CxKeyAction keyAction )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView::routeKeyAction
-//	
+// MyEditView::routeKeyAction
+//
 // Keys passed into routeKeyAction are targeted for the edit view changing the text buffer
 // and then the screen is updated to reflect.
 //
 //-------------------------------------------------------------------------------------------------
-EditView::EditStatus
-EditView::routeKeyAction( CxKeyAction keyAction )
+MyEditView::EditStatus
+MyEditView::routeKeyAction( CxKeyAction keyAction )
 {
     CxString lineText;
 
@@ -1495,18 +1496,18 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 					CxEditHint editHint = editBuffer->addBackspace();
 
 					reframe();
-                    
-					
+
+
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT ) {
 						//updateRemainderOfWindow( editHint.startRow(), editHint.startCol() );
                         lineText = windowLineTerminalString( editHint.startRow() );
-					}	
+					}
 
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT ) {
 						//updateRemainderOfWindowLine( editHint.startRow(), editHint.startCol() );
                         lineText = windowLineTerminalString( editHint.startRow() );
-					}	
-					
+					}
+
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE) {
 						//updateEntireWindowLine( editHint.startRow() );
                         lineText = windowLineTerminalString( editHint.startRow() );
@@ -1516,7 +1517,7 @@ EditView::routeKeyAction( CxKeyAction keyAction )
                 	screen->flush();
 				}
 			}
-			break;	
+			break;
 
 		//-----------------------------------------------------------------------------------------
 		// handle a small set of options keys, specifically backspace/delete on some machines
@@ -1527,20 +1528,20 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 				if (keyAction.tag() == "<option-delete>") {
 
 					CxEditHint editHint = editBuffer->addBackspace();
-	
+
 					reframe();
-				
+
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT ) {
 //						updateRemainderOfWindow( editHint.startRow(), editHint.startCol() );
                         lineText = windowLineTerminalString( editHint.startRow() );
 
-					}	
+					}
 
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT ) {
 //						updateRemainderOfWindowLine( editHint.startRow(), editHint.startCol() );
                         lineText = windowLineTerminalString( editHint.startRow() );
                     }
-					
+
 					if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE) {
 //						updateEntireWindowLine( editHint.startRow() );
                         lineText = windowLineTerminalString( editHint.startRow() );
@@ -1580,7 +1581,7 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 //					updateRemainderOfWindow( editHint.startRow(), editHint.startCol());
                     lineText = windowLineTerminalString( editHint.startRow() );
 				}
-			
+
                 updateStatusLine();
                 screen->flush();
 
@@ -1617,21 +1618,21 @@ EditView::routeKeyAction( CxKeyAction keyAction )
      	case CxKeyAction::BACKSPACE:
 			{
 				CxEditHint editHint = editBuffer->addBackspace();
-					
+
 				reframe();
 
 				if (editHint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT ) {
 //					updateRemainderOfWindow( editHint.startRow(), editHint.startCol() );
                     lineText = windowLineTerminalString( editHint.startRow() );
 
-				}	
+				}
 
 				if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT ) {
 //					updateRemainderOfWindowLine( editHint.startRow(), editHint.startCol() );
                     lineText = windowLineTerminalString( editHint.startRow() );
 
-				}	
-					
+				}
+
 				if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE) {
 //					updateEntireWindowLine( editHint.startRow() );
                     lineText = windowLineTerminalString( editHint.startRow() );
@@ -1657,7 +1658,7 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 //					updateRemainderOfWindow( editHint.startRow(), editHint.startCol() );
                     lineText = windowLineTerminalString( editHint.startRow() );
 
-				}	
+				}
 
 				if (editHint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT ) {
                     lineText = windowLineTerminalString( editHint.startRow() );
@@ -1673,47 +1674,47 @@ EditView::routeKeyAction( CxKeyAction keyAction )
       	default:
         	break;
 	}
-            
+
             screen->placeCursor(
                 bufferRowToScreenRow(editBuffer->cursor.row),
                 bufferColToScreenCol(editBuffer->cursor.col)
                 );
-            
+
     lineText += CxCursor::locateTerminalString(
                 bufferRowToScreenRow(editBuffer->cursor.row),
                                                bufferColToScreenCol(editBuffer->cursor.col));
-            
-            
+
+
             fputs(lineText.data(), stdout);
 
-    return( EditView::OK );
+    return( MyEditView::OK );
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// EditView:: getEditBuffer
+// MyEditView:: getEditBuffer
 //
 // return the underlying edit buffer
-// 
+//
 //-------------------------------------------------------------------------------------------------
 CxEditBuffer *
-EditView::getEditBuffer(void)
+MyEditView::getEditBuffer(void)
 {
     return(editBuffer);
 }
 
 //-------------------------------------------------------------------------------------------------
-// EditView:: colorizeText
+// MyEditView:: colorizeText
 //
 // return the string adjusted for color
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-EditView::colorizeText( CxString fullText, CxString visibleText )
+MyEditView::colorizeText( CxString fullText, CxString visibleText )
 {
     int isCommentLine = false;
     int isIncludeLine = false;
-    
+
     //---------------------------------------------------------------------------------------------
     // get the first token from the full text to see if this is a comment or a include
     //---------------------------------------------------------------------------------------------
@@ -1721,11 +1722,11 @@ EditView::colorizeText( CxString fullText, CxString visibleText )
     if (testString.index("//") == 0) {
         isCommentLine = TRUE;
     }
-    
+
     if (testString.index("#") == 0) {
         isIncludeLine = true;
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // colorize for comments or includes
     //
@@ -1735,117 +1736,117 @@ EditView::colorizeText( CxString fullText, CxString visibleText )
         visibleText = encapsolateWithEntryExitText( visibleText,
             programDefaults->commentTextColor()->terminalString(),
             "\033[0m");
-        
+
     }
-    
+
     colorizeString = programDefaults->includeTextColor()->terminalString();
     if (isIncludeLine) {
-        
+
         visibleText = encapsolateWithEntryExitText( visibleText,
             programDefaults->includeTextColor()->terminalString(),
             "\033[0m");
     }
-    
-    
+
+
     //---------------------------------------------------------------------------------------------
     // colorize language cpp language types
     //
     //---------------------------------------------------------------------------------------------
     colorizeString = programDefaults->cppLanguageTypesTextColor()->terminalString();
     if (colorizeString.length() && (!isCommentLine)) {
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "char",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "void",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "int",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "float",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "double",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "long",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "unsigned",
             programDefaults->cppLanguageTypesTextColor()->terminalString(),
             "\033[0m");
     }
-    
+
     //---------------------------------------------------------------------------------------------
     // colorize language cpp language elements
     //
     //---------------------------------------------------------------------------------------------
     colorizeString = programDefaults->cppLanguageElementsTextColor()->terminalString();
     if (colorizeString.length() && (!isCommentLine)) {
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "if",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "while",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "return",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "break",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "case",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "else",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "switch",
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
-        
+
         visibleText = injectTextConstantEntryExitText(
             visibleText,
             "class",
@@ -1858,21 +1859,21 @@ EditView::colorizeText( CxString fullText, CxString visibleText )
             programDefaults->cppLanguageElementsTextColor()->terminalString(),
             "\033[0m");
     }
-    
-    
+
+
     //---------------------------------------------------------------------------------------------
     // colorize language cpp language method definitions
     //
     //---------------------------------------------------------------------------------------------
     colorizeString = programDefaults->cppLanguageMethodDefinitionTextColor()->terminalString();
     if (colorizeString.length()) {
-        
+
         visibleText = injectMethodEntryExitText(
             visibleText,
             programDefaults->cppLanguageMethodDefinitionTextColor()->terminalString(),
             "\033[0m");
     }
-    
+
     return( visibleText );
 }
 
@@ -1880,9 +1881,9 @@ EditView::colorizeText( CxString fullText, CxString visibleText )
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
-int EditView::parseTextConstant( CxString s, CxString item, unsigned long initialPos, unsigned long *start, unsigned long *end)
+int MyEditView::parseTextConstant( CxString s, CxString item, unsigned long initialPos, unsigned long *start, unsigned long *end)
 {
-    
+
     char *firstCharPtr = s.data();
     char *charPtr = (char *) NULL;
 
@@ -1934,7 +1935,7 @@ int EditView::parseTextConstant( CxString s, CxString item, unsigned long initia
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
-int EditView::parseClassMethod( CxString s, unsigned long *start, unsigned long *end)
+int MyEditView::parseClassMethod( CxString s, unsigned long *start, unsigned long *end)
 {
     char *firstCharPtr = s.data();
     char *charPtr = (char *) NULL;
@@ -1993,7 +1994,7 @@ int EditView::parseClassMethod( CxString s, unsigned long *start, unsigned long 
 //-------------------------------------------------------------------------------------------------
 
 CxString
-EditView::injectTextConstantEntryExitText( CxString line, CxString item, CxString entryString, CxString exitString)
+MyEditView::injectTextConstantEntryExitText( CxString line, CxString item, CxString entryString, CxString exitString)
 {
     unsigned long initial = 0;
     unsigned long start = 0;
@@ -2014,7 +2015,7 @@ EditView::injectTextConstantEntryExitText( CxString line, CxString item, CxStrin
 //-------------------------------------------------------------------------------------------------
 
 CxString
-EditView::injectMethodEntryExitText( CxString line, CxString entryString, CxString exitString )
+MyEditView::injectMethodEntryExitText( CxString line, CxString entryString, CxString exitString )
 {
     unsigned long start;
     unsigned long end;
@@ -2030,7 +2031,7 @@ EditView::injectMethodEntryExitText( CxString line, CxString entryString, CxStri
 }
 
 CxString
-EditView::encapsolateWithEntryExitText( CxString line, CxString entryString, CxString exitString )
+MyEditView::encapsolateWithEntryExitText( CxString line, CxString entryString, CxString exitString )
 {
     return( entryString + line + exitString );
 }

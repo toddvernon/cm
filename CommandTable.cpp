@@ -226,9 +226,9 @@ CommandEntry commandTable[] = {
     // Project commands
     //---------------------------------------------------------------------------------------------
     { "project-clean",
-      NULL,
+      "[subproject]",
       "Run make clean",
-      0,
+      CMD_FLAG_OPTIONAL_ARG,
       &ScreenEditor::CMD_ProjectClean,
       NULL },
 
@@ -247,7 +247,7 @@ CommandEntry commandTable[] = {
       NULL },
 
     { "project-make",
-      "[target]",
+      "[subproject] [target]",
       "Build project",
       CMD_FLAG_OPTIONAL_ARG,
       &ScreenEditor::CMD_ProjectMake,

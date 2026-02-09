@@ -495,25 +495,48 @@ ScreenEditor::CMD_ProjectMake( CxString commandLine )
         return;
     }
 
-    // Build the command - "make" or "make <target>"
+    // Use subproject-aware build if project is loaded
+    if (project != NULL && project->subprojectCount() > 0) {
+        // Parse: [subproject] [target]
+        CxString subprojectName = commandLine.nextToken(" \t\n");
+        CxString makeTarget = commandLine.nextToken(" \t\n");
+
+        if (subprojectName.length() == 0) {
+            // No args: build default subproject
+            ProjectSubproject *sub = project->getDefaultSubproject();
+            if (sub == NULL) {
+                setMessage("(no default subproject)");
+                return;
+            }
+            startBuild(sub, "");
+        } else if (subprojectName == "all") {
+            startBuildAll(makeTarget);
+        } else {
+            ProjectSubproject *sub = project->findSubproject(subprojectName);
+            if (sub == NULL) {
+                setMessage(CxString("(unknown subproject: ") + subprojectName + ")");
+                return;
+            }
+            startBuild(sub, makeTarget);
+        }
+        showBuildView();
+        return;
+    }
+
+    // No project loaded - fall back to plain make in current directory
     CxString command = "make";
     if (commandLine.length() > 0) {
         command += " ";
         command += commandLine;
     }
 
-    // Start the non-blocking build
     int result = buildOutput->start(command);
-
     if (result != 0) {
         setMessage("(make: failed to execute command)");
         return;
     }
 
-    // Set the build status prefix for command line
     _buildStatusPrefix = "(Building...)";
-
-    // Show the build view immediately
     showBuildView();
 }
 
@@ -534,18 +557,41 @@ ScreenEditor::CMD_ProjectClean( CxString commandLine )
         return;
     }
 
-    // Start the non-blocking clean
-    int result = buildOutput->start("make clean");
+    // Use subproject-aware build if project is loaded
+    if (project != NULL && project->subprojectCount() > 0) {
+        // Parse: [subproject]
+        CxString subprojectName = commandLine.nextToken(" \t\n");
 
+        if (subprojectName.length() == 0) {
+            // No args: clean default subproject
+            ProjectSubproject *sub = project->getDefaultSubproject();
+            if (sub == NULL) {
+                setMessage("(no default subproject)");
+                return;
+            }
+            startBuild(sub, "clean");
+        } else if (subprojectName == "all") {
+            startBuildAll("clean");
+        } else {
+            ProjectSubproject *sub = project->findSubproject(subprojectName);
+            if (sub == NULL) {
+                setMessage(CxString("(unknown subproject: ") + subprojectName + ")");
+                return;
+            }
+            startBuild(sub, "clean");
+        }
+        showBuildView();
+        return;
+    }
+
+    // No project loaded - fall back to plain make clean
+    int result = buildOutput->start("make clean");
     if (result != 0) {
         setMessage("(make clean: failed to execute command)");
         return;
     }
 
-    // Set the build status prefix for command line
     _buildStatusPrefix = "(Cleaning...)";
-
-    // Show the build view immediately
     showBuildView();
 }
 
@@ -628,13 +674,23 @@ ScreenEditor::CMD_ProjectCreate( CxString commandLine )
     // Create new project file
     CxString projectPath = projectName + ".project";
 
-    // Build JSON content
+    // Build JSON content (new subproject format)
     CxString content = "{\n";
     content += "    \"projectName\": \"";
     content += projectName;
     content += "\",\n";
-    content += "    \"projectMakefile\": \"makefile\",\n";
-    content += "    \"files\": [\n";
+    content += "    \"baseDirectory\": \".\",\n";
+    content += "    \"subprojects\": [\n";
+    content += "        {\n";
+    content += "            \"name\": \"";
+    content += projectName;
+    content += "\",\n";
+    content += "            \"directory\": \".\",\n";
+    content += "            \"makefile\": \"makefile\",\n";
+    content += "            \"default\": true,\n";
+    content += "            \"files\": [\n";
+    content += "            ]\n";
+    content += "        }\n";
     content += "    ]\n";
     content += "}\n";
 

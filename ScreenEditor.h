@@ -224,11 +224,15 @@ private:
     void showProjectView(void);
     void showHelpView(void);
     void showBuildView(void);
+    void startBuild(ProjectSubproject *sub, CxString makeTarget);
+    void startBuildAll(CxString makeTarget);
+    void continueBuildAll(void);
     void buildIdleCallback(void);       // polls build output during keyboard idle
     void returnToEditMode(void);        // dismiss modal and redraw editors
     void enterCommandLineMode(void);    // EDIT -> COMMANDLINE
     void exitCommandLineMode(void);     // COMMANDLINE -> EDIT
     void resetCommandInputState(void);
+    void rebuildSubprojectCompleter(void);
 
     // decomposed command input handlers
     void handleCommandEnter(void);
@@ -245,6 +249,7 @@ private:
     Completer       _boxSymbolCompleter;    // child: box drawing symbols
     Completer       _symSymbolCompleter;    // child: common symbols
 #endif
+    Completer       _subprojectCompleter;   // subproject names for project-make/clean arg completion
     Completer      *_activeCompleter;       // points to whichever is active
 
     // command input state
@@ -253,6 +258,11 @@ private:
     CxString _argBuffer;            // freeform argument text
     CommandEntry *_currentCommand;  // selected command (after completion)
     int _quitRequested;             // set by CMD_Quit to signal exit
+
+    // build state
+    ProjectSubproject *_activeBuildSubproject;  // current/last build target
+    int _buildAllIndex;                         // -1 if not "build all", else current subproject index
+    CxString _buildAllTarget;                   // make target for "build all"
 
     // split screen state
     int _splitMode;                 // 0 = single view, 1 = horizontal split

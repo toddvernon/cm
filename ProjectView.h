@@ -32,8 +32,42 @@
 #ifndef _ProjectView_h_
 #define _ProjectView_h_
 
+
+//-------------------------------------------------------------------------------------------------
+// ProjectViewItemType
+//
+// Type of item in the visible items list.
+//
+//-------------------------------------------------------------------------------------------------
+enum ProjectViewItemType {
+    PVITEM_ALL,           // "All" row at top
+    PVITEM_SUBPROJECT,    // Subproject header
+    PVITEM_FILE,          // File under a subproject
+    PVITEM_OPEN_HEADER,   // "Open Files" section header
+    PVITEM_OPEN_FILE,     // Buffer not in any subproject
+    PVITEM_SEPARATOR      // Visual separator line between sections
+};
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectViewItem
+//
+// A single visible row in the project view.
+//
+//-------------------------------------------------------------------------------------------------
+struct ProjectViewItem {
+    ProjectViewItemType type;
+    int subprojectIndex;     // -1 for ALL, 0+ for subprojects/files
+    int fileIndex;           // -1 for ALL and headers, 0+ for files
+    int bufferIndex;         // index into editBufferList (-1 if N/A)
+};
+
+
 //---------------------------------------------------------------------------------------------------------
 //
+//  ProjectView
+//
+//  Modal dialog showing project subprojects with expand/collapse and file navigation.
 //
 //---------------------------------------------------------------------------------------------------------
 class ProjectView
@@ -45,36 +79,51 @@ class ProjectView
 
     void routeKeyAction( CxKeyAction keyAction );
     // route a keyboard action
-    
+
     void redraw( void );
     // redraw the part of the screen with the list
-    
+
     void recalcScreenPlacements(void);
     // recalcs the key places in the window that parts are placed
 
-    
-    int calcLongestName(void);
-    
     CxString getSelectedItem( void );
-    // get the selected item in the list
+    // get resolved file path for selected file item, empty string if not a file
 
-    CmEditBuffer *getSelectedBuffer( void );
-    // get the selected edit buffer (for save operation)
+    ProjectViewItemType getSelectedItemType( void );
+    // get the type of the currently selected item
+
+    ProjectSubproject* getSelectedSubproject( void );
+    // get the subproject for the current selection (NULL if "All" selected)
+
+    void toggleSelectedSubproject( void );
+    // toggle expand/collapse of the selected subproject header
 
     void setVisible( int visible );
     // set visibility state for resize handling
 
+    void rebuildVisibleItems( void );
+    // rebuild the flat list of visible items from project structure
+
+    CxString getContextFooter( void );
+    // build footer string based on currently selected item type
+
   private:
+
+    int isProjectFilePath( CxString path );
+    // check if a path belongs to any subproject in the project
+
+    int subprojectHasModifiedFile( ProjectSubproject *sub );
+    // check if any file in the subproject has unsaved changes
 
     int handleArrows( CxKeyAction keyAction );
     // handle the arrow keys
-    
+
     int reframe( void );
     // make sure selection is visible in list
-    
+
     CmEditBufferList *editBufferList;
-    // pointer the the list of files being edited
-    
+    // pointer to the list of files being edited (for buffer status checks)
+
     ProgramDefaults *programDefaults;
     // pointer to the program defaults
 
@@ -85,24 +134,22 @@ class ProjectView
     // box frame for modal display
 
     Project *project;
-    
-    // these hold the key screen locations (zero based) for the editor all in screen
-    // coordinates
+
+    // flat list of visible items (rebuilt on expand/collapse)
+    CxSList<ProjectViewItem*> _visibleItems;
+
+    // screen placement values (zero based)
     int  screenNumberOfLines;
     int  screenNumberOfCols;
-    
+
     int  screenProjectTitleBarLine;
     int  screenProjectFrameLine;
     int  screenProjectNumberOfLines;
 	int  screenProjectNumberOfCols;
-    int  screenProjectFirstListLine;  // index of the first visible edit row (zero based)
-    int  screenProjectLastListLine;   // index of the last visible edit row (zero based)
-   
-	// need list visible bounds 
+    int  screenProjectFirstListLine;
+    int  screenProjectLastListLine;
 
-    // these hold the windowing values that are used to translate edit buffer coordinates
-    // to screen coordinates
-    
+    // scrolling and selection
     int firstVisibleListIndex;
 	int selectedListItemIndex;
 
@@ -111,4 +158,3 @@ class ProjectView
 };
 
 #endif
-
