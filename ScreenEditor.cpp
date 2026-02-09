@@ -73,6 +73,8 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _activeCompleter = NULL;
     _currentCommand = NULL;
     _quitRequested = FALSE;
+    _activeBuildSubproject = NULL;
+    _buildAllIndex = -1;
 
     // initialize split screen state
     _splitMode = 0;     // single view mode
@@ -206,7 +208,8 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
         // a buffer.
         //-----------------------------------------------------------------------------------------
         project->load( filePath );
-        
+        rebuildSubprojectCompleter();
+
         loadNewFile( filePath, TRUE );
 
         int numberOfFiles = project->numberOfFiles();
@@ -374,6 +377,31 @@ ScreenEditor::initCommandCompleters( void )
 #endif
 
         _commandCompleter.addCandidate( entry->name, child, (void*)entry );
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::rebuildSubprojectCompleter
+//
+// Populates the subproject completer with names from the loaded project.
+// Called after project load. Includes "all" as a special option.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::rebuildSubprojectCompleter(void)
+{
+    _subprojectCompleter.clear();
+
+    if (project == NULL || project->subprojectCount() == 0) {
+        return;
+    }
+
+    _subprojectCompleter.addCandidate("all");
+
+    for (int i = 0; i < project->subprojectCount(); i++) {
+        ProjectSubproject *sub = project->subprojectAt(i);
+        _subprojectCompleter.addCandidate(sub->name);
     }
 }
 
@@ -811,6 +839,7 @@ ScreenEditor::showProjectView(void)
 
     screen->hideCursor();
     projectView->setVisible(1);
+    projectView->rebuildVisibleItems();    // refresh for current buffers
     projectView->recalcScreenPlacements();
     projectView->redraw();  // draws modal on top of existing screen content
     programMode = PROJECTVIEW;
@@ -853,6 +882,121 @@ ScreenEditor::showBuildView(void)
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::startBuild
+//
+// Start a build for a specific subproject with an optional make target.
+// Builds the command: cd <makeDir> && make [target]
+// Sets build context on BuildOutput for jump-to-error path resolution.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::startBuild(ProjectSubproject *sub, CxString makeTarget)
+{
+    _activeBuildSubproject = sub;
+
+    // Get make directory
+    CxString makeDir = project->getMakeDirectory(sub);
+
+    // Build command: cd <dir> && make [target]
+    CxString command = "cd ";
+    command += makeDir;
+    command += " && make";
+    if (makeTarget.length() > 0) {
+        command += " ";
+        command += makeTarget;
+    }
+
+    // Set build context for error path resolution
+    buildOutput->setBuildContext(makeDir, sub->name);
+
+    // Start the build
+    buildOutput->start(command);
+
+    // Set the build status prefix for command line
+    CxString prefix = "(Building ";
+    prefix += sub->name;
+    prefix += "...)";
+    _buildStatusPrefix = prefix;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::startBuildAll
+//
+// Start building all subprojects in sequence. Clears previous output,
+// sets up build-all state, and kicks off the first subproject.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::startBuildAll(CxString makeTarget)
+{
+    if (project == NULL || project->buildOrderCount() == 0) {
+        setMessage("(no subprojects to build)");
+        return;
+    }
+
+    _buildAllIndex = 0;
+    _buildAllTarget = makeTarget;
+
+    // Clear previous build output
+    buildOutput->clear();
+
+    // Start the first subproject
+    continueBuildAll();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::continueBuildAll
+//
+// Continue the build-all sequence by starting the next subproject.
+// Appends a separator line and starts the build without clearing output.
+// Called by startBuildAll() for the first subproject and by buildIdleCallback()
+// for subsequent subprojects.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::continueBuildAll(void)
+{
+    if (_buildAllIndex < 0 || _buildAllIndex >= project->buildOrderCount()) {
+        _buildAllIndex = -1;
+        return;
+    }
+
+    ProjectSubproject *sub = project->buildOrderAt(_buildAllIndex);
+    _activeBuildSubproject = sub;
+
+    // Append separator line
+    CxString sep = "Building ";
+    sep += sub->name;
+    buildOutput->appendSeparator(sep);
+
+    // Get make directory and build command
+    CxString makeDir = project->getMakeDirectory(sub);
+
+    CxString command = "cd ";
+    command += makeDir;
+    command += " && make";
+    if (_buildAllTarget.length() > 0) {
+        command += " ";
+        command += _buildAllTarget;
+    }
+
+    // Set build context for error path resolution
+    buildOutput->setBuildContext(makeDir, sub->name);
+
+    // Start without clearing (preserves accumulated output)
+    buildOutput->startNext(command);
+
+    // Set status prefix
+    CxString prefix = "(Building ";
+    prefix += sub->name;
+    prefix += "...)";
+    _buildStatusPrefix = prefix;
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::buildIdleCallback
 //
 // Called during keyboard idle (~100ms intervals) to poll build output.
@@ -883,7 +1027,27 @@ ScreenEditor::buildIdleCallback(void)
             }
         }
     } else if (buildOutput->isComplete() && _buildStatusPrefix.length() > 0) {
-        // Build just finished - update status
+        // Build just finished
+
+        // Check if this is part of a build-all sequence
+        if (_buildAllIndex >= 0) {
+            if (buildOutput->exitCode() == 0) {
+                _buildAllIndex++;
+                if (_buildAllIndex < project->buildOrderCount()) {
+                    // More subprojects to build - continue
+                    continueBuildAll();
+                    if (programMode == BUILDVIEW) {
+                        buildView->scrollToEnd();
+                        buildView->redraw();
+                    }
+                    return;
+                }
+            }
+            // Error or last subproject - done with build-all
+            _buildAllIndex = -1;
+        }
+
+        // Update status message
         int errCount = buildOutput->errorCount();
         int warnCount = buildOutput->warningCount();
         char msg[100];
@@ -1150,9 +1314,9 @@ ScreenEditor::focusCommandPrompt( CxKeyAction keyAction )
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::focusProjectView
 //
-// When the filelist is the focus this handles the routing of keys.  Most keys are passed through
-// to the file list view but a few are intercepted.  newline selects a new file to edit and esc
-// dismisses the window without loading a new buffer (like a cancel button)
+// When the project view is focused this handles key routing.  Enter on a file opens it,
+// Enter on a subproject header toggles expand/collapse, ESC dismisses.
+// S saves the selected file, A saves all modified files.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -1171,13 +1335,24 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
         break;
 
         //-----------------------------------------------------------------------------------------
-        // handle a newline - load selected file
+        // handle enter - context-sensitive based on item type
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::NEWLINE:
         {
-            projectView->setVisible(0);
-            loadNewFile(projectView->getSelectedItem(), TRUE);
-            returnToEditMode();
+            ProjectViewItemType itemType = projectView->getSelectedItemType();
+
+            if (itemType == PVITEM_FILE || itemType == PVITEM_OPEN_FILE) {
+                CxString filePath = projectView->getSelectedItem();
+                if (filePath.length() > 0) {
+                    projectView->setVisible(0);
+                    loadNewFile(filePath, TRUE);
+                    returnToEditMode();
+                }
+            } else if (itemType == PVITEM_SUBPROJECT) {
+                projectView->toggleSelectedSubproject();
+                projectView->redraw();
+            }
+            // PVITEM_ALL: no action on Enter
         }
         break;
 
@@ -1187,27 +1362,105 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
         case CxKeyAction::LOWERCASE_ALPHA:
         case CxKeyAction::UPPERCASE_ALPHA:
         {
-            // load the highlighted file
-            if (keyAction.tag() == 'l' || keyAction.tag() == 'L')
+            ProjectViewItemType selType = projectView->getSelectedItemType();
+
+            // make (build) - only on ALL or SUBPROJECT
+            if (keyAction.tag() == 'm' || keyAction.tag() == 'M')
             {
-                projectView->setVisible(0);
-                loadNewFile(projectView->getSelectedItem(), TRUE);
-                returnToEditMode();
+                if (selType == PVITEM_ALL || selType == PVITEM_SUBPROJECT) {
+                    if (buildOutput->isRunning()) {
+                        setMessage("(build already running)");
+                    } else if (project != NULL && project->subprojectCount() > 0) {
+                        ProjectSubproject *sub = projectView->getSelectedSubproject();
+                        if (sub == NULL) {
+                            startBuildAll("");
+                        } else {
+                            startBuild(sub, "");
+                        }
+                        projectView->setVisible(0);
+                        showBuildView();
+                        return;
+                    }
+                }
             }
 
-            // save the highlighted file
+            // clean - only on ALL or SUBPROJECT
+            if (keyAction.tag() == 'c' || keyAction.tag() == 'C')
+            {
+                if (selType == PVITEM_ALL || selType == PVITEM_SUBPROJECT) {
+                    if (buildOutput->isRunning()) {
+                        setMessage("(build already running)");
+                    } else if (project != NULL && project->subprojectCount() > 0) {
+                        ProjectSubproject *sub = projectView->getSelectedSubproject();
+                        if (sub == NULL) {
+                            startBuildAll("clean");
+                        } else {
+                            startBuild(sub, "clean");
+                        }
+                        projectView->setVisible(0);
+                        showBuildView();
+                        return;
+                    }
+                }
+            }
+
+            // test - only on ALL or SUBPROJECT
+            if (keyAction.tag() == 't' || keyAction.tag() == 'T')
+            {
+                if (selType == PVITEM_ALL || selType == PVITEM_SUBPROJECT) {
+                    if (buildOutput->isRunning()) {
+                        setMessage("(build already running)");
+                    } else if (project != NULL && project->subprojectCount() > 0) {
+                        ProjectSubproject *sub = projectView->getSelectedSubproject();
+                        if (sub == NULL) {
+                            startBuildAll("test");
+                        } else {
+                            startBuild(sub, "test");
+                        }
+                        projectView->setVisible(0);
+                        showBuildView();
+                        return;
+                    }
+                }
+            }
+
+            // save - context-sensitive
             if (keyAction.tag() == 's' || keyAction.tag() == 'S')
             {
-                CmEditBuffer *buffer = projectView->getSelectedBuffer();
-                if (buffer != NULL && buffer->isTouched()) {
-                    buffer->saveText(buffer->getFilePath());
-                    setMessage("(Saved)");
+                if (selType == PVITEM_FILE || selType == PVITEM_OPEN_FILE) {
+                    // save single file
+                    CxString filePath = projectView->getSelectedItem();
+                    CmEditBuffer *buffer = editBufferList->findPath(filePath);
+                    if (buffer != NULL && buffer->isTouched()) {
+                        buffer->saveText(buffer->getFilePath());
+                        setMessage("(Saved)");
+                    }
+                } else if (selType == PVITEM_SUBPROJECT) {
+                    // save all modified files in this subproject
+                    ProjectSubproject *sub = projectView->getSelectedSubproject();
+                    if (sub != NULL) {
+                        int savedCount = 0;
+                        for (int f = 0; f < (int)sub->files.entries(); f++) {
+                            CxString resolved = project->resolveFilePath(sub, sub->files.at(f));
+                            CmEditBuffer *buffer = editBufferList->findPath(resolved);
+                            if (buffer != NULL && buffer->isTouched()) {
+                                buffer->saveText(buffer->getFilePath());
+                                savedCount++;
+                            }
+                        }
+                        if (savedCount > 0) {
+                            CxString msg = CxString("(Saved ") + CxString(savedCount) + CxString(" files)");
+                            setMessage(msg);
+                        } else {
+                            setMessage("(No modified files)");
+                        }
+                    }
                 }
                 projectView->redraw();
             }
 
             // save all modified files
-            if ( keyAction.tag() == 'a' || keyAction.tag() == 'A')
+            if (keyAction.tag() == 'a' || keyAction.tag() == 'A')
             {
                 int savedCount = 0;
                 for (int i = 0; i < editBufferList->items(); i++) {
@@ -1227,7 +1480,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
             }
         }
         break;
-            
+
         //-----------------------------------------------------------------------------------------
         // handle all other keys
         //-----------------------------------------------------------------------------------------
@@ -1309,6 +1562,14 @@ ScreenEditor::focusBuildView( CxKeyAction keyAction )
                     CxString filename = line->filename;
                     int lineNum = line->line;
                     int colNum = line->column;
+
+                    // Resolve path using build directory context
+                    CxString buildDir = buildOutput->getBuildDirectory();
+                    if (buildDir.length() > 0) {
+                        filename = buildDir;
+                        filename += "/";
+                        filename += line->filename;
+                    }
 
                     // Dismiss build view first
                     buildView->setVisible(0);
@@ -1931,6 +2192,25 @@ ScreenEditor::handleArgumentModeInput( CxKeyAction keyAction )
         return;
     }
 
+    // TAB - complete subproject name for project-make/project-clean
+    if (keyAction.actionType() == CxKeyAction::CURSOR && keyAction.tag() == "<tab>") {
+        if (_currentCommand != NULL &&
+            (_currentCommand->handler == &ScreenEditor::CMD_ProjectMake ||
+             _currentCommand->handler == &ScreenEditor::CMD_ProjectClean)) {
+            // Only complete the first word (before any space)
+            int spaceIdx = _argBuffer.index(" ");
+            if (spaceIdx < 0) {
+                CompleterResult result = _subprojectCompleter.processTab(_argBuffer);
+                if (result.getStatus() == COMPLETER_UNIQUE ||
+                    result.getStatus() == COMPLETER_PARTIAL) {
+                    _argBuffer = result.getInput();
+                    updateArgumentDisplay();
+                }
+            }
+        }
+        return;
+    }
+
     // BACKSPACE - delete last character
     if (keyAction.actionType() == CxKeyAction::BACKSPACE) {
         if (_argBuffer.length() > 0) {
@@ -1983,7 +2263,33 @@ ScreenEditor::updateArgumentDisplay( void )
     }
     prefix += ": ";
 
-    renderCommandLine( prefix, _argBuffer, prefix.length() + _argBuffer.length() );
+    CxString display = _argBuffer;
+
+    // Show subproject completion hints for project-make/project-clean
+    if (_currentCommand->handler == &ScreenEditor::CMD_ProjectMake ||
+        _currentCommand->handler == &ScreenEditor::CMD_ProjectClean) {
+        // Only show hints while typing the first word (no space yet)
+        int spaceIdx = _argBuffer.index(" ");
+        if (spaceIdx < 0) {
+            CxString names[16];
+            int count = _subprojectCompleter.findMatches(_argBuffer, names, 16);
+            int isExactMatch = (count == 1 && _argBuffer == names[0]);
+
+            if (count > 0 && !isExactMatch) {
+                display += "  ";
+                for (int i = 0; i < count && i < 8; i++) {
+                    display += "| ";
+                    display += names[i];
+                    display += " ";
+                }
+                if (count > 8) {
+                    display += "...";
+                }
+            }
+        }
+    }
+
+    renderCommandLine( prefix, display, prefix.length() + _argBuffer.length() );
 }
 
 

@@ -13,28 +13,28 @@
 //-------------------------------------------------------------------------------------------------
 // ProjectView.cpp
 //
-// Edit View the class that handles display of the edit buffer on the screen.  It handles
-// screen sizing and resizing and reframing the visible part of the edit buffer on the
-// visible screen.
+// Modal dialog showing project structure organized by subproject.
+// Subproject headers are collapsible, files are listed under their subproject.
+// "All" row at top for build-all operations.
 //
 //-------------------------------------------------------------------------------------------------
 
 #include "ProjectView.h"
 
 //-------------------------------------------------------------------------------------------------
-// Platform-conditional selection indicator
+// Platform-conditional expand/collapse indicators
 //-------------------------------------------------------------------------------------------------
 #if defined(_LINUX_) || defined(_OSX_)
-static const char *SELECTION_INDICATOR = "\xe2\x96\xb6";  // ▶ (UTF-8)
+static const char *EXPAND_INDICATOR   = "\xe2\x96\xbc";  // ▼ (UTF-8)
+static const char *COLLAPSE_INDICATOR = "\xe2\x96\xb6";  // ▶ (UTF-8)
 #else
-static const char *SELECTION_INDICATOR = ">";
+static const char *EXPAND_INDICATOR   = "v";
+static const char *COLLAPSE_INDICATOR = ">";
 #endif
 
 
 //-------------------------------------------------------------------------------------------------
 // ProjectView::ProjectView (constructor)
-//
-// Constructs an overlay file list view allowing the user to select a file from the edit buffer
 //
 //-------------------------------------------------------------------------------------------------
 ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
@@ -52,8 +52,148 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
 
     // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
+    // build the visible items from project structure
+    rebuildVisibleItems();
+
     // recalc where everything should display
     recalcScreenPlacements();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::rebuildVisibleItems
+//
+// Rebuild the flat list of visible items from the project subproject structure.
+// Called on construction and whenever expand/collapse state changes.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::rebuildVisibleItems( void )
+{
+    _visibleItems.clearAndDelete();
+
+    // build "Other Files" section first (non-project buffers at top)
+    int openFilesAdded = 0;
+    for (int i = 0; i < editBufferList->items(); i++) {
+        CmEditBuffer *buf = editBufferList->at(i);
+        if (buf == NULL) continue;
+
+        CxString path = buf->getFilePath();
+        if (path.length() == 0) continue;
+
+        // skip buffers that belong to a project subproject
+        if (project->subprojectCount() > 0 && isProjectFilePath(path)) {
+            continue;
+        }
+
+        // add header on first non-project buffer
+        if (!openFilesAdded) {
+            ProjectViewItem *hdrItem = new ProjectViewItem();
+            hdrItem->type = PVITEM_OPEN_HEADER;
+            hdrItem->subprojectIndex = -1;
+            hdrItem->fileIndex = -1;
+            hdrItem->bufferIndex = -1;
+            _visibleItems.append(hdrItem);
+            openFilesAdded = 1;
+        }
+
+        ProjectViewItem *openItem = new ProjectViewItem();
+        openItem->type = PVITEM_OPEN_FILE;
+        openItem->subprojectIndex = -1;
+        openItem->fileIndex = -1;
+        openItem->bufferIndex = i;
+        _visibleItems.append(openItem);
+    }
+
+    if (project->subprojectCount() > 0) {
+
+        // add separator between open files and project sections
+        if (openFilesAdded) {
+            ProjectViewItem *sepItem = new ProjectViewItem();
+            sepItem->type = PVITEM_SEPARATOR;
+            sepItem->subprojectIndex = -1;
+            sepItem->fileIndex = -1;
+            sepItem->bufferIndex = -1;
+            _visibleItems.append(sepItem);
+        }
+
+        // add "All" row
+        ProjectViewItem *allItem = new ProjectViewItem();
+        allItem->type = PVITEM_ALL;
+        allItem->subprojectIndex = -1;
+        allItem->fileIndex = -1;
+        allItem->bufferIndex = -1;
+        _visibleItems.append(allItem);
+
+        // add subprojects and their files
+        for (int s = 0; s < project->subprojectCount(); s++) {
+            ProjectSubproject *sub = project->subprojectAt(s);
+
+            // add subproject header
+            ProjectViewItem *subItem = new ProjectViewItem();
+            subItem->type = PVITEM_SUBPROJECT;
+            subItem->subprojectIndex = s;
+            subItem->fileIndex = -1;
+            subItem->bufferIndex = -1;
+            _visibleItems.append(subItem);
+
+            // if expanded, add files
+            if (sub->isExpanded) {
+                for (int f = 0; f < (int)sub->files.entries(); f++) {
+                    ProjectViewItem *fileItem = new ProjectViewItem();
+                    fileItem->type = PVITEM_FILE;
+                    fileItem->subprojectIndex = s;
+                    fileItem->fileIndex = f;
+                    fileItem->bufferIndex = -1;
+                    _visibleItems.append(fileItem);
+                }
+            }
+        }
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::isProjectFilePath
+//
+// Check if a file path belongs to any subproject in the project.
+// Returns 1 if the path matches a resolved project file, 0 otherwise.
+//
+//-------------------------------------------------------------------------------------------------
+int
+ProjectView::isProjectFilePath( CxString path )
+{
+    for (int s = 0; s < project->subprojectCount(); s++) {
+        ProjectSubproject *sub = project->subprojectAt(s);
+        for (int f = 0; f < (int)sub->files.entries(); f++) {
+            CxString resolved = project->resolveFilePath(sub, sub->files.at(f));
+            if (resolved == path) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::subprojectHasModifiedFile
+//
+// Check if any file in the subproject has unsaved changes.
+// Returns 1 if at least one file is modified, 0 otherwise.
+//
+//-------------------------------------------------------------------------------------------------
+int
+ProjectView::subprojectHasModifiedFile( ProjectSubproject *sub )
+{
+    for (int f = 0; f < (int)sub->files.entries(); f++) {
+        CxString resolved = project->resolveFilePath(sub, sub->files.at(f));
+        CmEditBuffer *buf = editBufferList->findPath(resolved);
+        if (buf != NULL && buf->isTouched()) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 
@@ -61,7 +201,7 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
 // ProjectView::recalcScreenPlacements
 //
 // Calculate centered modal bounds with 15% margins on each side.
-// Content height is based on buffer count, clamped to min/max limits.
+// Content height is based on visible item count, clamped to min/max limits.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -89,13 +229,13 @@ ProjectView::recalcScreenPlacements(void)
     int maxItems = (int)(screenNumberOfLines * 0.6) - 6;  // reserve 6 for frame rows
     if (maxItems < minItems) maxItems = minItems;
 
-    int bufferCount = editBufferList->items();
-    if (bufferCount < minItems) {
+    int itemCount = (int)_visibleItems.entries();
+    if (itemCount < minItems) {
         screenProjectNumberOfLines = minItems;
-    } else if (bufferCount > maxItems) {
+    } else if (itemCount > maxItems) {
         screenProjectNumberOfLines = maxItems;
     } else {
-        screenProjectNumberOfLines = bufferCount;
+        screenProjectNumberOfLines = itemCount;
     }
 
     // total height = content lines + 6 (top, title, sep, content..., sep, footer, bottom)
@@ -120,45 +260,24 @@ ProjectView::recalcScreenPlacements(void)
     // set the first list index visible in the scrolling list
     firstVisibleListIndex = 0;
 
-    // set the selected item in the list (ensure valid bounds)
-    selectedListItemIndex = editBufferList->currentItemIndex();
-    if (selectedListItemIndex < 0) {
+    // set the selected item (start at first selectable item)
+    selectedListItemIndex = 0;
+    int totalItems = (int)_visibleItems.entries();
+    while (selectedListItemIndex < totalItems) {
+        ProjectViewItemType t = _visibleItems.at(selectedListItemIndex)->type;
+        if (t != PVITEM_SEPARATOR && t != PVITEM_OPEN_HEADER) break;
+        selectedListItemIndex++;
+    }
+    if (selectedListItemIndex >= totalItems && totalItems > 0) {
         selectedListItemIndex = 0;
     }
-    if (selectedListItemIndex >= editBufferList->items()) {
-        selectedListItemIndex = editBufferList->items() - 1;
-        if (selectedListItemIndex < 0) {
-            selectedListItemIndex = 0;
-        }
-    }
-}
-
-
-int
-ProjectView::calcLongestName(void)
-{
-    int maxLength = 0;
-    
-    // looping on visible  items
-    for (int c=0; c<editBufferList->items(); c++) {
-        
-        // get the edit buffer at that index
-        CmEditBuffer *eb = editBufferList->at(c);
-        
-        // get the file assuming we haven't made a mistake
-        CxString filePath = eb->getFilePath( );
-        
-        if (filePath.length() > maxLength) maxLength = filePath.length();
-    }
-    
-    return( maxLength );
 }
 
 
 //-------------------------------------------------------------------------------------------------
 // ProjectView::redraw
 //
-// Draw centered modal dialog with box frame, title, content, and footer.
+// Draw centered modal dialog with box frame, title, grouped subproject content, and footer.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -170,7 +289,6 @@ ProjectView::redraw( void )
 
     // get frame content bounds
     int contentLeft  = frame->contentLeft();
-    int contentRight = frame->contentRight();
     int contentWidth = frame->contentWidth();
 
     //---------------------------------------------------------------------------------------------
@@ -179,22 +297,28 @@ ProjectView::redraw( void )
     frame->setFrameColor(programDefaults->statusBarTextColor(),
                          programDefaults->statusBarBackgroundColor());
 
-    // build title string: Project: <name> or Buffer List if no project
+    // build title string
     CxString title;
     CxString projName = project->projectName();
     if (projName.length() > 0) {
         title = CxString("Project: ") + projName;
+    } else if (project->subprojectCount() == 0) {
+        title = "Other Files";
     } else {
-        title = "Buffer List";
+        title = "Project";
     }
 
-    // build footer string with keyboard hints
-    CxString footer = CxString("[Enter] Load   [S] Save   [A] Save All   [Esc] Cancel");
+    // build context-sensitive footer based on current selection
+    CxString footer = getContextFooter();
 
     frame->drawWithTitleAndFooter(title, footer);
 
+    // tag colors - bright_red for modified, cyan for in-memory
+    CxAnsiForegroundColor tagModifiedColor("bright_red");
+    CxAnsiForegroundColor tagInMemoryColor("cyan");
+
     //---------------------------------------------------------------------------------------------
-    // draw the file list content
+    // draw the visible items
     //---------------------------------------------------------------------------------------------
     for (int c = 0; c < screenProjectNumberOfLines; c++) {
 
@@ -205,90 +329,243 @@ ProjectView::redraw( void )
         // position cursor at start of content area
         screen->placeCursor(row, contentLeft);
 
-        // if this item exists in the buffer list
-        if (logicalItem < editBufferList->items()) {
+        // if this item exists in the visible list
+        if (logicalItem < (int)_visibleItems.entries()) {
 
-            CmEditBuffer *eb = editBufferList->at(logicalItem);
+            ProjectViewItem *item = _visibleItems.at(logicalItem);
 
-            // build status text
-            CxString statusText = "";
-            if (eb->isTouched()) {
-                statusText = "/modified";
-            } else if (eb->isInMemory()) {
-                statusText = "/in-memory";
-            }
+            //-------------------------------------------------------------------------------------
+            // build the display text and tag based on item type
+            //-------------------------------------------------------------------------------------
+            CxString prefix;
+            int prefixDisplayWidth;
+            CxString text;
+            int textExtraBytes = 0;  // bytes beyond display columns for multi-byte chars
+            CxString tagMod;    // "/modified" or empty
+            CxString tagMem;    // "/in-memory" or empty
 
-            // get file path
-            CxString filePath = eb->getFilePath();
+            switch (item->type) {
 
-            // Layout: " X path...padding...status "
-            // where X is indicator (▶) for selected, space for unselected
-            // Total display width = contentWidth
-            // Indicator area = 3 columns (" X ")
-            // Status area = status length + 1 trailing space
-            // Path area = remaining space
+                case PVITEM_ALL:
+                    prefix = "   ";
+                    prefixDisplayWidth = 3;
+#if defined(_LINUX_) || defined(_OSX_)
+                    text = "All \xf0\x9f\x8e\xaf";  // 🎯
+                    textExtraBytes = 2;  // 4 bytes, 2 display columns
+#else
+                    text = "All (target)";
+#endif
+                    break;
 
-            int indicatorDisplayLen = 3;  // " X " display columns
-            int statusDisplayLen = statusText.length() + 1;  // status + trailing space
-            int pathAreaLen = contentWidth - indicatorDisplayLen - statusDisplayLen;
+                case PVITEM_SUBPROJECT:
+                {
+                    ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+                    prefix = " ";
+                    if (sub->isExpanded) {
+                        prefix += EXPAND_INDICATOR;
+                    } else {
+                        prefix += COLLAPSE_INDICATOR;
+                    }
+                    prefix += " ";
+                    prefixDisplayWidth = 3;
 
-            // truncate path if needed
-            if ((int)filePath.length() > pathAreaLen) {
-                filePath = filePath.subString(0, pathAreaLen - 3);
-                filePath += "...";
-            }
+                    text = sub->name;
+#if defined(_LINUX_) || defined(_OSX_)
+                    text += " \xf0\x9f\x8e\xaf";  // 🎯
+                    textExtraBytes = 2;
+#else
+                    text += " (target)";
+#endif
 
-            // pad path to fill path area
-            while ((int)filePath.length() < pathAreaLen) {
-                filePath += " ";
+                    if (subprojectHasModifiedFile(sub)) {
+                        tagMod = "/modified";
+                    }
+                }
+                break;
+
+                case PVITEM_FILE:
+                {
+                    ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+                    prefix = "     ";
+                    prefixDisplayWidth = 5;
+                    text = sub->files.at(item->fileIndex);
+
+                    CxString resolved = project->resolveFilePath(sub, sub->files.at(item->fileIndex));
+                    CmEditBuffer *buf = editBufferList->findPath(resolved);
+                    if (buf != NULL) {
+                        if (buf->isTouched()) {
+                            tagMod = "/modified";
+                        }
+                        if (buf->isInMemory()) {
+                            tagMem = "/in-memory";
+                        }
+                    }
+                }
+                break;
+
+                case PVITEM_OPEN_HEADER:
+                {
+                    prefix = "   ";
+                    prefixDisplayWidth = 3;
+                    text = "Other Files";
+                }
+                break;
+
+                case PVITEM_OPEN_FILE:
+                {
+                    prefix = "     ";
+                    prefixDisplayWidth = 5;
+
+                    CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
+                    if (buf != NULL) {
+                        CxString path = buf->getFilePath();
+                        int lastSlash = path.lastChar('/');
+                        if (lastSlash >= 0) {
+                            text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
+                        } else {
+                            text = path;
+                        }
+
+                        if (buf->isTouched()) {
+                            tagMod = "/modified";
+                        }
+                        if (buf->isInMemory()) {
+                            tagMem = "/in-memory";
+                        }
+                    } else {
+                        text = "(unknown)";
+                    }
+                }
+                break;
+
+                case PVITEM_SEPARATOR:
+                {
+                    prefix = "";
+                    prefixDisplayWidth = 0;
+                    text = "";
+#if defined(_LINUX_) || defined(_OSX_)
+                    for (int i = 0; i < contentWidth; i++) {
+                        text += "\xe2\x94\x80";  // ─ (U+2500)
+                    }
+#else
+                    for (int i = 0; i < contentWidth; i++) {
+                        text += "-";
+                    }
+#endif
+                }
+                break;
             }
 
             //-------------------------------------------------------------------------------------
-            // draw selected item
+            // compute layout: text area, tag placement
             //-------------------------------------------------------------------------------------
-            if (selectedListItemIndex == logicalItem) {
+            int textAreaLen = contentWidth - prefixDisplayWidth - 1;
 
-                // set selection colors
+            // total tag display width: each tag plus a space separator between them
+            int totalTagLen = 0;
+            if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+            if (tagMem.length() > 0) {
+                if (totalTagLen > 0) totalTagLen += 1;  // space between tags
+                totalTagLen += (int)tagMem.length();
+            }
+
+            int maxTextLen = textAreaLen;
+            if (totalTagLen > 0) {
+                maxTextLen = textAreaLen - totalTagLen - 1;  // 1 space before tags
+            }
+
+            // for separator, skip normal text layout
+            if (item->type != PVITEM_SEPARATOR) {
+                if ((int)text.length() - textExtraBytes > maxTextLen) {
+                    text = text.subString(0, maxTextLen - 3 + textExtraBytes);
+                    text += "...";
+                }
+
+                while ((int)text.length() < textAreaLen + textExtraBytes) {
+                    text += " ";
+                }
+            }
+
+            //-------------------------------------------------------------------------------------
+            // draw with selection highlight or normal colors
+            //-------------------------------------------------------------------------------------
+            int isSelected = (selectedListItemIndex == logicalItem);
+            int isSeparator = (item->type == PVITEM_SEPARATOR ||
+                               item->type == PVITEM_OPEN_HEADER);
+
+            if (isSelected && !isSeparator) {
                 screen->setForegroundColor(programDefaults->statusBarTextColor());
                 screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-
-                // build the line: " ▶ " + padded_path + status + " "
-                CxString line = " ";
-                line += SELECTION_INDICATOR;
-                line += " ";
-                line += filePath;
-                line += statusText;
-                line += " ";
-
-                screen->writeText(line);
-                screen->resetColors();
-
-                cursorRow = row;
-
-            //-------------------------------------------------------------------------------------
-            // draw unselected item
-            //-------------------------------------------------------------------------------------
             } else {
-
-                // use modal content colors (dark background for overlay effect)
                 screen->setForegroundColor(programDefaults->modalContentTextColor());
                 screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+            }
 
-                // build the line: "   " + padded_path + status + " "
-                CxString line = "   ";
-                line += filePath;
-                line += statusText;
-                line += " ";
+            if (totalTagLen > 0 && !isSeparator) {
+                // draw prefix + text up to tag position
+                int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
+                CxString textPart = text.subString(0, textBeforeTag);
 
+                CxString line = prefix;
+                line += textPart;
                 screen->writeText(line);
-                screen->resetColors();
+
+                // set background for tags
+                CxColor *tagBg = isSelected
+                    ? programDefaults->statusBarBackgroundColor()
+                    : programDefaults->modalContentBackgroundColor();
+
+                // draw /modified tag in red
+                if (tagMod.length() > 0) {
+                    screen->setForegroundColor(&tagModifiedColor);
+                    screen->setBackgroundColor(tagBg);
+                    screen->writeText(tagMod);
+                }
+
+                // draw /in-memory tag in cyan
+                if (tagMem.length() > 0) {
+                    if (tagMod.length() > 0) {
+                        // space between tags in normal text color
+                        if (isSelected) {
+                            screen->setForegroundColor(programDefaults->statusBarTextColor());
+                        } else {
+                            screen->setForegroundColor(programDefaults->modalContentTextColor());
+                        }
+                        screen->setBackgroundColor(tagBg);
+                        screen->writeText(" ");
+                    }
+                    screen->setForegroundColor(&tagInMemoryColor);
+                    screen->setBackgroundColor(tagBg);
+                    screen->writeText(tagMem);
+                }
+
+                // trailing space in normal colors
+                if (isSelected) {
+                    screen->setForegroundColor(programDefaults->statusBarTextColor());
+                    screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+                } else {
+                    screen->setForegroundColor(programDefaults->modalContentTextColor());
+                    screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+                }
+                screen->writeText(" ");
+            } else {
+                // no tag - simple line
+                CxString line = prefix;
+                line += text;
+                line += " ";
+                screen->writeText(line);
+            }
+
+            screen->resetColors();
+
+            if (isSelected && !isSeparator) {
+                cursorRow = row;
             }
 
         //-----------------------------------------------------------------------------------------
-        // draw empty line if beyond buffer list
+        // draw empty line if beyond visible items
         //-----------------------------------------------------------------------------------------
         } else {
-            // fill empty lines with modal background
             screen->setForegroundColor(programDefaults->modalContentTextColor());
             screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
             CxString emptyLine;
@@ -309,40 +586,157 @@ ProjectView::redraw( void )
 //-------------------------------------------------------------------------------------------------
 // ProjectView::getSelectedItem
 //
-// return the path of the currently selected item
+// Return the resolved file path if a file item is selected, empty string otherwise.
 //
 //-------------------------------------------------------------------------------------------------
 CxString
 ProjectView::getSelectedItem( void )
 {
-    // get the edit buffer at that index
-    CmEditBuffer *eb = editBufferList->at( selectedListItemIndex );
+    if (selectedListItemIndex < 0 || selectedListItemIndex >= (int)_visibleItems.entries()) {
+        return CxString("");
+    }
 
-    // get the file assuming we haven't made a mistake
-    CxString filePath = eb->getFilePath( );
+    ProjectViewItem *item = _visibleItems.at(selectedListItemIndex);
 
-    // return the name of the path
-    return(filePath);
+    if (item->type == PVITEM_FILE) {
+        ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+        if (sub == NULL) {
+            return CxString("");
+        }
+        return project->resolveFilePath(sub, sub->files.at(item->fileIndex));
+    }
+
+    if (item->type == PVITEM_OPEN_FILE) {
+        CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
+        if (buf != NULL) {
+            return buf->getFilePath();
+        }
+        return CxString("");
+    }
+
+    return CxString("");
 }
 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::getSelectedBuffer
+// ProjectView::getSelectedItemType
 //
-// return the edit buffer for the currently selected item (for save operations)
+// Return the type of the currently selected item.
 //
 //-------------------------------------------------------------------------------------------------
-CmEditBuffer *
-ProjectView::getSelectedBuffer( void )
+ProjectViewItemType
+ProjectView::getSelectedItemType( void )
 {
-    return editBufferList->at( selectedListItemIndex );
+    if (selectedListItemIndex < 0 || selectedListItemIndex >= (int)_visibleItems.entries()) {
+        return PVITEM_ALL;
+    }
+    return _visibleItems.at(selectedListItemIndex)->type;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::getSelectedSubproject
+//
+// Return the subproject for the currently selected item.
+// Returns NULL if "All" is selected.
+//
+//-------------------------------------------------------------------------------------------------
+ProjectSubproject*
+ProjectView::getSelectedSubproject( void )
+{
+    if (selectedListItemIndex < 0 || selectedListItemIndex >= (int)_visibleItems.entries()) {
+        return NULL;
+    }
+
+    ProjectViewItem *item = _visibleItems.at(selectedListItemIndex);
+    if (item->subprojectIndex < 0) {
+        return NULL;
+    }
+
+    return project->subprojectAt(item->subprojectIndex);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::getContextFooter
+//
+// Build a context-sensitive footer string based on the currently selected item.
+//
+//-------------------------------------------------------------------------------------------------
+CxString
+ProjectView::getContextFooter( void )
+{
+    ProjectViewItemType selType = getSelectedItemType();
+
+    // file items (project or non-project)
+    if (selType == PVITEM_FILE || selType == PVITEM_OPEN_FILE) {
+        CxString filePath = getSelectedItem();
+        CmEditBuffer *buf = editBufferList->findPath(filePath);
+        if (buf != NULL && buf->isTouched()) {
+            return "[Enter] Open  [S] Save  [A] Save All  [Esc] Close";
+        }
+        return "[Enter] Open  [A] Save All  [Esc] Close";
+    }
+
+    // subproject header
+    if (selType == PVITEM_SUBPROJECT) {
+        ProjectSubproject *sub = getSelectedSubproject();
+        if (sub != NULL && subprojectHasModifiedFile(sub)) {
+            return "[S] Save All  [M] Make  [C] Clean  [T] Test  [Esc] Close";
+        }
+        return "[M] Make  [C] Clean  [T] Test  [Esc] Close";
+    }
+
+    // ALL row
+    if (selType == PVITEM_ALL) {
+        return "[M] Make  [C] Clean  [Esc] Close";
+    }
+
+    // separator, open header, or no project
+    return "[Esc] Close";
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::toggleSelectedSubproject
+//
+// Toggle expand/collapse of the selected subproject header and rebuild visible items.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::toggleSelectedSubproject( void )
+{
+    if (selectedListItemIndex < 0 || selectedListItemIndex >= (int)_visibleItems.entries()) {
+        return;
+    }
+
+    ProjectViewItem *item = _visibleItems.at(selectedListItemIndex);
+    if (item->type != PVITEM_SUBPROJECT) {
+        return;
+    }
+
+    ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+    if (sub == NULL) {
+        return;
+    }
+
+    sub->isExpanded = !sub->isExpanded;
+    rebuildVisibleItems();
+
+    // ensure selected index is still valid
+    if (selectedListItemIndex >= (int)_visibleItems.entries()) {
+        selectedListItemIndex = (int)_visibleItems.entries() - 1;
+        if (selectedListItemIndex < 0) {
+            selectedListItemIndex = 0;
+        }
+    }
 }
 
 
 //-------------------------------------------------------------------------------------------------
 // ProjectView::setVisible
 //
-// Set the visibility state for resize handling
+// Set the visibility state for resize handling.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -354,37 +748,25 @@ ProjectView::setVisible( int visible )
 
 //-------------------------------------------------------------------------------------------------
 // ProjectView::routeKeyAction
-//	
-// Keys passed into routeKeyAction are targeted for the edit view changing the text buffer
-// and then the screen is updated to reflect.
+//
+// Handle keyboard actions for navigation.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ProjectView::routeKeyAction( CxKeyAction keyAction )
 {
-	//---------------------------------------------------------------------------------------------
-	// based on the kind of key
-	//
-	//---------------------------------------------------------------------------------------------
 	switch (keyAction.actionType() )
 	{
-		//-----------------------------------------------------------------------------------------
-		// select another file in the list
-		//
-		//-----------------------------------------------------------------------------------------
 		case CxKeyAction::CURSOR:
 			{
                 if (handleArrows( keyAction )) {
                     redraw();
                 }
-                
+
                 screen->flush();
 			}
 			break;
 
-        //-----------------------------------------------------------------------------------------
-        // ignore everything else
-        //-----------------------------------------------------------------------------------------
       	default:
         	break;
 	}
@@ -392,12 +774,11 @@ ProjectView::routeKeyAction( CxKeyAction keyAction )
     return;
 }
 
- 
 
 //-------------------------------------------------------------------------------------------------
-// ProjectView::selectedItemVisible
+// ProjectView::reframe
 //
-// if selected item isn't visible move the text in the visible window
+// If selected item isn't visible, adjust the scroll window.
 //
 //-------------------------------------------------------------------------------------------------
 int
@@ -428,9 +809,9 @@ ProjectView::reframe( )
         changeMade = true;
         firstVisibleListIndex++;
     }
-    
+
     if (changeMade) return(true);
-    
+
     return(false);
 }
 
@@ -438,33 +819,50 @@ ProjectView::reframe( )
 //-------------------------------------------------------------------------------------------------
 // ProjectView::handleArrows
 //
-// moves the cursor according to the desired direction and what is valid in the
-// edit buffer
+// Move selection up/down through the visible items list.
 //
 //-------------------------------------------------------------------------------------------------
 int
 ProjectView::handleArrows( CxKeyAction keyAction )
 {
-    if (keyAction.tag() == "<arrow-down>") {
-        
-        selectedListItemIndex++;
-        
-        if (selectedListItemIndex >= editBufferList->items()) {
-            selectedListItemIndex--;
-        }
-    
-        return( true );
+    int totalItems = (int)_visibleItems.entries();
+    int prevIndex = selectedListItemIndex;
 
+    if (keyAction.tag() == "<arrow-down>") {
+
+        selectedListItemIndex++;
+
+        // skip non-selectable items
+        while (selectedListItemIndex < totalItems &&
+               (_visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR ||
+               _visibleItems.at(selectedListItemIndex)->type == PVITEM_OPEN_HEADER)) {
+            selectedListItemIndex++;
+        }
+
+        // if we ran off the end, stay put
+        if (selectedListItemIndex >= totalItems) {
+            selectedListItemIndex = prevIndex;
+        }
+
+        return( true );
     }
 
     if (keyAction.tag() == "<arrow-up>") {
-        
+
         selectedListItemIndex--;
-        
-        if (selectedListItemIndex < 0) {
-            selectedListItemIndex = 0;
+
+        // skip non-selectable items
+        while (selectedListItemIndex >= 0 &&
+               (_visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR ||
+               _visibleItems.at(selectedListItemIndex)->type == PVITEM_OPEN_HEADER)) {
+            selectedListItemIndex--;
         }
-        
+
+        // if we ran past the top, stay put
+        if (selectedListItemIndex < 0) {
+            selectedListItemIndex = prevIndex;
+        }
+
         return( true );
     }
 
