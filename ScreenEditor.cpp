@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 #include <sys/types.h>
 
 #include "EditView.h"
@@ -75,6 +76,8 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _quitRequested = FALSE;
     _activeBuildSubproject = NULL;
     _buildAllIndex = -1;
+    _newFileSubproject = NULL;
+    _newFileFromProjectView = 0;
 
     // initialize split screen state
     _splitMode = 0;     // single view mode
@@ -1460,6 +1463,52 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                 }
                 projectView->redraw();
             }
+
+            // new file - only on SUBPROJECT or OPEN_HEADER
+            if (keyAction.tag() == 'n' || keyAction.tag() == 'N')
+            {
+                if (selType == PVITEM_SUBPROJECT || selType == PVITEM_OPEN_HEADER) {
+                    // store context for CMD_NewBuffer
+                    _newFileSubproject = projectView->getSelectedSubproject();  // NULL for Other Files
+                    _newFileFromProjectView = 1;
+
+                    // dismiss project view
+                    projectView->setVisible(0);
+                    returnToEditMode();
+
+                    // build pre-filled path
+                    CxString dirPath;
+                    if (_newFileSubproject != NULL) {
+                        dirPath = project->getMakeDirectory(_newFileSubproject);
+                    } else {
+                        char cwd[1024];
+                        getcwd(cwd, sizeof(cwd));
+                        dirPath = CxString(cwd);
+                    }
+                    dirPath += "/";
+
+                    // enter command line mode and select file-new
+                    programMode = ScreenEditor::COMMANDLINE;
+                    _cmdInputState = CMD_INPUT_COMMAND;
+                    _cmdBuffer = "";
+                    _argBuffer = "";
+                    _currentCommand = NULL;
+                    _activeCompleter = &_commandCompleter;
+
+                    // find and select the file-new command entry
+                    for (int i = 0; commandTable[i].name != NULL; i++) {
+                        if (CxString(commandTable[i].name) == "file-new") {
+                            selectCommand(&commandTable[i]);
+                            break;
+                        }
+                    }
+
+                    // pre-fill argument with directory path
+                    _argBuffer = dirPath;
+                    updateArgumentDisplay();
+                    commandLineView->placeCursor();
+                }
+            }
         }
         break;
 
@@ -1698,6 +1747,10 @@ ScreenEditor::enterCommandMode( void )
     _argBuffer = "";
     _currentCommand = NULL;
     _activeCompleter = &_commandCompleter;
+
+    // reset project view new-file state so direct ESC usage doesn't inherit stale context
+    _newFileFromProjectView = 0;
+    _newFileSubproject = NULL;
 
     updateCommandDisplay();
 }

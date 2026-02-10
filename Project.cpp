@@ -120,15 +120,33 @@ Project::readFile( CxString fname )
         return( false );
     }
 
+    // First pass: collect leading # comment lines and blank lines before JSON
+    int inHeader = 1;
+    _headerComments = "";
+
     while (!inFile.eof()) {
 
         CxString line = inFile.getUntil('\n');
 
-        line.stripLeading(" \t");
-        line.stripTrailing(" \n\r");
+        CxString trimmed = line;
+        trimmed.stripLeading(" \t");
+        trimmed.stripTrailing(" \n\r");
 
-        if (line.firstChar('#') != 0) {
-            _data += line;
+        if (inHeader) {
+            if (trimmed.length() == 0 || trimmed.firstChar('#') == 0) {
+                // leading blank line or # comment - preserve
+                _headerComments += line;
+            } else {
+                // first non-blank non-comment line - start of JSON
+                inHeader = 0;
+                if (trimmed.firstChar('#') != 0) {
+                    _data += trimmed;
+                }
+            }
+        } else {
+            if (trimmed.firstChar('#') != 0) {
+                _data += trimmed;
+            }
         }
     }
 
@@ -215,6 +233,7 @@ Project::parseBaseDirectory( CxJSONObject *object )
         if (member->object()->type() == CxJSONBase::STRING) {
             CxJSONString *value = (CxJSONString *) member->object();
             _baseDirectory = value->get();
+            _originalBaseDirectory = _baseDirectory;
             return( TRUE );
         }
     }
@@ -673,4 +692,112 @@ CxString
 Project::getBaseDirectory(void)
 {
     return _baseDirectory;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Project::addFileToSubproject
+//
+// Add a file to a subproject's files list and append the resolved path to the flat file list.
+//
+//-------------------------------------------------------------------------------------------------
+void
+Project::addFileToSubproject(ProjectSubproject *sub, CxString relativeFilename)
+{
+    sub->files.append(relativeFilename);
+
+    CxString resolved = resolveFilePath(sub, relativeFilename);
+    _fileList.append(resolved);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Project::save
+//
+// Write the project file back to disk. Preserves leading header comments and writes
+// JSON in the same indented style as the original format.
+//
+//-------------------------------------------------------------------------------------------------
+int
+Project::save(void)
+{
+    CxFile outFile;
+
+    if (!outFile.open(_projectFilePath, "w")) {
+        return FALSE;
+    }
+
+    // write preserved header comments
+    if (_headerComments.length() > 0) {
+        outFile.printf("%s", _headerComments.data());
+    }
+
+    // write JSON
+    outFile.printf("{\n");
+    outFile.printf("\t\"projectName\":\"%s\",\n", _projectName.data());
+    outFile.printf("\t\"baseDirectory\":\"%s\",\n", _originalBaseDirectory.data());
+
+    // displayOrder
+    if (_displayOrder.entries() > 0) {
+        outFile.printf("\t\"displayOrder\":[");
+        for (int i = 0; i < (int)_displayOrder.entries(); i++) {
+            if (i > 0) outFile.printf(", ");
+            outFile.printf("\"%s\"", _displayOrder.at(i).data());
+        }
+        outFile.printf("],\n");
+    }
+
+    // buildOrder
+    if (_buildOrder.entries() > 0) {
+        outFile.printf("\t\"buildOrder\":[");
+        for (int i = 0; i < (int)_buildOrder.entries(); i++) {
+            if (i > 0) outFile.printf(", ");
+            outFile.printf("\"%s\"", _buildOrder.at(i).data());
+        }
+        outFile.printf("],\n");
+    }
+
+    // subprojects
+    outFile.printf("\t\"subprojects\":[\n");
+    for (int s = 0; s < (int)_subprojects.entries(); s++) {
+        ProjectSubproject *sub = _subprojects.at(s);
+
+        outFile.printf("\t\t{\n");
+        outFile.printf("\t\t\t\"name\":\"%s\",\n", sub->name.data());
+        outFile.printf("\t\t\t\"directory\":\"%s\",\n", sub->directory.data());
+        outFile.printf("\t\t\t\"makefile\":\"%s\"", sub->makefile.data());
+
+        if (sub->isDefault) {
+            outFile.printf(",\n\t\t\t\"default\":true");
+        }
+
+        if (!sub->isExpanded) {
+            outFile.printf(",\n\t\t\t\"collapsed\":true");
+        }
+
+        // files
+        if (sub->files.entries() > 0) {
+            outFile.printf(",\n\t\t\t\"files\":[\n");
+            for (int f = 0; f < (int)sub->files.entries(); f++) {
+                outFile.printf("\t\t\t\t\"%s\"", sub->files.at(f).data());
+                if (f < (int)sub->files.entries() - 1) {
+                    outFile.printf(",");
+                }
+                outFile.printf("\n");
+            }
+            outFile.printf("\t\t\t]");
+        }
+
+        outFile.printf("\n\t\t}");
+        if (s < (int)_subprojects.entries() - 1) {
+            outFile.printf(",");
+        }
+        outFile.printf("\n");
+    }
+    outFile.printf("\t]\n");
+
+    outFile.printf("}\n");
+    outFile.close();
+
+    return TRUE;
 }

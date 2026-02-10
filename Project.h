@@ -81,6 +81,10 @@ public:
     CxString getMakeDirectory(ProjectSubproject *sub);
     CxString getBaseDirectory(void);
 
+    // Modification
+    int save(void);
+    void addFileToSubproject(ProjectSubproject *sub, CxString relativeFilename);
+
 private:
 
     int readFile( CxString fname );
@@ -103,6 +107,8 @@ private:
     CxString _projectName;
     CxString _projectFilePath;
     CxString _baseDirectory;
+    CxString _originalBaseDirectory;  // un-resolved value for round-trip save
+    CxString _headerComments;         // leading # comment lines from project file
 
     CxSList< CxString > _fileList;
     CxSList< ProjectSubproject* > _subprojects;

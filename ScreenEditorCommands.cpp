@@ -224,13 +224,75 @@ void
 ScreenEditor::CMD_NewBuffer( CxString commandLine )
 {
     CxString fileName = commandLine.nextToken(" \t\n");
+    if (fileName.length() == 0) {
+        setMessage("(no filename)");
+        return;
+    }
 
-    char buffer[200];
-    sprintf(buffer, "(new buffer %s loaded)", fileName.data() );
+    // create the file on disk (touch it - "a" creates if not exist, doesn't truncate)
+    CxFile touchFile;
+    if (touchFile.open(fileName, "a")) {
+        touchFile.close();
+    }
 
-    setMessage( CxString(buffer));
+    // load into editor buffer
+    loadNewFile(fileName, TRUE);
+    activeEditView()->reframeAndUpdateScreen();
 
-    activeEditView()->updateScreen();
+    // if triggered from project view 'N' and we have a subproject, add to project
+    if (_newFileFromProjectView && _newFileSubproject != NULL && project != NULL) {
+        // extract relative filename: strip the subproject directory prefix
+        CxString subDir = project->getMakeDirectory(_newFileSubproject);
+        CxString relName = fileName;
+        CxString prefix = subDir + "/";
+        if (fileName.length() > prefix.length()) {
+            CxString head = fileName.subString(0, prefix.length());
+            if (head == prefix) {
+                relName = fileName.subString(prefix.length(),
+                                             fileName.length() - prefix.length());
+            }
+        }
+
+        project->addFileToSubproject(_newFileSubproject, relName);
+        project->save();
+
+        // rebuild project view to show new file
+        projectView->rebuildVisibleItems();
+
+        // extract just the filename for display
+        CxString displayName = relName;
+        int lastSlash = -1;
+        for (int i = 0; i < (int)relName.length(); i++) {
+            if (relName.charAt(i) == '/') lastSlash = i;
+        }
+        if (lastSlash >= 0) {
+            displayName = relName.subString(lastSlash + 1,
+                                            relName.length() - lastSlash - 1);
+        }
+
+        char msg[512];
+        sprintf(msg, "(file created, added to project, %s)", displayName.data());
+        setMessage(CxString(msg));
+    } else {
+        // Other Files or direct ESC usage - just report creation
+        CxString displayName = fileName;
+        int lastSlash = -1;
+        for (int i = 0; i < (int)fileName.length(); i++) {
+            if (fileName.charAt(i) == '/') lastSlash = i;
+        }
+        if (lastSlash >= 0) {
+            displayName = fileName.subString(lastSlash + 1,
+                                             fileName.length() - lastSlash - 1);
+        }
+
+        char msg[512];
+        sprintf(msg, "(file created, %s)", displayName.data());
+        setMessage(CxString(msg));
+    }
+
+    // reset project view context
+    _newFileFromProjectView = 0;
+    _newFileSubproject = NULL;
 }
 
 

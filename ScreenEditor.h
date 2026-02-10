@@ -251,6 +251,10 @@ private:
     CommandEntry *_currentCommand;  // selected command (after completion)
     int _quitRequested;             // set by CMD_Quit to signal exit
 
+    // new file from project view state
+    ProjectSubproject *_newFileSubproject;      // subproject for 'N' shortcut (NULL = Other Files)
+    int _newFileFromProjectView;               // 1 if CMD_NewBuffer was triggered from project 'N'
+
     // build state
     ProjectSubproject *_activeBuildSubproject;  // current/last build target
     int _buildAllIndex;                         // -1 if not "build all", else current subproject index

@@ -693,9 +693,9 @@ ProjectView::getContextFooter( void )
     if (selType == PVITEM_SUBPROJECT) {
         ProjectSubproject *sub = getSelectedSubproject();
         if (sub != NULL && subprojectHasModifiedFile(sub)) {
-            return "[S] Save All  [M] Make  [C] Clean  [T] Test  [Esc] Close";
+            return "[S] Save All  [M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
         }
-        return "[M] Make  [C] Clean  [T] Test  [Esc] Close";
+        return "[M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
     }
 
     // ALL row
@@ -705,7 +705,7 @@ ProjectView::getContextFooter( void )
 
     // open header
     if (selType == PVITEM_OPEN_HEADER) {
-        return "[Enter] Expand/Collapse  [Esc] Close";
+        return "[Enter] Expand/Collapse  [N] New  [Esc] Close";
     }
 
     // separator or no project
