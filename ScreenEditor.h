@@ -134,7 +134,6 @@ class ScreenEditor {
     void CMD_NewBuffer( CxString commandLine );
     void CMD_BufferNext( CxString commandLine );
     void CMD_BufferPrev( CxString commandLine );
-    void CMD_BufferList( CxString commandLine );
     void CMD_Quit( CxString commandLine );
     void CMD_Help( CxString commandLine );
     void CMD_Count( CxString commandLine );

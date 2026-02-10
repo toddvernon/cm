@@ -174,13 +174,6 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_NewBuffer,
       NULL },
 
-    { "buffer-list",
-      NULL,
-      "Show project/buffer list",
-      0,
-      &ScreenEditor::CMD_BufferList,
-      NULL },
-
     //---------------------------------------------------------------------------------------------
     // Mark and cut/paste commands
     //---------------------------------------------------------------------------------------------

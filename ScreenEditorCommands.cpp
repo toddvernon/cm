@@ -358,18 +358,6 @@ ScreenEditor::CMD_BufferPrev( CxString commandLine )
 }
 
 
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferList:
-//
-// Show project/buffer list (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferList( CxString commandLine )
-{
-    showProjectView();
-}
-
 
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Quit:
