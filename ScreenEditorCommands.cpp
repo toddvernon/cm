@@ -9,6 +9,7 @@
 //-------------------------------------------------------------------------------------------------
 
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 
 #include "EditView.h"
@@ -53,11 +54,74 @@ static void copyToSystemClipboard( CxString text )
 //-------------------------------------------------------------------------------------------------
 // pasteFromSystemClipboard (macOS and Linux)
 //
-// Reads text from the system clipboard.
+// Reads text from the system clipboard directly into a CxUTFString.
+// Raw bytes are accumulated then parsed once via fromUTF8Bytes.
 // Uses pbpaste on macOS, xclip on Linux.
 //
 //-------------------------------------------------------------------------------------------------
 #if defined(_OSX_) || defined(_LINUX_)
+
+#ifdef CM_UTF8_SUPPORT
+static CxUTFString pasteFromSystemClipboard( void )
+{
+    CxUTFString result;
+
+#ifdef _OSX_
+    FILE *pipe = popen("pbpaste", "r");
+#else
+    FILE *pipe = popen("xclip -selection clipboard -o", "r");
+#endif
+    if (pipe) {
+        char chunk[4096];
+        char *rawBytes = 0;
+        int totalLen = 0;
+        int capacity = 0;
+
+        while (1) {
+            int bytesRead = (int)fread(chunk, 1, sizeof(chunk), pipe);
+            if (bytesRead <= 0) break;
+
+            if (totalLen + bytesRead > capacity) {
+                int newCapacity = (capacity == 0) ? 8192 : capacity * 2;
+                if (newCapacity < totalLen + bytesRead) {
+                    newCapacity = totalLen + bytesRead;
+                }
+                char *newBuf = new char[newCapacity + 1];
+                if (rawBytes) {
+                    memcpy(newBuf, rawBytes, totalLen);
+                    delete[] rawBytes;
+                }
+                rawBytes = newBuf;
+                capacity = newCapacity;
+            }
+
+            memcpy(rawBytes + totalLen, chunk, bytesRead);
+            totalLen += bytesRead;
+        }
+        pclose(pipe);
+
+        if (totalLen > 0) {
+            // Normalize CRLF to LF (web clipboard content may use \r\n)
+            int writePos = 0;
+            for (int i = 0; i < totalLen; i++) {
+                if (rawBytes[i] == '\r' && i + 1 < totalLen && rawBytes[i + 1] == '\n') {
+                    continue;
+                }
+                rawBytes[writePos++] = rawBytes[i];
+            }
+            totalLen = writePos;
+
+            rawBytes[totalLen] = '\0';
+            result.fromUTF8Bytes(rawBytes, totalLen);
+        }
+        if (rawBytes) {
+            delete[] rawBytes;
+        }
+    }
+
+    return result;
+}
+#else
 static CxString pasteFromSystemClipboard( void )
 {
     CxString result = "";
@@ -77,6 +141,8 @@ static CxString pasteFromSystemClipboard( void )
 
     return result;
 }
+#endif
+
 #endif
 
 
@@ -214,6 +280,16 @@ void
 ScreenEditor::CMD_SystemPaste( CxString commandLine )
 {
 #if defined(_OSX_) || defined(_LINUX_)
+
+#ifdef CM_UTF8_SUPPORT
+    CxUTFString clipboardText = pasteFromSystemClipboard();
+    if (clipboardText.charCount() > 0) {
+        activeEditView()->pasteText( clipboardText );
+        setMessage("(pasted from system clipboard)");
+    } else {
+        setMessage("(system clipboard empty)");
+    }
+#else
     CxString clipboardText = pasteFromSystemClipboard();
     if (clipboardText.length() > 0) {
         activeEditView()->pasteText( clipboardText );
@@ -221,6 +297,8 @@ ScreenEditor::CMD_SystemPaste( CxString commandLine )
     } else {
         setMessage("(system clipboard empty)");
     }
+#endif
+
 #else
     setMessage("(system clipboard not available on this platform)");
 #endif

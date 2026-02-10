@@ -724,6 +724,22 @@ EditView::pasteText( CxString text)
 }
 
 
+#ifdef CM_UTF8_SUPPORT
+//-------------------------------------------------------------------------------------------------
+// EditView::pasteText (CxUTFString version)
+//
+// Paste pre-parsed UTF-8 text then update the screen
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::pasteText( CxUTFString &text )
+{
+    editBuffer->pasteFromCutBuffer( text );
+    updateScreen();
+}
+#endif
+
+
 //-------------------------------------------------------------------------------------------------
 // EditView::setMark
 //

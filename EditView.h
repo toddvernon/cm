@@ -104,6 +104,11 @@ class EditView
     void pasteText( CxString text );
 	// paste text from the cut buffer
 
+#ifdef CM_UTF8_SUPPORT
+    void pasteText( CxUTFString &text );
+    // paste pre-parsed UTF-8 text
+#endif
+
     void setMark( void );
 	// set a mark at the current cursor position	
 

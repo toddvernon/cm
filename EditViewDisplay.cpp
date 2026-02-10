@@ -344,7 +344,43 @@ EditView::formatEditorLine(unsigned long bufferRow )
     // to the colorize method
     //
     //---------------------------------------------------------------------------------------------
+#ifdef CM_UTF8_SUPPORT
+    // For UTF-8, extract visible bytes using display column math.
+    // toBytesExpanded() converts tabs to spaces, but multi-byte characters
+    // still occupy more bytes than display columns, so byte offset != display column.
+    int visStartCol = (int)_visibleFirstEditBufferCol;
+    int visEndCol   = visStartCol + (int)_screenEditNumberOfCols;
+
+    int displayCol = 0;
+    int bytePos    = 0;
+    int idx        = 0;
+
+    // Skip characters before the visible area
+    while (idx < utfLine->charCount() && displayCol < visStartCol) {
+        const CxUTFCharacter *ch = utfLine->at(idx);
+        int w = ch->displayWidth();
+        int b = ch->isTab() ? w : ch->byteCount();
+        displayCol += w;
+        bytePos    += b;
+        idx++;
+    }
+    int byteStart = bytePos;
+
+    // Collect characters within the visible area
+    while (idx < utfLine->charCount() && displayCol < visEndCol) {
+        const CxUTFCharacter *ch = utfLine->at(idx);
+        int w = ch->displayWidth();
+        int b = ch->isTab() ? w : ch->byteCount();
+        displayCol += w;
+        bytePos    += b;
+        idx++;
+    }
+    int byteEnd = bytePos;
+
+    CxString visibleText = fullText.subString(byteStart, byteEnd - byteStart);
+#else
     CxString visibleText = fullText.subString(_visibleFirstEditBufferCol, _screenEditNumberOfCols );
+#endif
 
     //---------------------------------------------------------------------------------------------
     // now colorize the text
