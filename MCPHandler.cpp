@@ -676,7 +676,7 @@ CxString MCPHandler::handleGetBuffer(CxString bufferId)
         char msg[256];
         unsigned long lineCount = buf->numberOfLines();
         sprintf(msg, "buffer too large (%lu bytes, %lu lines). Use get_buffer_range with start_line and end_line to read in chunks.",
-                content.length(), lineCount);
+                (unsigned long)content.length(), lineCount);
         return buildErrorResponse(0, msg);
     }
 

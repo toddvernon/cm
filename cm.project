@@ -1,15 +1,55 @@
 {
-	"projectName": "Cm Development",
-	"baseDirectory": "../..",
-	"displayOrder": ["cm", "cx", "cx_tests"],
-	"buildOrder": ["cx", "cx_tests", "cm"],
-	"subprojects": [
+	"projectName":"Cm Development",
+	"baseDirectory":"../..",
+	"displayOrder":["cm", "cx", "cx_tests"],
+	"buildOrder":["cx", "cx_tests", "cm"],
+	"subprojects":[
 		{
-			"name": "cx",
-			"directory": "cx",
-			"makefile": "makefile",
-			"collapsed": true,
-			"files": [
+			"name":"cm",
+			"directory":"cx_apps/cm",
+			"makefile":"makefile",
+			"files":[
+				"Cm.cpp",
+				"ScreenEditor.cpp",
+				"ScreenEditor.h",
+				"ScreenEditorCommands.cpp",
+				"ScreenEditorCore.cpp",
+				"EditView.cpp",
+				"EditView.h",
+				"EditViewDisplay.cpp",
+				"EditViewInput.cpp",
+				"CommandLineView.cpp",
+				"CommandLineView.h",
+				"ProjectView.cpp",
+				"ProjectView.h",
+				"BuildView.cpp",
+				"BuildView.h",
+				"HelpTextView.cpp",
+				"HelpTextView.h",
+				"Project.cpp",
+				"Project.h",
+				"ProgramDefaults.cpp",
+				"ProgramDefaults.h",
+				"MarkUp.cpp",
+				"MarkUp.h",
+				"MarkUpColorizers.cpp",
+				"MarkUpParsing.cpp",
+				"CommandTable.cpp",
+				"CommandTable.h",
+				"UTFSymbols.cpp",
+				"UTFSymbols.h",
+				"MCPHandler.cpp",
+				"MCPHandler.h",
+				"CmTypes.h",
+				"todd.txt"
+			]
+		},
+		{
+			"name":"cx",
+			"directory":"cx",
+			"makefile":"makefile",
+			"collapsed":true,
+			"files":[
 				"base/string.cpp",
 				"base/string.h",
 				"base/buffer.cpp",
@@ -201,11 +241,11 @@
 			]
 		},
 		{
-			"name": "cx_tests",
-			"directory": "cx_tests",
-			"makefile": "makefile",
-			"collapsed": true,
-			"files": [
+			"name":"cx_tests",
+			"directory":"cx_tests",
+			"makefile":"makefile",
+			"collapsed":true,
+			"files":[
 				"cxb64/cxb64_test.cpp",
 				"cxbuildoutput/cxbuildoutput_test.cpp",
 				"cxcallback/cxcallback_test.cpp",
@@ -236,45 +276,6 @@
 				"cxutfeditbuffer/cxutfeditbuffer_test.cpp",
 				"cxutfstring/cxutfstring_test.cpp",
 				"cxutfstringlist/cxutfstringlist_test.cpp"
-			]
-		},
-		{
-			"name": "cm",
-			"directory": "cx_apps/cm",
-			"makefile": "makefile",
-			"files": [
-				"Cm.cpp",
-				"ScreenEditor.cpp",
-				"ScreenEditor.h",
-				"ScreenEditorCommands.cpp",
-				"ScreenEditorCore.cpp",
-				"EditView.cpp",
-				"EditView.h",
-				"EditViewDisplay.cpp",
-				"EditViewInput.cpp",
-				"CommandLineView.cpp",
-				"CommandLineView.h",
-				"ProjectView.cpp",
-				"ProjectView.h",
-				"BuildView.cpp",
-				"BuildView.h",
-				"HelpTextView.cpp",
-				"HelpTextView.h",
-				"Project.cpp",
-				"Project.h",
-				"ProgramDefaults.cpp",
-				"ProgramDefaults.h",
-				"MarkUp.cpp",
-				"MarkUp.h",
-				"MarkUpColorizers.cpp",
-				"MarkUpParsing.cpp",
-				"CommandTable.cpp",
-				"CommandTable.h",
-				"UTFSymbols.cpp",
-				"UTFSymbols.h",
-				"MCPHandler.cpp",
-				"MCPHandler.h",
-				"CmTypes.h"
 			]
 		}
 	]
