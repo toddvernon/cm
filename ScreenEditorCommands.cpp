@@ -400,6 +400,14 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
     fileName = fileName.stripTrailing(" \t\n\r");
 
     CmEditBuffer *editBuffer = editBufferList->current();
+
+    if (editBuffer == NULL) {
+        // No buffer exists (started without a file) — create one
+        editBuffer = new CmEditBuffer();
+        editBufferList->add(editBuffer);
+        activeEditView()->setEditBuffer(editBuffer);
+    }
+
     editBuffer->saveText( fileName );
 
     setMessage("(file saved)");
@@ -452,6 +460,7 @@ void
 ScreenEditor::CMD_Count( CxString commandLine )
 {
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(0 lines, 0 characters)"); return; }
 
     unsigned long lineCount = editBuffer->numberOfLines();
     unsigned long charCount = editBuffer->characterCount();
@@ -472,6 +481,7 @@ void
 ScreenEditor::CMD_Entab( CxString commandLine )
 {
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(entab complete)"); return; }
     editBuffer->entab();
     activeEditView()->reframeAndUpdateScreen();
     setMessage("(entab complete)");
@@ -488,6 +498,7 @@ void
 ScreenEditor::CMD_Detab( CxString commandLine )
 {
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(detab complete)"); return; }
     editBuffer->detab();
     activeEditView()->reframeAndUpdateScreen();
     setMessage("(detab complete)");
@@ -504,6 +515,7 @@ void
 ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 {
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(0 trailing characters removed)"); return; }
     int removed = editBuffer->trimTrailing();
     activeEditView()->reframeAndUpdateScreen();
 
@@ -571,6 +583,7 @@ void
 ScreenEditor::CMD_GotoError( CxString commandLine )
 {
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(no error pattern found)"); return; }
 
     // Get current line
     unsigned long cursorRow = editBuffer->cursor.row;
@@ -686,6 +699,11 @@ ScreenEditor::insertUTFSymbolHelper( CxString commandLine, const char *symbolTyp
 
     // insert the UTF-8 character at cursor (as a single character)
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) {
+        editBuffer = new CmEditBuffer();
+        editBufferList->add(editBuffer);
+        activeEditView()->setEditBuffer(editBuffer);
+    }
     editBuffer->addCharacter( CxString(symbol->utf8) );
 
     activeEditView()->reframeAndUpdateScreen();
@@ -782,6 +800,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
 
     // get direct access to editBuffer to avoid per-replacement screen updates
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
+    if (editBuffer == NULL) { setMessage("(0 replacements)"); return; }
 
     // move cursor to beginning of buffer
     editBuffer->cursorGotoRequest(0, 0);
@@ -876,12 +895,26 @@ void ScreenEditor::CTRL_SwitchView(void)
 void ScreenEditor::CTRLX_Save(void)
 {
     CmEditBuffer *editBuffer = editBufferList->current();
-    CxString filePath = editBuffer->getFilePath();
 
-    if (filePath.length()) {
-        CMD_SaveFile(filePath);
-    } else {
-        setMessage("(there is no current filename, use file-save-as)");
+    if (editBuffer != NULL && editBuffer->getFilePath().length()) {
+        CMD_SaveFile(editBuffer->getFilePath());
+        return;
+    }
+
+    // No buffer or no filename — enter file-save-as argument input
+    for (int i = 0; commandTable[i].name != NULL; i++) {
+        if (CxString(commandTable[i].name) == "file-save-as") {
+            resetPrompt();
+            programMode = ScreenEditor::COMMANDLINE;
+            _cmdInputState = CMD_INPUT_COMMAND;
+            _cmdBuffer = "";
+            _argBuffer = "";
+            _currentCommand = NULL;
+            _activeCompleter = &_commandCompleter;
+            selectCommand(&commandTable[i]);
+            commandLineView->placeCursor();
+            return;
+        }
     }
 }
 

@@ -29,18 +29,22 @@ make
 
 ## Project Structure
 - `Cm.cpp` - main entry point
-- `ScreenEditor.*` - core editor logic
-- `EditView.*` - text editing view
+- `ScreenEditor.*` - core editor logic (includes ScreenEditorCore.cpp, ScreenEditorCommands.cpp)
+- `EditView.*` - text editing view (includes EditViewDisplay.cpp, EditViewInput.cpp)
 - `CommandLineView.*` - command line interface
+- `CommandTable.*` - static ESC command table (data only)
 - `FileListView.*` - file browser
-- `HelpTextView.*` - help display
-- `MarkUp.*` - syntax highlighting
+- `HelpView.*` - help display
+- `BuildView.*` - build output display
+- `ProjectView.*` - project/buffer list view
+- `MarkUp.*` - syntax highlighting (includes MarkUpColorizers.cpp, MarkUpParsing.cpp)
 - `ProgramDefaults.*` - configuration handling
 - `Project.*` - project management
+- `UTFSymbols.*` - UTF-8 symbol table for box drawing and common symbols
 
 ## Screen Resize Architecture
 
-**ScreenEditor owns the single resize callback.** Sub-elements (EditView, CommandLineView, FileListView, HelpTextView) do NOT register their own callbacks with the OS.
+**ScreenEditor owns the single resize callback.** Sub-elements (EditView, CommandLineView, FileListView, HelpView) do NOT register their own callbacks with the OS.
 
 - ScreenEditor registers ONE callback via `screen->addScreenSizeCallback()`
 - On resize, ScreenEditor coordinates ALL recalcs first, THEN all redraws in correct z-order
@@ -101,73 +105,92 @@ The `Completer` library (`cx/commandcompleter`) handles command selection via a 
 **DO NOT implement, suggest, or reference any of the following:**
 - Dehyphenated matching (removing hyphens before comparing)
 - Fuzzy matching, abbreviated matching, or command shortening
-- Matching "gl" to "goto-line", "sa" to "save-as", "bn" to "buffer-next", etc.
+- Matching "gl" to "goto-line", "sa" to "file-save-as", etc.
 - A `dehyphenate()` function or any hyphen-stripping logic
 
 **All matching in this project is LITERAL PREFIX matching.** The user's input must be an exact prefix of the candidate name, including hyphens. For example:
 - "goto" matches "goto-line" (literal prefix) - CORRECT
 - "gl" matches "goto-line" (dehyphenated) - WRONG, DO NOT DO THIS
-- "buf" matches "buffer-next" (literal prefix) - CORRECT
-- "bn" matches "buffer-next" (dehyphenated) - WRONG, DO NOT DO THIS
+- "file" matches "file-save" (literal prefix) - CORRECT
+- "fs" matches "file-save" (dehyphenated) - WRONG, DO NOT DO THIS
 
 This applies to the Completer library, CommandTable, UTFSymbols, and all code in this project.
 
-See `COMPLETER_INTEGRATION.md` for command categories, flows, and the integration pattern.
+See `COMPLETER_INTEGRATION.md` for completer flows and the integration pattern.
 See `cx_tests/cxcommandcompleter/cxcommandcompleter_example.cpp` for working code.
 
-## Current Work (2026-02-04)
-
-**ESC command system with Completer library integration**
+## ESC Command System
 
 ### Architecture
 - `CommandTable.h/cpp` - static command table (data only, no matching logic)
 - `Completer` library (`cx/commandcompleter`) - handles all prefix matching/completion
-- Child completers for UTF symbol selection (`utf-box`, `utf-symbol`)
+- Child completers for UTF symbol selection (`insert-box`, `insert-symbol`)
 - `ScreenEditor.h/cpp` - command input state machine uses Completer status-driven API
 
 ### How It Works
-- ESC → "command> " prompt → type partial command → TAB completes → ENTER executes
-- Symbol commands (`utf-box`, `utf-symbol`) use child completers for two-level selection
-- Freeform arg commands (`find`, `goto-line`, etc.) transition to argument input mode
-- No-arg commands (`wc`, `mark`, `cut`, etc.) execute directly on ENTER
+- ESC → "command> " prompt shows category prefixes (file-, edit-, search-, etc.)
+- Type a letter to narrow to a category, TAB completes, ENTER executes
+- Symbol commands (`insert-box`, `insert-symbol`) use child completers for two-level selection
+- Freeform arg commands (`search-text`, `goto-line`, etc.) transition to argument input mode
+- No-arg commands (`edit-mark`, `edit-cut`, etc.) execute directly on ENTER
 
-### Files
-- `CommandTable.h/cpp` - command definitions (replaces old CommandRegistry)
+### Command Categories (menu-bar order)
+Each category is unique at the first keystroke:
+```
+f = file-       load, new, quit, save, save-as
+e = edit-       cut, mark, paste, system-paste
+s = search-     text, replace, replace-all
+g = goto-       error, line
+i = insert-     box, comment-block, symbol
+t = text-       count, detab, entab, trim-trailing
+v = view-       build, help, split, unsplit
+p = project     (standalone, opens project dialog)
+```
+
+### CTRL Key Bindings
+```
+C-b   Show build output          C-p   Project/buffer list
+C-f   Find again                 C-r   Replace again
+C-h   Show help                  C-s   Split screen
+C-j   Toggle jump scroll         C-u   Unsplit screen
+C-k   Cut to end of line         C-v   Page down
+C-l   Toggle line numbers        C-w   Cut mark to cursor
+C-n   Next buffer                C-y   Paste
+C-o   Switch split view          C-z   Page up
+```
+
+### CTRL-X Chord
+```
+C-x C-s   Save current buffer
+C-x C-c   Quit editor
+```
+
+### Lazy Buffer Creation (no-file startup)
+
+When cm starts with no filename argument, there is NO edit buffer until an
+operation requires one. Every command that touches the buffer must check for
+NULL (`activeEditView()->getEditBuffer()` or `editBufferList->current()`)
+before dereferencing. The rules:
+
+- **Read-only commands on empty buffer = report success.** If the command
+  would have succeeded on an empty buffer, report the natural success message.
+  Examples: `text-entab` → "(entab complete)", `text-count` → "(0 lines, 0
+  characters)", `text-trim-trailing` → "(0 trailing characters removed)".
+
+- **Commands that insert or write = create the buffer.** Any action where
+  the user is showing intent to use the buffer (inserting text, saving a file,
+  pasting) should create the buffer on demand, add it to `editBufferList`,
+  set it in `activeEditView()`, then proceed normally.
+
+- **Ambiguous cases must be surfaced during development.** If a command on
+  a NULL buffer would not clearly succeed or clearly need a buffer, that is
+  an ambiguity that needs to be discussed and resolved — do not silently
+  guess.
+
+### Key Files
+- `CommandTable.h/cpp` - command definitions (data-driven, no matching logic)
 - `ScreenEditor.h/cpp` - Completer members, status-driven input loop
-- `UTFSymbols.h/cpp` - symbol table (matching now uses Completer static methods)
+- `ScreenEditorCore.cpp` - CTRL dispatch table, file loading
+- `ScreenEditorCommands.cpp` - all CMD_*, CTRL_*, CONTROL_* handlers
+- `UTFSymbols.h/cpp` - symbol table (matching uses Completer static methods)
 - `makefile` - links `libcx_commandcompleter.a`
-
-### Removed Files
-- `CommandRegistry.h/cpp` - replaced by CommandTable + Completer
-- `PrefixMatcher.h/cpp` - replaced by Completer library
-
-## ACTIVE DEBUGGING: Intermittent Startup Crash
-
-**Status**: Debug logging enabled, signal blocking disabled to reproduce crash
-
-### The Problem
-- Intermittent crash (~20% of the time) at startup after "(Loaded ...)" message
-- "trace trap" error, doesn't reproduce in debugger
-- Was "fixed" by blocking SIGWINCH during construction, but root cause unknown
-
-### Current Debug Setup (ScreenEditor.cpp constructor)
-- Writes to `/tmp/cm_debug.log` with numbered steps (1-20)
-- Each step is fflush'd immediately
-- SIGWINCH blocking is COMMENTED OUT to try to reproduce crash
-- When crash occurs, check `cat /tmp/cm_debug.log` for last successful step
-
-### To Re-enable the Fix
-In `ScreenEditor.cpp` constructor, uncomment:
-```cpp
-sigset_t blockSet, oldSet;
-sigemptyset(&blockSet);
-sigaddset(&blockSet, SIGWINCH);
-sigprocmask(SIG_BLOCK, &blockSet, &oldSet);
-```
-And at end of constructor:
-```cpp
-sigprocmask(SIG_SETMASK, &oldSet, NULL);
-```
-
-### To Remove Debug Logging
-Remove all `if (dbg) { fprintf(...); fflush(dbg); }` lines and the `FILE *dbg = fopen(...)` line
