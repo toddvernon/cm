@@ -407,37 +407,6 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferNext:
-//
-// Switch to next buffer (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferNext( CxString commandLine )
-{
-    nextBuffer();
-    setMessage("(next buffer)");
-    activeEditView()->updateScreen();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_BufferPrev:
-//
-// Switch to previous buffer (ESC command wrapper)
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_BufferPrev( CxString commandLine )
-{
-    previousBuffer();
-    setMessage("(previous buffer)");
-    activeEditView()->updateScreen();
-}
-
-
-
-//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Quit:
 //
 // Quit editor (ESC command wrapper)
@@ -545,124 +514,6 @@ ScreenEditor::CMD_TrimTrailing( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ProjectMake
-//
-// Run make (or make <target>) with streaming output in BuildView.
-// Uses non-blocking I/O to show output as it arrives.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ProjectMake( CxString commandLine )
-{
-    // Check if a build is already running
-    if (buildOutput->isRunning()) {
-        setMessage("(build already running)");
-        showBuildView();
-        return;
-    }
-
-    // Use subproject-aware build if project is loaded
-    if (project != NULL && project->subprojectCount() > 0) {
-        // Parse: [subproject] [target]
-        CxString subprojectName = commandLine.nextToken(" \t\n");
-        CxString makeTarget = commandLine.nextToken(" \t\n");
-
-        if (subprojectName.length() == 0) {
-            // No args: build default subproject
-            ProjectSubproject *sub = project->getDefaultSubproject();
-            if (sub == NULL) {
-                setMessage("(no default subproject)");
-                return;
-            }
-            startBuild(sub, "");
-        } else if (subprojectName == "all") {
-            startBuildAll(makeTarget);
-        } else {
-            ProjectSubproject *sub = project->findSubproject(subprojectName);
-            if (sub == NULL) {
-                setMessage(CxString("(unknown subproject: ") + subprojectName + ")");
-                return;
-            }
-            startBuild(sub, makeTarget);
-        }
-        showBuildView();
-        return;
-    }
-
-    // No project loaded - fall back to plain make in current directory
-    CxString command = "make";
-    if (commandLine.length() > 0) {
-        command += " ";
-        command += commandLine;
-    }
-
-    int result = buildOutput->start(command);
-    if (result != 0) {
-        setMessage("(make: failed to execute command)");
-        return;
-    }
-
-    _buildStatusPrefix = "(Building...)";
-    showBuildView();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ProjectClean
-//
-// Run make clean with streaming output in BuildView.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ProjectClean( CxString commandLine )
-{
-    // Check if a build is already running
-    if (buildOutput->isRunning()) {
-        setMessage("(build already running)");
-        showBuildView();
-        return;
-    }
-
-    // Use subproject-aware build if project is loaded
-    if (project != NULL && project->subprojectCount() > 0) {
-        // Parse: [subproject]
-        CxString subprojectName = commandLine.nextToken(" \t\n");
-
-        if (subprojectName.length() == 0) {
-            // No args: clean default subproject
-            ProjectSubproject *sub = project->getDefaultSubproject();
-            if (sub == NULL) {
-                setMessage("(no default subproject)");
-                return;
-            }
-            startBuild(sub, "clean");
-        } else if (subprojectName == "all") {
-            startBuildAll("clean");
-        } else {
-            ProjectSubproject *sub = project->findSubproject(subprojectName);
-            if (sub == NULL) {
-                setMessage(CxString("(unknown subproject: ") + subprojectName + ")");
-                return;
-            }
-            startBuild(sub, "clean");
-        }
-        showBuildView();
-        return;
-    }
-
-    // No project loaded - fall back to plain make clean
-    int result = buildOutput->start("make clean");
-    if (result != 0) {
-        setMessage("(make clean: failed to execute command)");
-        return;
-    }
-
-    _buildStatusPrefix = "(Cleaning...)";
-    showBuildView();
-}
-
-
-//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_ProjectShow
 //
 // Show project/buffer list (ESC command wrapper)
@@ -706,98 +557,6 @@ ScreenEditor::CTRL_ShowBuild(void)
         return;
     }
     showBuildView();
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ProjectCreate
-//
-// Create a new project file or edit existing one if project already loaded.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ProjectCreate( CxString commandLine )
-{
-    CxString projectName = commandLine;
-    projectName = projectName.stripLeading(" \t\n\r");
-    projectName = projectName.stripTrailing(" \t\n\r");
-
-    if (projectName.length() == 0) {
-        setMessage("(project name required)");
-        return;
-    }
-
-    // Check if project already loaded
-    if (project->projectName().length() > 0) {
-        // Project exists - load it into buffer
-        CxString projectPath = project->projectFilePath();
-        loadNewFile(projectPath, TRUE);
-        activeEditView()->reframeAndUpdateScreen();
-        setMessage("(Project already active - editing project file)");
-        return;
-    }
-
-    // Create new project file
-    CxString projectPath = projectName + ".project";
-
-    // Build JSON content (new subproject format)
-    CxString content = "{\n";
-    content += "    \"projectName\": \"";
-    content += projectName;
-    content += "\",\n";
-    content += "    \"baseDirectory\": \".\",\n";
-    content += "    \"subprojects\": [\n";
-    content += "        {\n";
-    content += "            \"name\": \"";
-    content += projectName;
-    content += "\",\n";
-    content += "            \"directory\": \".\",\n";
-    content += "            \"makefile\": \"makefile\",\n";
-    content += "            \"default\": true,\n";
-    content += "            \"files\": [\n";
-    content += "            ]\n";
-    content += "        }\n";
-    content += "    ]\n";
-    content += "}\n";
-
-    // Write file
-    CxFile file;
-    if (!file.open(projectPath, "w")) {
-        setMessage("(Failed to create project file)");
-        return;
-    }
-    file.printf("%s", content.data());
-    file.close();
-
-    // Load into project and buffer
-    project->load(projectPath);
-    loadNewFile(projectPath, TRUE);
-    activeEditView()->reframeAndUpdateScreen();
-
-    char msg[200];
-    sprintf(msg, "(Created project '%s')", projectName.data());
-    setMessage(msg);
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::CMD_ProjectEdit
-//
-// Edit the current project file.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::CMD_ProjectEdit( CxString commandLine )
-{
-    if (project->projectName().length() == 0) {
-        setMessage("(No project loaded)");
-        return;
-    }
-
-    CxString projectPath = project->projectFilePath();
-    loadNewFile(projectPath, TRUE);
-    activeEditView()->reframeAndUpdateScreen();
-    setMessage("(Editing project file)");
 }
 
 
@@ -1011,7 +770,7 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
 {
     // check if we have a find pattern
     if (_findString.length() == 0) {
-        setMessage("(no find pattern - use ESC f first)");
+        setMessage("(no find pattern - use search-text first)");
         return;
     }
 
@@ -1094,9 +853,14 @@ void ScreenEditor::CTRL_ProjectList(void)
     showProjectView();
 }
 
-void ScreenEditor::CTRL_UpdateScreen(void)
+void ScreenEditor::CTRL_Split(void)
 {
-    activeEditView()->updateScreen();
+    splitHorizontal();
+}
+
+void ScreenEditor::CTRL_Unsplit(void)
+{
+    unsplit();
 }
 
 void ScreenEditor::CTRL_Help(void)
@@ -1117,7 +881,7 @@ void ScreenEditor::CTRLX_Save(void)
     if (filePath.length()) {
         CMD_SaveFile(filePath);
     } else {
-        setMessage("(there is no current filename, use ESC s)");
+        setMessage("(there is no current filename, use file-save-as)");
     }
 }
 

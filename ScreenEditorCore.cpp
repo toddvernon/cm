@@ -35,8 +35,9 @@ ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
     { "Y",    &ScreenEditor::CTRL_Paste,                "(text pasted)" },
     { "N",    &ScreenEditor::CTRL_NextBuffer,           "(next buffer)" },
     { "P",    &ScreenEditor::CTRL_ProjectList,          "(Project List)" },
-    { "U",    &ScreenEditor::CTRL_UpdateScreen,         "(Update Screen)" },
-    { "<US>", &ScreenEditor::CTRL_Help,                 "(Help)" },
+    { "S",    &ScreenEditor::CTRL_Split,                 NULL },
+    { "U",    &ScreenEditor::CTRL_Unsplit,               NULL },
+    { "H",    &ScreenEditor::CTRL_Help,                 "(Help)" },
     { "O",    &ScreenEditor::CTRL_SwitchView,           NULL },
     { "B",    &ScreenEditor::CTRL_ShowBuild,            NULL },
     { NULL,   NULL,                                      NULL }
@@ -369,12 +370,6 @@ ScreenEditor::handleControl( CxKeyAction keyAction )
     // Control-X prefix - two-key command sequence
     if (keyAction.tag() == "X") {
         return dispatchControlX();
-    }
-
-    // Control-H (backspace) - special case, routes directly to editView
-    if (keyAction.tag() == "H") {
-        activeEditView()->routeKeyAction(keyAction);
-        return 0;
     }
 
     // Look up in dispatch table

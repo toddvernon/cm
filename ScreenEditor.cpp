@@ -66,7 +66,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     commandLineView = NULL;
     editBufferList = NULL;
     projectView = NULL;
-    helpTextView = NULL;
+    helpView = NULL;
     buildView = NULL;
     buildOutput = NULL;
     project = NULL;
@@ -208,8 +208,6 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
         // a buffer.
         //-----------------------------------------------------------------------------------------
         project->load( filePath );
-        rebuildSubprojectCompleter();
-
         loadNewFile( filePath, TRUE );
 
         int numberOfFiles = project->numberOfFiles();
@@ -263,13 +261,9 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //
     //---------------------------------------------------------------------------------------------
 
-  	helpTextView = new HelpTextView(programDefaults,
-									project,
-									screen);
+  	helpView = new HelpView(programDefaults, screen);
 
-    // if (dbg) { fprintf(dbg, "16: HelpTextView created\n"); fflush(dbg); }
-
-    helpTextView->loadHelpText("./cm.txt");
+    // if (dbg) { fprintf(dbg, "16: HelpView created\n"); fflush(dbg); }
 
     // if (dbg) { fprintf(dbg, "17: help text loaded\n"); fflush(dbg); }
 
@@ -377,31 +371,6 @@ ScreenEditor::initCommandCompleters( void )
 #endif
 
         _commandCompleter.addCandidate( entry->name, child, (void*)entry );
-    }
-}
-
-
-//-------------------------------------------------------------------------------------------------
-// ScreenEditor::rebuildSubprojectCompleter
-//
-// Populates the subproject completer with names from the loaded project.
-// Called after project load. Includes "all" as a special option.
-//
-//-------------------------------------------------------------------------------------------------
-void
-ScreenEditor::rebuildSubprojectCompleter(void)
-{
-    _subprojectCompleter.clear();
-
-    if (project == NULL || project->subprojectCount() == 0) {
-        return;
-    }
-
-    _subprojectCompleter.addCandidate("all");
-
-    for (int i = 0; i < project->subprojectCount(); i++) {
-        ProjectSubproject *sub = project->subprojectAt(i);
-        _subprojectCompleter.addCandidate(sub->name);
     }
 }
 
@@ -711,9 +680,9 @@ ScreenEditor::screenResizeCallback(void)
         projectView->recalcScreenPlacements();
     }
 
-    // 1f. HelpTextView recalc (if in HELPVIEW mode)
+    // 1f. HelpView recalc (if in HELPVIEW mode)
     if (programMode == HELPVIEW) {
-        helpTextView->recalcScreenPlacements();
+        helpView->recalcScreenPlacements();
     }
 
     // 1g. BuildView recalc (if in BUILDVIEW mode)
@@ -748,7 +717,7 @@ ScreenEditor::screenResizeCallback(void)
     }
 
     if (programMode == HELPVIEW) {
-        helpTextView->redraw();
+        helpView->redraw();
         return;
     }
 
@@ -855,8 +824,21 @@ ScreenEditor::showProjectView(void)
 void
 ScreenEditor::showHelpView(void)
 {
-    helpTextView->recalcScreenPlacements();
-    helpTextView->redraw();
+    FILE *dbg = fopen("/tmp/helpview_debug.log", "a");
+    if (dbg) { fprintf(dbg, "showHelpView: start\n"); fflush(dbg); }
+
+    screen->flush();
+    screen->hideCursor();
+    helpView->setVisible(1);
+    helpView->rebuildVisibleItems();
+    helpView->recalcScreenPlacements();
+
+    if (dbg) { fprintf(dbg, "showHelpView: about to redraw\n"); fflush(dbg); }
+
+    helpView->redraw();
+
+    if (dbg) { fprintf(dbg, "showHelpView: redraw done, setting mode to HELPVIEW\n"); fflush(dbg); fclose(dbg); }
+
     programMode = HELPVIEW;
 }
 
@@ -1506,21 +1488,38 @@ ScreenEditor::focusHelpView( CxKeyAction keyAction )
     switch (keyAction.actionType() )
     {
         //-----------------------------------------------------------------------------------------
-        // handle escape key or newline - dismiss help view
+        // handle escape key - dismiss help view
         //-----------------------------------------------------------------------------------------
         case CxKeyAction::COMMAND:
-        case CxKeyAction::NEWLINE:
         {
+            helpView->setVisible(0);
             returnToEditMode();
         }
         break;
 
         //-----------------------------------------------------------------------------------------
-        // handle all other keys
+        // handle enter key - toggle section or dismiss
+        //-----------------------------------------------------------------------------------------
+        case CxKeyAction::NEWLINE:
+        {
+            HelpViewItemType itemType = helpView->getSelectedItemType();
+            if (itemType == HELPITEM_SECTION) {
+                helpView->toggleSelectedSection();
+                helpView->redraw();
+            } else {
+                // dismiss on non-section items
+                helpView->setVisible(0);
+                returnToEditMode();
+            }
+        }
+        break;
+
+        //-----------------------------------------------------------------------------------------
+        // handle all other keys (arrows)
         //-----------------------------------------------------------------------------------------
         default:
         {
-            helpTextView->routeKeyAction( keyAction );
+            helpView->routeKeyAction( keyAction );
         }
         break;
     }
@@ -1872,26 +1871,64 @@ ScreenEditor::updateCommandDisplay( void )
     // command level - show matching commands with arg hints
     CxString display = _cmdBuffer;
 
-    CompleterCandidate *matches[16];
-    int count = _activeCompleter->findMatchesFull( _cmdBuffer, matches, 16 );
+    if (_cmdBuffer.length() == 0) {
+        // No input yet: show category prefixes for discoverability
+        CompleterCandidate *allMatches[32];
+        int allCount = _activeCompleter->findMatchesFull( _cmdBuffer, allMatches, 32 );
 
-    // don't show hint if typed text exactly matches a command
-    int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+        CxString categories[16];
+        int categoryCount = 0;
 
-    if (count > 0 && !isExactMatch) {
-        display += "  ";
-        for (int i = 0; i < count && i < 8; i++) {
-            display += "| ";
-            display += matches[i]->name;
-            CommandEntry *entry = (CommandEntry *)matches[i]->userData;
-            if (entry != NULL && entry->argHint != NULL) {
-                display += " ";
-                display += entry->argHint;
+        for (int i = 0; i < allCount; i++) {
+            CxString name = allMatches[i]->name;
+            int dashIdx = name.index("-");
+            CxString cat;
+            if (dashIdx > 0) {
+                cat = name.subString(0, dashIdx + 1);
+            } else {
+                cat = name;
             }
+
+            int found = 0;
+            for (int j = 0; j < categoryCount; j++) {
+                if (categories[j] == cat) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found && categoryCount < 16) {
+                categories[categoryCount++] = cat;
+            }
+        }
+
+        display += "  ";
+        for (int i = 0; i < categoryCount; i++) {
+            display += "| ";
+            display += categories[i];
             display += " ";
         }
-        if (count > 8) {
-            display += "...";
+    } else {
+        CompleterCandidate *matches[16];
+        int count = _activeCompleter->findMatchesFull( _cmdBuffer, matches, 16 );
+
+        // don't show hint if typed text exactly matches a command
+        int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
+
+        if (count > 0 && !isExactMatch) {
+            display += "  ";
+            for (int i = 0; i < count && i < 8; i++) {
+                display += "| ";
+                display += matches[i]->name;
+                CommandEntry *entry = (CommandEntry *)matches[i]->userData;
+                if (entry != NULL && entry->argHint != NULL) {
+                    display += " ";
+                    display += entry->argHint;
+                }
+                display += " ";
+            }
+            if (count > 8) {
+                display += "...";
+            }
         }
     }
 
@@ -2192,25 +2229,6 @@ ScreenEditor::handleArgumentModeInput( CxKeyAction keyAction )
         return;
     }
 
-    // TAB - complete subproject name for project-make/project-clean
-    if (keyAction.actionType() == CxKeyAction::CURSOR && keyAction.tag() == "<tab>") {
-        if (_currentCommand != NULL &&
-            (_currentCommand->handler == &ScreenEditor::CMD_ProjectMake ||
-             _currentCommand->handler == &ScreenEditor::CMD_ProjectClean)) {
-            // Only complete the first word (before any space)
-            int spaceIdx = _argBuffer.index(" ");
-            if (spaceIdx < 0) {
-                CompleterResult result = _subprojectCompleter.processTab(_argBuffer);
-                if (result.getStatus() == COMPLETER_UNIQUE ||
-                    result.getStatus() == COMPLETER_PARTIAL) {
-                    _argBuffer = result.getInput();
-                    updateArgumentDisplay();
-                }
-            }
-        }
-        return;
-    }
-
     // BACKSPACE - delete last character
     if (keyAction.actionType() == CxKeyAction::BACKSPACE) {
         if (_argBuffer.length() > 0) {
@@ -2264,30 +2282,6 @@ ScreenEditor::updateArgumentDisplay( void )
     prefix += ": ";
 
     CxString display = _argBuffer;
-
-    // Show subproject completion hints for project-make/project-clean
-    if (_currentCommand->handler == &ScreenEditor::CMD_ProjectMake ||
-        _currentCommand->handler == &ScreenEditor::CMD_ProjectClean) {
-        // Only show hints while typing the first word (no space yet)
-        int spaceIdx = _argBuffer.index(" ");
-        if (spaceIdx < 0) {
-            CxString names[16];
-            int count = _subprojectCompleter.findMatches(_argBuffer, names, 16);
-            int isExactMatch = (count == 1 && _argBuffer == names[0]);
-
-            if (count > 0 && !isExactMatch) {
-                display += "  ";
-                for (int i = 0; i < count && i < 8; i++) {
-                    display += "| ";
-                    display += names[i];
-                    display += " ";
-                }
-                if (count > 8) {
-                    display += "...";
-                }
-            }
-        }
-    }
 
     renderCommandLine( prefix, display, prefix.length() + _argBuffer.length() );
 }

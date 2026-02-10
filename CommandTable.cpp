@@ -6,6 +6,13 @@
 //  Static command table - defines all ESC commands.
 //  Matching and completion are handled by the Completer library.
 //
+//  Commands follow a category-action naming convention for menu-like discoverability.
+//  Categories are ordered by traditional menu bar precedence:
+//  File, Edit, Search, Goto, Insert, Text, View, Project
+//
+//  Each category is unique at the first keystroke:
+//  f=file, e=edit, s=search, g=goto, i=insert, t=text, v=view, p=project
+//
 //  Created by Todd Vernon on 1/25/26.
 //  Copyright (c) 2026 Todd Vernon. All rights reserved.
 //
@@ -19,60 +26,99 @@
 // Command table
 //
 // Commands are registered into Completer objects at startup for literal prefix matching.
-// For example: "goto" matches "goto-line", "find" matches "find"
-//
 // The symbolFilter field is used for commands with CMD_FLAG_SYMBOL_ARG to set up
-// child completers (e.g., "box-" for utf-box, "sym-" for utf-symbol).
+// child completers (e.g., "box-" for insert-box, "sym-" for insert-symbol).
 //-------------------------------------------------------------------------------------------------
 CommandEntry commandTable[] = {
 
-    //---------------------------------------------------------------------------------------------
-    // Find commands
-    //---------------------------------------------------------------------------------------------
-    { "find",
+    //--- file- ---------------------------------------------------------------
+    { "file-load",
+      "<filename>",
+      "Load file into new buffer",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_LoadFile,
+      NULL },
+
+    { "file-new",
+      "<filename>",
+      "Create new buffer",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_NewBuffer,
+      NULL },
+
+    { "file-quit",
+      NULL,
+      "Quit editor",
+      0,
+      &ScreenEditor::CMD_Quit,
+      NULL },
+
+    { "file-save",
+      "[filename]",
+      "Save current buffer",
+      CMD_FLAG_OPTIONAL_ARG,
+      &ScreenEditor::CMD_SaveFile,
+      NULL },
+
+    { "file-save-as",
+      "<filename>",
+      "Save buffer to new file",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_SaveFile,
+      NULL },
+
+    //--- edit- ---------------------------------------------------------------
+    { "edit-cut",
+      NULL,
+      "Cut from mark to cursor",
+      0,
+      &ScreenEditor::CMD_CutToMark,
+      NULL },
+
+    { "edit-mark",
+      NULL,
+      "Set mark at cursor position",
+      0,
+      &ScreenEditor::CMD_SetMark,
+      NULL },
+
+    { "edit-paste",
+      NULL,
+      "Paste from cut buffer",
+      0,
+      &ScreenEditor::CMD_PasteText,
+      NULL },
+
+    { "edit-system-paste",
+      NULL,
+      "Paste from system clipboard",
+      0,
+      &ScreenEditor::CMD_SystemPaste,
+      NULL },
+
+    //--- search- -------------------------------------------------------------
+    { "search-text",
       "<pattern>",
       "Search for text in buffer",
       CMD_FLAG_NEEDS_ARG,
       &ScreenEditor::CMD_Find,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // Buffer info commands
-    //---------------------------------------------------------------------------------------------
-    { "wc",
-      NULL,
-      "Count lines and characters in buffer",
-      0,
-      &ScreenEditor::CMD_Count,
+    { "search-replace",
+      "<replacement>",
+      "Replace next occurrence (uses last search)",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_Replace,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // Tab conversion commands
-    //---------------------------------------------------------------------------------------------
-    { "entab",
-      NULL,
-      "Convert leading spaces to tabs",
-      0,
-      &ScreenEditor::CMD_Entab,
+    { "search-replace-all",
+      "<replacement>",
+      "Replace all occurrences (uses last search)",
+      CMD_FLAG_NEEDS_ARG,
+      &ScreenEditor::CMD_ReplaceAll,
       NULL },
 
-    { "detab",
-      NULL,
-      "Convert tabs to spaces",
-      0,
-      &ScreenEditor::CMD_Detab,
-      NULL },
-
-    { "trim-trailing",
-      NULL,
-      "Remove trailing whitespace from all lines",
-      0,
-      &ScreenEditor::CMD_TrimTrailing,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Build commands
-    //---------------------------------------------------------------------------------------------
+    //--- goto- ---------------------------------------------------------------
     { "goto-error",
       NULL,
       "Jump to file:line from error message under cursor",
@@ -80,45 +126,6 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_GotoError,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // UTF symbol insertion (modern platforms only)
-    //---------------------------------------------------------------------------------------------
-#ifdef CM_UTF8_SUPPORT
-    { "utf-box",
-      "<symbol>",
-      "Insert box drawing symbol (TAB for completion)",
-      CMD_FLAG_NEEDS_ARG | CMD_FLAG_SYMBOL_ARG,
-      &ScreenEditor::CMD_InsertUTFBox,
-      "box-" },
-
-    { "utf-symbol",
-      "<symbol>",
-      "Insert common symbol (TAB for completion)",
-      CMD_FLAG_NEEDS_ARG | CMD_FLAG_SYMBOL_ARG,
-      &ScreenEditor::CMD_InsertUTFSymbol,
-      "sym-" },
-#endif
-
-    //---------------------------------------------------------------------------------------------
-    // Replace commands
-    //---------------------------------------------------------------------------------------------
-    { "replace",
-      "<replacement>",
-      "Replace next occurrence (uses last find)",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_Replace,
-      NULL },
-
-    { "replace-all",
-      "<replacement>",
-      "Replace all occurrences (uses last find)",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_ReplaceAll,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Navigation commands
-    //---------------------------------------------------------------------------------------------
     { "goto-line",
       "<line>",
       "Go to specified line number",
@@ -126,176 +133,98 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_GotoLine,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // File commands
-    //---------------------------------------------------------------------------------------------
-    { "save",
-      "[filename]",
-      "Save current buffer",
-      CMD_FLAG_OPTIONAL_ARG,
-      &ScreenEditor::CMD_SaveFile,
-      NULL },
+    //--- insert- -------------------------------------------------------------
+#ifdef CM_UTF8_SUPPORT
+    { "insert-box",
+      "<symbol>",
+      "Insert box drawing symbol (TAB for completion)",
+      CMD_FLAG_NEEDS_ARG | CMD_FLAG_SYMBOL_ARG,
+      &ScreenEditor::CMD_InsertUTFBox,
+      "box-" },
+#endif
 
-    { "save-as",
-      "<filename>",
-      "Save buffer to new file",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_SaveFile,
-      NULL },
-
-    { "load",
-      "<filename>",
-      "Load file into new buffer",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_LoadFile,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Buffer commands
-    //---------------------------------------------------------------------------------------------
-    { "buffer-next",
-      NULL,
-      "Switch to next buffer",
-      0,
-      &ScreenEditor::CMD_BufferNext,
-      NULL },
-
-    { "buffer-prev",
-      NULL,
-      "Switch to previous buffer",
-      0,
-      &ScreenEditor::CMD_BufferPrev,
-      NULL },
-
-    { "buffer-new",
-      "<filename>",
-      "Create new buffer",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_NewBuffer,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Mark and cut/paste commands
-    //---------------------------------------------------------------------------------------------
-    { "mark",
-      NULL,
-      "Set mark at cursor position",
-      0,
-      &ScreenEditor::CMD_SetMark,
-      NULL },
-
-    { "cut",
-      NULL,
-      "Cut from mark to cursor",
-      0,
-      &ScreenEditor::CMD_CutToMark,
-      NULL },
-
-    { "paste",
-      NULL,
-      "Paste from cut buffer",
-      0,
-      &ScreenEditor::CMD_PasteText,
-      NULL },
-
-    { "system-paste",
-      NULL,
-      "Paste from system clipboard",
-      0,
-      &ScreenEditor::CMD_SystemPaste,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Code editing commands
-    //---------------------------------------------------------------------------------------------
-    { "comment-block",
+    { "insert-comment-block",
       "<column>",
       "Insert comment block to column",
       CMD_FLAG_NEEDS_ARG,
       &ScreenEditor::CMD_CommentBlock,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // Project commands
-    //---------------------------------------------------------------------------------------------
-    { "project-clean",
-      "[subproject]",
-      "Run make clean",
-      CMD_FLAG_OPTIONAL_ARG,
-      &ScreenEditor::CMD_ProjectClean,
-      NULL },
+#ifdef CM_UTF8_SUPPORT
+    { "insert-symbol",
+      "<symbol>",
+      "Insert common symbol (TAB for completion)",
+      CMD_FLAG_NEEDS_ARG | CMD_FLAG_SYMBOL_ARG,
+      &ScreenEditor::CMD_InsertUTFSymbol,
+      "sym-" },
+#endif
 
-    { "project-create",
-      "<name>",
-      "Create new project file",
-      CMD_FLAG_NEEDS_ARG,
-      &ScreenEditor::CMD_ProjectCreate,
-      NULL },
-
-    { "project-edit",
+    //--- text- ---------------------------------------------------------------
+    { "text-count",
       NULL,
-      "Edit project file",
+      "Count lines and characters in buffer",
       0,
-      &ScreenEditor::CMD_ProjectEdit,
+      &ScreenEditor::CMD_Count,
       NULL },
 
-    { "project-make",
-      "[subproject] [target]",
-      "Build project",
-      CMD_FLAG_OPTIONAL_ARG,
-      &ScreenEditor::CMD_ProjectMake,
-      NULL },
-
-    { "project-show",
+    { "text-detab",
       NULL,
-      "Show project/buffer list",
+      "Convert tabs to spaces",
       0,
-      &ScreenEditor::CMD_ProjectShow,
+      &ScreenEditor::CMD_Detab,
       NULL },
 
-    { "show-build",
+    { "text-entab",
       NULL,
-      "Show build output (Ctrl-B)",
+      "Convert leading spaces to tabs",
+      0,
+      &ScreenEditor::CMD_Entab,
+      NULL },
+
+    { "text-trim-trailing",
+      NULL,
+      "Remove trailing whitespace from all lines",
+      0,
+      &ScreenEditor::CMD_TrimTrailing,
+      NULL },
+
+    //--- view- ---------------------------------------------------------------
+    { "view-build",
+      NULL,
+      "Show build output",
       0,
       &ScreenEditor::CMD_ShowBuild,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // Split screen commands
-    //---------------------------------------------------------------------------------------------
-    { "split",
-      NULL,
-      "Split screen horizontally",
-      0,
-      &ScreenEditor::CMD_Split,
-      NULL },
-
-    { "unsplit",
-      NULL,
-      "Return to single view",
-      0,
-      &ScreenEditor::CMD_Unsplit,
-      NULL },
-
-    //---------------------------------------------------------------------------------------------
-    // Application commands
-    //---------------------------------------------------------------------------------------------
-    { "quit",
-      NULL,
-      "Quit editor",
-      0,
-      &ScreenEditor::CMD_Quit,
-      NULL },
-
-    { "help",
+    { "view-help",
       NULL,
       "Show help screen",
       0,
       &ScreenEditor::CMD_Help,
       NULL },
 
-    //---------------------------------------------------------------------------------------------
-    // End of table
-    //---------------------------------------------------------------------------------------------
+    { "view-split",
+      NULL,
+      "Split screen horizontally",
+      0,
+      &ScreenEditor::CMD_Split,
+      NULL },
+
+    { "view-unsplit",
+      NULL,
+      "Return to single view",
+      0,
+      &ScreenEditor::CMD_Unsplit,
+      NULL },
+
+    //--- project (standalone, opens dialog) ----------------------------------
+    { "project",
+      NULL,
+      "Open project dialog",
+      0,
+      &ScreenEditor::CMD_ProjectShow,
+      NULL },
+
+    //--- end -----------------------------------------------------------------
     { NULL, NULL, NULL, 0, NULL, NULL }
 };

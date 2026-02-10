@@ -31,7 +31,7 @@
 #include "ProgramDefaults.h"
 #include "Project.h"
 #include "ProjectView.h"
-#include "HelpTextView.h"
+#include "HelpView.h"
 #include "CommandTable.h"
 #include <cx/commandcompleter/completer.h>
 #include <cx/buildoutput/buildoutput.h>
@@ -132,8 +132,6 @@ class ScreenEditor {
     void CMD_SystemPaste( CxString commandLine );
 	void CMD_CommentBlock( CxString commandLine );
     void CMD_NewBuffer( CxString commandLine );
-    void CMD_BufferNext( CxString commandLine );
-    void CMD_BufferPrev( CxString commandLine );
     void CMD_Quit( CxString commandLine );
     void CMD_Help( CxString commandLine );
     void CMD_Count( CxString commandLine );
@@ -141,10 +139,6 @@ class ScreenEditor {
     void CMD_Detab( CxString commandLine );
     void CMD_TrimTrailing( CxString commandLine );
     void CMD_GotoError( CxString commandLine );
-    void CMD_ProjectClean( CxString commandLine );
-    void CMD_ProjectCreate( CxString commandLine );
-    void CMD_ProjectEdit( CxString commandLine );
-    void CMD_ProjectMake( CxString commandLine );
     void CMD_ProjectShow( CxString commandLine );
     void CMD_ShowBuild( CxString commandLine );
     void CMD_Split( CxString commandLine );
@@ -163,10 +157,11 @@ class ScreenEditor {
     void CTRL_PageUp(void);
     void CTRL_NextBuffer(void);
     void CTRL_ProjectList(void);
-    void CTRL_UpdateScreen(void);
     void CTRL_Help(void);
     void CTRL_SwitchView(void);
     void CTRL_ShowBuild(void);
+    void CTRL_Split(void);
+    void CTRL_Unsplit(void);
 
     // Control-X subcommand handlers
     void CTRLX_Save(void);
@@ -190,7 +185,7 @@ class ScreenEditor {
     CmEditBufferList *editBufferList;
     
     ProjectView *projectView;
-	HelpTextView *helpTextView;
+	HelpView *helpView;
     BuildView *buildView;
     BuildOutput *buildOutput;
 
@@ -231,7 +226,6 @@ private:
     void enterCommandLineMode(void);    // EDIT -> COMMANDLINE
     void exitCommandLineMode(void);     // COMMANDLINE -> EDIT
     void resetCommandInputState(void);
-    void rebuildSubprojectCompleter(void);
 
     // decomposed command input handlers
     void handleCommandEnter(void);
@@ -248,7 +242,6 @@ private:
     Completer       _boxSymbolCompleter;    // child: box drawing symbols
     Completer       _symSymbolCompleter;    // child: common symbols
 #endif
-    Completer       _subprojectCompleter;   // subproject names for project-make/clean arg completion
     Completer      *_activeCompleter;       // points to whichever is active
 
     // command input state
