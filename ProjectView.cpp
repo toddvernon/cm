@@ -50,6 +50,9 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
     // initially not visible
     _visible = 0;
 
+    // "Other Files" section starts expanded
+    _otherFilesExpanded = 1;
+
     // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
     // build the visible items from project structure
@@ -97,12 +100,15 @@ ProjectView::rebuildVisibleItems( void )
             openFilesAdded = 1;
         }
 
-        ProjectViewItem *openItem = new ProjectViewItem();
-        openItem->type = PVITEM_OPEN_FILE;
-        openItem->subprojectIndex = -1;
-        openItem->fileIndex = -1;
-        openItem->bufferIndex = i;
-        _visibleItems.append(openItem);
+        // only add file items if expanded
+        if (_otherFilesExpanded) {
+            ProjectViewItem *openItem = new ProjectViewItem();
+            openItem->type = PVITEM_OPEN_FILE;
+            openItem->subprojectIndex = -1;
+            openItem->fileIndex = -1;
+            openItem->bufferIndex = i;
+            _visibleItems.append(openItem);
+        }
     }
 
     if (project->subprojectCount() > 0) {
@@ -265,7 +271,7 @@ ProjectView::recalcScreenPlacements(void)
     int totalItems = (int)_visibleItems.entries();
     while (selectedListItemIndex < totalItems) {
         ProjectViewItemType t = _visibleItems.at(selectedListItemIndex)->type;
-        if (t != PVITEM_SEPARATOR && t != PVITEM_OPEN_HEADER) break;
+        if (t != PVITEM_SEPARATOR) break;
         selectedListItemIndex++;
     }
     if (selectedListItemIndex >= totalItems && totalItems > 0) {
@@ -405,7 +411,13 @@ ProjectView::redraw( void )
 
                 case PVITEM_OPEN_HEADER:
                 {
-                    prefix = "   ";
+                    prefix = " ";
+                    if (_otherFilesExpanded) {
+                        prefix += EXPAND_INDICATOR;
+                    } else {
+                        prefix += COLLAPSE_INDICATOR;
+                    }
+                    prefix += " ";
                     prefixDisplayWidth = 3;
                     text = "Other Files";
                 }
@@ -490,8 +502,7 @@ ProjectView::redraw( void )
             // draw with selection highlight or normal colors
             //-------------------------------------------------------------------------------------
             int isSelected = (selectedListItemIndex == logicalItem);
-            int isSeparator = (item->type == PVITEM_SEPARATOR ||
-                               item->type == PVITEM_OPEN_HEADER);
+            int isSeparator = (item->type == PVITEM_SEPARATOR);
 
             if (isSelected && !isSeparator) {
                 screen->setForegroundColor(programDefaults->statusBarTextColor());
@@ -692,7 +703,12 @@ ProjectView::getContextFooter( void )
         return "[M] Make  [C] Clean  [Esc] Close";
     }
 
-    // separator, open header, or no project
+    // open header
+    if (selType == PVITEM_OPEN_HEADER) {
+        return "[Enter] Expand/Collapse  [Esc] Close";
+    }
+
+    // separator or no project
     return "[Esc] Close";
 }
 
@@ -711,6 +727,21 @@ ProjectView::toggleSelectedSubproject( void )
     }
 
     ProjectViewItem *item = _visibleItems.at(selectedListItemIndex);
+
+    if (item->type == PVITEM_OPEN_HEADER) {
+        _otherFilesExpanded = !_otherFilesExpanded;
+        rebuildVisibleItems();
+
+        // ensure selected index is still valid
+        if (selectedListItemIndex >= (int)_visibleItems.entries()) {
+            selectedListItemIndex = (int)_visibleItems.entries() - 1;
+            if (selectedListItemIndex < 0) {
+                selectedListItemIndex = 0;
+            }
+        }
+        return;
+    }
+
     if (item->type != PVITEM_SUBPROJECT) {
         return;
     }
@@ -834,8 +865,7 @@ ProjectView::handleArrows( CxKeyAction keyAction )
 
         // skip non-selectable items
         while (selectedListItemIndex < totalItems &&
-               (_visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR ||
-               _visibleItems.at(selectedListItemIndex)->type == PVITEM_OPEN_HEADER)) {
+               _visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR) {
             selectedListItemIndex++;
         }
 
@@ -853,8 +883,7 @@ ProjectView::handleArrows( CxKeyAction keyAction )
 
         // skip non-selectable items
         while (selectedListItemIndex >= 0 &&
-               (_visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR ||
-               _visibleItems.at(selectedListItemIndex)->type == PVITEM_OPEN_HEADER)) {
+               _visibleItems.at(selectedListItemIndex)->type == PVITEM_SEPARATOR) {
             selectedListItemIndex--;
         }
 

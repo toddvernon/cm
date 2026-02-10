@@ -8,6 +8,7 @@
 			"name": "cx",
 			"directory": "cx",
 			"makefile": "makefile",
+			"collapsed": true,
 			"files": [
 				"base/string.cpp",
 				"base/string.h",
@@ -203,6 +204,7 @@
 			"name": "cx_tests",
 			"directory": "cx_tests",
 			"makefile": "makefile",
+			"collapsed": true,
 			"files": [
 				"cxb64/cxb64_test.cpp",
 				"cxbuildoutput/cxbuildoutput_test.cpp",

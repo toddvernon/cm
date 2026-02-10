@@ -155,6 +155,8 @@ class ProjectView
 
     int _visible;  // whether modal is currently displayed
 
+    int _otherFilesExpanded;  // expand/collapse state for "Other Files" section
+
 };
 
 #endif

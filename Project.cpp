@@ -331,6 +331,17 @@ Project::parseSubproject( CxJSONObject *subObj )
     }
 
     //---------------------------------------------------------------------------------------------
+    // parse "collapsed" (optional boolean, default false = expanded)
+    //---------------------------------------------------------------------------------------------
+    CxJSONMember *collapsedMember = subObj->find("collapsed");
+    if (collapsedMember != NULL && collapsedMember->object()->type() == CxJSONBase::BOOLEAN) {
+        CxJSONBoolean *value = (CxJSONBoolean *) collapsedMember->object();
+        if (value->get()) {
+            sub->isExpanded = 0;
+        }
+    }
+
+    //---------------------------------------------------------------------------------------------
     // parse "files" array
     //---------------------------------------------------------------------------------------------
     CxJSONMember *filesMember = subObj->find("files");

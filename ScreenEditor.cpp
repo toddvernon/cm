@@ -1348,7 +1348,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                     loadNewFile(filePath, TRUE);
                     returnToEditMode();
                 }
-            } else if (itemType == PVITEM_SUBPROJECT) {
+            } else if (itemType == PVITEM_SUBPROJECT || itemType == PVITEM_OPEN_HEADER) {
                 projectView->toggleSelectedSubproject();
                 projectView->redraw();
             }
