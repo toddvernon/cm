@@ -119,7 +119,7 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/ProgramDefaults.o		 \
 	$(APP_OBJECT_DIR)/Project.o				 \
 	$(APP_OBJECT_DIR)/ProjectView.o		 \
-	$(APP_OBJECT_DIR)/HelpTextView.o		 \
+	$(APP_OBJECT_DIR)/HelpView.o		 \
 	$(APP_OBJECT_DIR)/BuildView.o            \
 	$(APP_OBJECT_DIR)/MarkUp.o               \
 	$(APP_OBJECT_DIR)/MarkUpColorizers.o     \
@@ -220,7 +220,7 @@ $(APP_OBJECT_DIR)/ScreenEditorCommands.o : ScreenEditorCommands.cpp
 $(APP_OBJECT_DIR)/ScreenEditorCore.o : ScreenEditorCore.cpp
 $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/ProjectView.o	: ProjectView.cpp
-$(APP_OBJECT_DIR)/HelpTextView.o	: HelpTextView.cpp
+$(APP_OBJECT_DIR)/HelpView.o	: HelpView.cpp
 $(APP_OBJECT_DIR)/BuildView.o		: BuildView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
 $(APP_OBJECT_DIR)/MarkUpColorizers.o: MarkUpColorizers.cpp
