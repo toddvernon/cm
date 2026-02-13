@@ -44,7 +44,7 @@ int main(int argc, char **argv)
      if (argc == 2) {
         filePath = argv[1];
     }
-    
+
 	int row=0;
  	int col=0;
 
@@ -60,10 +60,10 @@ int main(int argc, char **argv)
 	// save the cursor position
 //	CxScreen::saveCursorPosition();
 
-	// open alternate screen to preserve the existing screen    
+	// open alternate screen to preserve the existing screen
     CxScreen::openAlternateScreen();
     CxScreen::clearScreen();
-    
+
 	// create ad run the editor
     ScreenEditor screenEditor( screen, keyboard, filePath );
     screenEditor.run();
@@ -86,7 +86,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
-
-
-

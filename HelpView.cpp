@@ -12,6 +12,7 @@
 //-------------------------------------------------------------------------------------------------
 
 #include "HelpView.h"
+#include "CmVersion.h"
 #include <stdlib.h>
 
 #if defined(_LINUX_) || defined(_OSX_)
@@ -428,7 +429,9 @@ HelpView::redraw( void )
     // build context-sensitive footer based on current selection
     CxString footer = getContextFooter();
 
-    frame->drawWithTitleAndFooter("Help", footer);
+    CxString title = "cmacs ";
+    title += CM_VERSION;
+    frame->drawWithTitleAndFooter(title, footer);
 
     //---------------------------------------------------------------------------------------------
     // draw the visible items
