@@ -3,8 +3,11 @@
 //  EditViewDisplay.cpp
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  Screen rendering and coordinate translation methods for EditView.
-//  Extracted from EditView.cpp to reduce file size.
 //
 //-------------------------------------------------------------------------------------------------
 

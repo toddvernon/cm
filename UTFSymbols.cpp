@@ -3,8 +3,11 @@
 //  UTFSymbols.cpp
 //  cmacs
 //
-//  UTF-8 symbol table for insert-utf command
-//  Only available on modern platforms (macOS, Linux)
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
+//  UTF-8 symbol table for box drawing and common symbols (macOS, Linux only).
 //
 //-------------------------------------------------------------------------------------------------
 

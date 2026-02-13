@@ -3,9 +3,11 @@
 //  HelpView.h
 //  cmacs
 //
-//  Created by Todd Vernon on 2/9/26.
-//  Copyright © 2026 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
+//  Modal help view definitions.
 //
 //-------------------------------------------------------------------------------------------------
 

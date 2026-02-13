@@ -3,8 +3,11 @@
 //  ScreenEditorCommands.cpp
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  CMD_*, CTRL_*, and CONTROL_* command handler implementations for ScreenEditor.
-//  Extracted from ScreenEditor.cpp to reduce file size.
 //
 //-------------------------------------------------------------------------------------------------
 

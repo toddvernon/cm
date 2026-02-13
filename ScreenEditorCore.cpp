@@ -3,8 +3,11 @@
 //  ScreenEditorCore.cpp
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  File management, buffer switching, control dispatch, and dispatch tables for ScreenEditor.
-//  Extracted from ScreenEditor.cpp to reduce file size.
 //
 //-------------------------------------------------------------------------------------------------
 

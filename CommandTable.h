@@ -3,11 +3,11 @@
 //  CommandTable.h
 //  cmacs
 //
-//  Static command table - defines all ESC commands.
-//  Matching and completion are handled by the Completer library.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-//  Created by Todd Vernon on 1/25/26.
-//  Copyright (c) 2026 Todd Vernon. All rights reserved.
+//  Static command table definitions for ESC commands.
 //
 //-------------------------------------------------------------------------------------------------
 

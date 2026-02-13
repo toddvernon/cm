@@ -3,9 +3,11 @@
 //  Project.cpp
 //  cmacs
 //
-//  Created by Todd Vernon on 6/24/22.
-//  Copyright © 2022 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
+//  Project file loading, parsing, and subproject management.
 //
 //-------------------------------------------------------------------------------------------------
 

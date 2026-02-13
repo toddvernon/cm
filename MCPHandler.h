@@ -1,15 +1,13 @@
 //-------------------------------------------------------------------------------------------------
 //
-// MCPHandler.h
+//  MCPHandler.h
+//  cmacs
 //
-// MCP socket thread - connects to mcp_bridge and handles tool commands
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-// Linux and macOS only.
-//
-//-------------------------------------------------------------------------------------------------
-//
-// (c) Copyright 2024 T.Vernon
-// ALL RIGHTS RESERVED
+//  MCP socket thread definitions (macOS, Linux only).
 //
 //-------------------------------------------------------------------------------------------------
 

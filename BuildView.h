@@ -3,11 +3,11 @@
 //  BuildView.h
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  Modal view for displaying build output with error/warning navigation.
-//
-//  Created by Todd Vernon on 2/8/26.
-//  Copyright (c) 2026 Todd Vernon. All rights reserved.
-//
 //
 //-------------------------------------------------------------------------------------------------
 

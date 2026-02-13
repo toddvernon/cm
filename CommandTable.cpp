@@ -3,18 +3,12 @@
 //  CommandTable.cpp
 //  cmacs
 //
-//  Static command table - defines all ESC commands.
-//  Matching and completion are handled by the Completer library.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-//  Commands follow a category-action naming convention for menu-like discoverability.
-//  Categories are ordered by traditional menu bar precedence:
-//  File, Edit, Search, Goto, Insert, Text, View, Project
-//
-//  Each category is unique at the first keystroke:
-//  f=file, e=edit, s=search, g=goto, i=insert, t=text, v=view, p=project
-//
-//  Created by Todd Vernon on 1/25/26.
-//  Copyright (c) 2026 Todd Vernon. All rights reserved.
+//  Static command table defining all ESC commands. Commands follow a category-action
+//  naming convention (file-, edit-, search-, goto-, insert-, text-, view-, project).
 //
 //-------------------------------------------------------------------------------------------------
 

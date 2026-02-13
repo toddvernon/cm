@@ -1,15 +1,13 @@
 //-------------------------------------------------------------------------------------------------
 //
-// mcp_bridge.cpp
+//  mcp_bridge.cpp
+//  cmacs
 //
-// MCP Bridge - connects Claude Desktop to cm editor via TCP socket
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-// Linux and macOS only.
-//
-//-------------------------------------------------------------------------------------------------
-//
-// (c) Copyright 2024 T.Vernon
-// ALL RIGHTS RESERVED
+//  MCP Bridge - connects Claude Desktop to cm editor via TCP socket (macOS, Linux only).
 //
 //-------------------------------------------------------------------------------------------------
 

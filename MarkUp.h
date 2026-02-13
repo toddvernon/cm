@@ -1,10 +1,13 @@
 //-------------------------------------------------------------------------------------------------
 //
 //  MarkUp.h
+//  cmacs
 //
-//  Created by Todd Vernon on 12/30/23.
-//  Copyright © 2023 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
+//  Syntax highlighting engine definitions.
 //
 //-------------------------------------------------------------------------------------------------
 

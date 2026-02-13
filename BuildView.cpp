@@ -3,21 +3,12 @@
 //  BuildView.cpp
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  Modal view for displaying build output with error/warning navigation.
-//
-//  Created by Todd Vernon on 2/8/26.
-//  Copyright (c) 2026 Todd Vernon. All rights reserved.
-//
-//
-//-------------------------------------------------------------------------------------------------
-
-
-//-------------------------------------------------------------------------------------------------
-// BuildView.cpp
-//
-// Modal dialog that displays build output with streaming updates during build.
-// Lines are color-coded by type (error=red, warning=yellow, plain=default).
-// Arrow keys navigate, Enter on error line allows goto-file-line.
+//  Lines are color-coded by type, arrow keys navigate, Enter jumps to error location.
 //
 //-------------------------------------------------------------------------------------------------
 

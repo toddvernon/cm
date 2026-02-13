@@ -3,19 +3,12 @@
 //  EditView.cpp
 //  cmacs
 //
-//  Created by Todd Vernon on 6/24/22.
-//  Copyright © 2022 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-//
-//-------------------------------------------------------------------------------------------------
-
-
-//-------------------------------------------------------------------------------------------------
-// EditView.cpp
-// 
-// Edit View the class that handles display of the edit buffer on the screen.  It handles
-// todd sizing and resizing and reframing the visible part of the edit buffer on the
-// visible screen.
+//  Text editing view that handles display of the edit buffer on screen, including
+//  sizing, resizing, and reframing the visible portion of the buffer.
 //
 //-------------------------------------------------------------------------------------------------
 

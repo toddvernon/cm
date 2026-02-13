@@ -3,19 +3,12 @@
 //  ProjectView.cpp
 //  cmacs
 //
-//  Created by Todd Vernon on 9/15/23.
-//  Copyright    2022 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-//
-//-------------------------------------------------------------------------------------------------
-
-
-//-------------------------------------------------------------------------------------------------
-// ProjectView.cpp
-//
-// Modal dialog showing project structure organized by subproject.
-// Subproject headers are collapsible, files are listed under their subproject.
-// "All" row at top for build-all operations.
+//  Modal dialog showing project structure organized by subproject with
+//  collapsible headers and file navigation.
 //
 //-------------------------------------------------------------------------------------------------
 

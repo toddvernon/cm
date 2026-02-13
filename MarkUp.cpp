@@ -3,19 +3,11 @@
 //  MarkUp.cpp
 //  cmacs
 //
-//  Created by Todd Vernon on 6/24/22.
-//  Copyright © 2022 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
-//
-//-------------------------------------------------------------------------------------------------
-
-
-//-------------------------------------------------------------------------------------------------
-// MarkUp.cpp
-// 
-// Edit View the class that handles display of the edit buffer on the screen.  It handles
-// screen sizing and resizing and reframing the visible part of the edit buffer on the
-// visible screen.
+//  Syntax highlighting engine with language-specific colorization rules.
 //
 //-------------------------------------------------------------------------------------------------
 

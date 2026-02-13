@@ -3,9 +3,11 @@
 //  CmTypes.h
 //  cmacs
 //
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
 //  Platform-specific type definitions for UTF-8 support.
-//  On modern platforms (Linux, macOS), use UTF-8 aware edit buffers.
-//  On older platforms (IRIX, Solaris), use traditional byte-based buffers.
 //
 //-------------------------------------------------------------------------------------------------
 

@@ -3,8 +3,11 @@
 //  MarkUpColorizers.cpp
 //  cmacs
 //
-//  Element colorizer methods for MarkUp class.
-//  Extracted from MarkUp.cpp to reduce file size.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
+//
+//  Element colorizer methods for MarkUp class (strings, comments, keywords, numbers).
 //
 //-------------------------------------------------------------------------------------------------
 

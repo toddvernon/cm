@@ -3,9 +3,11 @@
 //  ProjectView.h
 //  cmacs
 //
-//  Created by Todd Vernon on 9/15/23.
-//  Copyright © 2022 Todd Vernon. All rights reserved.
+//  Copyright 2022-2025 Todd Vernon. All rights reserved.
+//  Licensed under the Apache License, Version 2.0
+//  See LICENSE file for details.
 //
+//  Modal project/buffer list view definitions.
 //
 //-------------------------------------------------------------------------------------------------
 
