@@ -556,7 +556,9 @@ ProjectView::redraw( void )
                 // no tag - simple line
                 CxString line = prefix;
                 line += text;
-                line += " ";
+                if (!isSeparator) {
+                    line += " ";
+                }
                 screen->writeText(line);
             }
 
