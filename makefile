@@ -269,8 +269,10 @@ $(OBJECTS):
 
 archive:
 	@echo "Creating cxapps_unix.tar..."
+	@echo "  (extracts to cx_apps/cm/ when untarred from parent directory)"
 	@test -d ../../ARCHIVE || mkdir ../../ARCHIVE
 	@tar cvf ../../ARCHIVE/cxapps_unix.tar \
+		--transform 's,^\./,cx_apps/cm/,' \
 		--exclude='*.o' \
 		--exclude='*.a' \
 		--exclude='.git' \
