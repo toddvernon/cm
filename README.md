@@ -11,7 +11,7 @@ If you've outgrown nano but don't want to climb the vim or emacs learning curve,
 - **Split screens** — View two files side by side.
 - **Syntax highlighting** — For C, C++, Python, Markdown, and more.
 
-The real story is portability. CMacs is written in C++ with zero external dependencies—no Boost, no STL, no autoconf, no cmake, no package managers pulling in half the internet. Just `make`. It builds on modern macOS and Linux, but also on SGI IRIX, Solaris, and SunOS machines from the early 1990s. That combination—C++, no dependencies, runs on 30-year-old hardware—is rare.
+The real story is portability. CMacs is written in C++ with zero external dependencies—no Boost, no autoconf, no cmake, no package managers pulling in half the internet. Just `make`. It builds on modern macOS and Linux, but also on SGI IRIX, Solaris, and SunOS machines from the early 1990s. That combination—C++, no dependencies, runs on 30-year-old hardware—is rare.
 
 On vintage systems, you'll need GNU Make and GCC 2.8.1 or later (cross-compiled or bootstrapped), but once you have those, CMacs builds clean.
 
