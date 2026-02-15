@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CMacs - The Portable Terminal Editor</title>
+    <title>Cmacs - The Portable Terminal Editor</title>
     <style>
         :root {
             --bg-dark: #fdfdfd;
@@ -50,12 +50,63 @@
         }
 
         .hero .tagline {
-            font-size: 1.4rem;
-            color: var(--text-muted);
-            margin-bottom: 30px;
+            font-size: 1.6rem;
+            color: var(--text);
+            margin-bottom: 15px;
             max-width: 700px;
             margin-left: auto;
             margin-right: auto;
+            font-weight: 500;
+        }
+
+        .hero .tagline-sub {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 25px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.7;
+        }
+
+        .hero-platforms {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .hero-platforms span {
+            background: var(--bg-card);
+            color: var(--text);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hero-platforms span svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .runs-everywhere-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .runs-everywhere-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
         }
 
         .hero-image {
@@ -160,16 +211,52 @@
             text-align: center;
         }
 
+        .screenshot-item {
+            margin-bottom: 60px;
+        }
+
+        .screenshot-item:last-child {
+            margin-bottom: 0;
+        }
+
         .screenshot-item img {
             max-width: 100%;
             border-radius: 0;
             box-shadow: none;
+            margin-bottom: 25px;
+        }
+
+        .screenshot-item h3 {
+            font-size: 1.5rem;
             margin-bottom: 15px;
+            color: var(--text);
+            text-align: center;
         }
 
         .screenshot-item p {
             color: var(--text-muted);
             font-size: 1.1rem;
+            line-height: 1.7;
+            max-width: 800px;
+            margin: 0 auto 25px;
+            text-align: center;
+        }
+
+        .screenshot-item kbd {
+            background: #1d1d1f;
+            color: #f5f5f7;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .screenshot-item code {
+            background: var(--bg-card);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.9rem;
         }
 
         /* Portability Section */
@@ -237,6 +324,145 @@
             color: #86868b;
         }
 
+        /* How It Works Section */
+        .how-it-works {
+            padding: 80px 0;
+        }
+
+        .how-it-works h2 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+        }
+
+        .how-it-works .intro {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto 50px;
+        }
+
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .workflow-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .workflow-section h3 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        .tab-completion-demo {
+            background: #1d1d1f;
+            border-radius: 10px;
+            padding: 25px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #f5f5f7;
+            margin-bottom: 20px;
+        }
+
+        .tab-completion-demo .prompt {
+            color: #86868b;
+        }
+
+        .tab-completion-demo .input {
+            color: #6ee7b7;
+        }
+
+        .tab-completion-demo .result {
+            color: #fbbf24;
+        }
+
+        .tab-completion-demo .line {
+            margin: 8px 0;
+        }
+
+        .workflow-section p {
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        /* Command Tree */
+        .command-tree {
+            background: #1d1d1f;
+            border-radius: 10px;
+            padding: 25px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #f5f5f7;
+            overflow-x: auto;
+        }
+
+        .command-tree .category {
+            color: #6ee7b7;
+        }
+
+        .command-tree .cmd {
+            color: #fbbf24;
+        }
+
+        .command-tree .desc {
+            color: #86868b;
+        }
+
+        .tree-line {
+            margin: 3px 0;
+            white-space: nowrap;
+        }
+
+        /* CTRL Keys Section */
+        .ctrl-keys {
+            padding: 60px 0;
+            background: var(--bg-card);
+        }
+
+        .ctrl-keys h2 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 40px;
+        }
+
+        .ctrl-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .ctrl-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ctrl-item kbd {
+            background: #1d1d1f;
+            color: #f5f5f7;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.85rem;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .ctrl-item span {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
         /* Footer */
         footer {
             padding: 40px 0;
@@ -271,12 +497,22 @@
 <body>
     <section class="hero">
         <div class="container">
-            <h1>CMacs</h1>
+            <h1>Cmacs</h1>
             <p class="tagline">
-                Zero dependencies. Syntax highlighting. Project builds.<br>
                 The grown-up nano that runs everywhere.
             </p>
-            <img src="EditScreen.png" alt="CMacs Editor" class="hero-image">
+            <p class="tagline-sub">
+                A portable modern full-screen editor that runs in your terminal, written in portable C++ that compiles on your Mac M3, Linux, and decades-old Unix workstations. Built on a zero-dependency library with minimal templates and no language features past 1998. Includes a built-in project manager and build system for fast compiles and easy navigation to errors.
+            </p>
+            <div class="hero-platforms">
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>macOS</span>
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06-.135-.12-.2-.18-.264-.14-.135-.276-.134-.41-.2.136.066.262.2.348.397.012.032.023.064.032.097.055-.135.08-.2.073-.267 0-.027-.008-.064-.023-.102-.09-.2-.254-.334-.478-.399-.22-.066-.465-.066-.697 0l-.002.003c-.14.066-.257.2-.373.333-.12.135-.257.265-.422.4-.093.063-.2.135-.292.135-.09.003-.18-.064-.27-.198l-.004-.002c-.03-.066-.067-.135-.085-.2-.043-.135-.064-.198-.061-.267.005-.067.036-.135.1-.202.175-.135.51-.267.99-.267h.082c-.028-.07-.05-.134-.085-.2-.18-.332-.45-.467-.936-.467-.17 0-.327.063-.47.132l-.002.002c-.063.027-.156.066-.26.135-.223.135-.603.465-.928.735-.325.267-.71.534-1.123.666-.125.04-.258.063-.388.067l-.022.001v.065c0 .266-.06.468-.26.666-.185.2-.433.334-.712.4h.068-.068c.226 0 .385-.066.534-.132l.003-.002c.068-.028.13-.067.2-.1.066-.032.13-.067.195-.102.098-.05.163-.067.26-.097.36-.111.574-.398.713-.665.136-.267.206-.536.275-.668.058-.1.09-.166.15-.198.08-.029.17-.026.262.003l-.008-.01c.02.066.03.132.03.2 0 .264-.12.6-.29.867-.036.064-.07.13-.109.195-.038.068-.074.134-.11.2-.064.134-.108.267-.133.4-.026.134-.021.266.043.332.12.135.24.133.357.067z"/></svg>Linux</span>
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0L1.5 6v12L12 24l10.5-6V6L12 0zm0 2.4l7.5 4.32v8.55L12 19.6l-7.5-4.33V6.72L12 2.4z"/></svg>NetBSD</span>
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Solaris</span>
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>SunOS</span>
+                <span><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 8l-8-4.5L4 8v8l8 4.5 8-4.5V8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 3.5v8.5" stroke="currentColor" stroke-width="2"/><path d="M12 12l7-4" stroke="currentColor" stroke-width="2"/><path d="M12 12l-7-4" stroke="currentColor" stroke-width="2"/></svg>IRIX</span>
+            </div>
+            <img src="EditScreen.png" alt="Cmacs Editor" class="hero-image">
             <div class="cta-buttons">
                 <a href="https://github.com/toddvernon/cm" class="btn btn-primary">View on GitHub</a>
                 <a href="https://github.com/toddvernon/cm#getting-started" class="btn btn-secondary">Get Started</a>
@@ -286,7 +522,7 @@
 
     <section class="features">
         <div class="container">
-            <h2>Why CMacs?</h2>
+            <h2>Why Cmacs?</h2>
             <div class="feature-grid">
                 <div class="feature-card">
                     <h3>Always Insert Mode</h3>
@@ -316,36 +552,103 @@
         </div>
     </section>
 
-    <section class="screenshots">
+    <section class="how-it-works">
         <div class="container">
-            <h2>In Action</h2>
-            <div class="screenshot-grid">
-                <div class="screenshot-item">
-                    <img src="ProjectDialog.png" alt="Project Dialog">
-                    <p>Project and buffer management</p>
+            <h2>How It Works</h2>
+            <p class="intro">
+                Cmacs uses tab-completed commands instead of memorized shortcuts. Press ESC, type a few letters, and TAB completes. Every command is discoverable.
+            </p>
+            <div class="workflow-grid">
+                <div class="workflow-section">
+                    <h3>Tab Completion in Action</h3>
+                    <div class="tab-completion-demo">
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">f</span><span class="result"> → file-</span></div>
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">file-s</span><span class="result"> → file-save</span></div>
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">g</span><span class="result"> → goto-</span></div>
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">goto-l</span><span class="result"> → goto-line</span></div>
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">s</span><span class="result"> → search-</span></div>
+                        <div class="line"><span class="prompt">command&gt;</span> <span class="input">search-t</span><span class="result"> → search-text</span></div>
+                    </div>
+                    <p>Each category starts with a unique letter. Type one character to narrow to a category, then TAB to complete. No memorization required.</p>
                 </div>
-                <div class="screenshot-item">
-                    <img src="BuildDialog.png" alt="Build Output">
-                    <p>Integrated build with error navigation</p>
+                <div class="workflow-section">
+                    <h3>ESC Command Tree</h3>
+                    <div class="command-tree">
+                        <div class="tree-line"><span class="category">f</span> → file-</div>
+                        <div class="tree-line">    ├── <span class="cmd">file-load</span> <span class="desc">Load file</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">file-new</span> <span class="desc">New buffer</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">file-save</span> <span class="desc">Save</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">file-save-as</span> <span class="desc">Save as</span></div>
+                        <div class="tree-line">    └── <span class="cmd">file-quit</span> <span class="desc">Quit</span></div>
+                        <div class="tree-line"><span class="category">e</span> → edit-</div>
+                        <div class="tree-line">    ├── <span class="cmd">edit-mark</span> <span class="desc">Set mark</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">edit-cut</span> <span class="desc">Cut</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">edit-paste</span> <span class="desc">Paste</span></div>
+                        <div class="tree-line">    └── <span class="cmd">edit-system-paste</span> <span class="desc">System paste</span></div>
+                        <div class="tree-line"><span class="category">s</span> → search-</div>
+                        <div class="tree-line">    ├── <span class="cmd">search-text</span> <span class="desc">Find text</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">search-replace</span> <span class="desc">Replace next</span></div>
+                        <div class="tree-line">    └── <span class="cmd">search-replace-all</span> <span class="desc">Replace all</span></div>
+                        <div class="tree-line"><span class="category">g</span> → goto-</div>
+                        <div class="tree-line">    ├── <span class="cmd">goto-line</span> <span class="desc">Go to line</span></div>
+                        <div class="tree-line">    └── <span class="cmd">goto-error</span> <span class="desc">Jump to error</span></div>
+                        <div class="tree-line"><span class="category">i</span> → insert-</div>
+                        <div class="tree-line">    ├── <span class="cmd">insert-box</span> <span class="desc">Box drawing</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">insert-symbol</span> <span class="desc">Unicode symbol</span></div>
+                        <div class="tree-line">    └── <span class="cmd">insert-comment-block</span> <span class="desc">Comment block</span></div>
+                        <div class="tree-line"><span class="category">t</span> → text-</div>
+                        <div class="tree-line">    ├── <span class="cmd">text-count</span> <span class="desc">Count lines</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">text-detab</span> <span class="desc">Tabs → spaces</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">text-entab</span> <span class="desc">Spaces → tabs</span></div>
+                        <div class="tree-line">    └── <span class="cmd">text-trim-trailing</span> <span class="desc">Trim whitespace</span></div>
+                        <div class="tree-line"><span class="category">v</span> → view-</div>
+                        <div class="tree-line">    ├── <span class="cmd">view-build</span> <span class="desc">Build output</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">view-help</span> <span class="desc">Show help</span></div>
+                        <div class="tree-line">    ├── <span class="cmd">view-split</span> <span class="desc">Split screen</span></div>
+                        <div class="tree-line">    └── <span class="cmd">view-unsplit</span> <span class="desc">Unsplit</span></div>
+                        <div class="tree-line"><span class="category">p</span> → <span class="cmd">project</span> <span class="desc">Project dialog</span></div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="portability">
+    <section class="ctrl-keys">
         <div class="container">
-            <h2>Runs Everywhere</h2>
-            <p class="subtitle">
-                The same codebase compiles on your M3 Mac and on a 1993 SPARCstation.
-                No compromises on modern systems, no abandoning vintage hardware.
-            </p>
-            <div class="platforms">
-                <div class="platform">macOS</div>
-                <div class="platform">Linux</div>
-                <div class="platform">NetBSD</div>
-                <div class="platform">Solaris</div>
-                <div class="platform">IRIX 6.5</div>
-                <div class="platform">SunOS</div>
+            <h2>Quick Keys</h2>
+            <div class="ctrl-grid">
+                <div class="ctrl-item"><kbd>C-h</kbd> <span>Help</span></div>
+                <div class="ctrl-item"><kbd>C-p</kbd> <span>Project list</span></div>
+                <div class="ctrl-item"><kbd>C-n</kbd> <span>Next buffer</span></div>
+                <div class="ctrl-item"><kbd>C-s</kbd> <span>Split screen</span></div>
+                <div class="ctrl-item"><kbd>C-u</kbd> <span>Unsplit</span></div>
+                <div class="ctrl-item"><kbd>C-o</kbd> <span>Switch view</span></div>
+                <div class="ctrl-item"><kbd>C-f</kbd> <span>Find again</span></div>
+                <div class="ctrl-item"><kbd>C-r</kbd> <span>Replace again</span></div>
+                <div class="ctrl-item"><kbd>C-k</kbd> <span>Cut to EOL</span></div>
+                <div class="ctrl-item"><kbd>C-w</kbd> <span>Cut selection</span></div>
+                <div class="ctrl-item"><kbd>C-y</kbd> <span>Paste</span></div>
+                <div class="ctrl-item"><kbd>C-l</kbd> <span>Line numbers</span></div>
+                <div class="ctrl-item"><kbd>C-b</kbd> <span>Build output</span></div>
+                <div class="ctrl-item"><kbd>C-v</kbd> <span>Page down</span></div>
+                <div class="ctrl-item"><kbd>C-z</kbd> <span>Page up</span></div>
+                <div class="ctrl-item"><kbd>C-x C-s</kbd> <span>Save</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="screenshots">
+        <div class="container">
+            <h2>In Action</h2>
+            <div class="screenshot-item">
+                <h3>Project Management</h3>
+                <p>Press <kbd>C-p</kbd> to open the project dialog. Define your project once with a simple <code>.project</code> file listing source files and a build command. Jump between buffers instantly, switch projects, or kick off a build without leaving the editor. The project dialog shows all open buffers and lets you navigate your codebase with single keystrokes.</p>
+                <img src="ProjectDialog.png" alt="Project Dialog">
+            </div>
+            <div class="screenshot-item">
+                <h3>Integrated Build</h3>
+                <p>Press <kbd>C-b</kbd> to view build output. Cmacs captures compiler errors and warnings, parsing file paths and line numbers automatically. Navigate directly to errors with <code>goto-error</code>—the editor opens the file and jumps to the exact line. No more copying paths from terminal output. Build, fix, rebuild, all without leaving your editor.</p>
+                <img src="BuildDialog.png" alt="Build Output">
             </div>
         </div>
     </section>
@@ -373,10 +676,11 @@ cd ~/dev/cx/cx_apps/cm && make
     <footer>
         <div class="container">
             <p>
-                CMacs is open source under the Apache 2.0 License.<br>
+                Cmacs is open source under the Apache 2.0 License.<br>
                 <a href="https://github.com/toddvernon/cm">GitHub</a> &middot;
                 <a href="https://github.com/toddvernon/cm#key-bindings">Documentation</a> &middot;
-                <a href="https://github.com/toddvernon/cx">cx Library</a>
+                <a href="https://github.com/toddvernon/cx">cx Library</a> &middot;
+                <a href="https://github.com/toddvernon">@toddvernon</a>
             </p>
         </div>
     </footer>
