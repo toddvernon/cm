@@ -2,14 +2,21 @@
 
 Zero dependencies. Syntax highlighting. Project builds. The grown-up nano—running on macOS, Linux, and your 1993 SPARCstation or IRIX Indigo.
 
+![Main Window](assets/EditScreen.png)
+
 ## Why CMacs?
 
 If you've outgrown nano but don't want to climb the vim or emacs learning curve, CMacs sits in the middle ground. Like nano, you're always in insert mode—just open a file and start typing. But where nano stops at basic editing, CMacs adds:
 
 - **Tab-completed commands** — Press ESC and type. Don't memorize shortcuts; discover them as you type.
 - **Project files** — Define your project once, jump between source files with a keystroke, kick off builds from the editor.
+![Main Window](assets/ProjectDialog.png)
+
 - **Split screens** — View two files side by side.
 - **Syntax highlighting** — For C, C++, Python, Markdown, and more.
+- **Integrated build** - Build and Navigate to Errors
+
+![Main Window](assets/BuildDialog.png)
 
 The real story is portability. CMacs is written in C++ with zero external dependencies—no Boost, no autoconf, no cmake, no package managers pulling in half the internet. Just `make`. It builds on modern macOS and Linux, but also on SGI IRIX, Solaris, and SunOS machines from the early 1990s. That combination—C++, no dependencies, runs on 30-year-old hardware—is rare.
 
