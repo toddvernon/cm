@@ -345,10 +345,6 @@ CommandLineView::reframe(void)
 
         return;
     }
-
-    // this is a should never happen situation
-    printf("error: fell through reframe");
-    exit(0);
 }
 
 

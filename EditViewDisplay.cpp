@@ -328,16 +328,14 @@ EditView::formatEditorLine(unsigned long bufferRow )
 #ifdef CM_UTF8_SUPPORT
     CxUTFString *utfLine = editBuffer->line(bufferRow);
     if (utfLine == NULL) {
-        printf("null line in formatEditorLine\n");
-        exit(0);
+        return lineNumberString;
     }
     // Use toBytesExpanded() to expand tabs to spaces for display
     CxString fullText = utfLine->toBytesExpanded();
 #else
     CxString *textPtr = editBuffer->line(bufferRow);
     if (textPtr == NULL) {
-        printf("null line in formatEditorLine\n");
-        exit(0);
+        return lineNumberString;
     }
     CxString fullText = *textPtr;
 #endif

@@ -127,16 +127,29 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/CommandTable.o         \
 	$(APP_OBJECT_DIR)/UTFSymbols.o
 
-## MCP Support (Linux/macOS only) #############################
+## MCP Support (Linux/macOS only, developer builds) ###########
+#
+# MCP (Model Context Protocol) support for Claude Desktop integration.
+# This is experimental and disabled by default.
+#
+# To build with MCP support:
+#   make DEVELOPER=1
+#   make DEVELOPER=1 mcp_bridge
+#
+######################################################
 
-ifeq ($(UNAME_S),darwin)
-    BUILD_MCP=1
-endif
-ifeq ($(UNAME_S),linux)
-    BUILD_MCP=1
+ifdef DEVELOPER
+  ifeq ($(UNAME_S),darwin)
+      BUILD_MCP=1
+  endif
+  ifeq ($(UNAME_S),linux)
+      BUILD_MCP=1
+  endif
 endif
 
 ifdef BUILD_MCP
+    # Enable MCP code paths in source
+    CPPFLAGS += -DCM_MCP_ENABLED
     # Add MCP handler object
     OBJECTS += $(APP_OBJECT_DIR)/MCPHandler.o
 
@@ -198,6 +211,15 @@ install:
 ifeq ($(UNAME_S), darwin)
 	sudo xattr -cr /usr/local/bin/cm
 endif
+
+install-help:
+	sudo mkdir -p /usr/local/share/cm
+	sudo cp cm_help.md /usr/local/share/cm/cm_help.md
+	sudo cp cm_help.txt /usr/local/share/cm/cm_help.txt
+	sudo chmod 644 /usr/local/share/cm/cm_help.md
+	sudo chmod 644 /usr/local/share/cm/cm_help.txt
+
+install-all: install install-help
 
 
 $(APP_OBJECT_DIR)/cm: $(OBJECTS)

@@ -161,26 +161,15 @@ HelpView::findHelpFile( CxString *outPath )
 int
 HelpView::loadHelpFile( void )
 {
-    FILE *dbg = fopen("/tmp/helpview_debug.log", "a");
-    if (dbg) { fprintf(dbg, "loadHelpFile: start\n"); fflush(dbg); }
-
     CxString path;
 
     if (!findHelpFile(&path)) {
-        if (dbg) { fprintf(dbg, "loadHelpFile: findHelpFile returned FALSE\n"); fflush(dbg); fclose(dbg); }
         _helpFileLoaded = 0;
         return FALSE;
     }
 
-    if (dbg) { fprintf(dbg, "loadHelpFile: found file at '%s'\n", path.data()); fflush(dbg); }
-
     parseMarkdown(path);
-
-    if (dbg) { fprintf(dbg, "loadHelpFile: parsed %d sections\n", (int)_sections.entries()); fflush(dbg); }
-
     rebuildVisibleItems();
-
-    if (dbg) { fprintf(dbg, "loadHelpFile: rebuilt %d visible items\n", (int)_visibleItems.entries()); fflush(dbg); fclose(dbg); }
 
     _helpFileLoaded = 1;
 
@@ -406,10 +395,6 @@ HelpView::recalcScreenPlacements( void )
 void
 HelpView::redraw( void )
 {
-    FILE *dbg = fopen("/tmp/helpview_debug.log", "a");
-    if (dbg) { fprintf(dbg, "redraw: start, screenHelpNumberOfLines=%d, visibleItems=%d\n",
-               screenHelpNumberOfLines, (int)_visibleItems.entries()); fflush(dbg); }
-
     int cursorRow = 0;
 
     reframe();
@@ -417,8 +402,6 @@ HelpView::redraw( void )
     // get frame content bounds
     int contentLeft  = frame->contentLeft();
     int contentWidth = frame->contentWidth();
-
-    if (dbg) { fprintf(dbg, "redraw: contentLeft=%d, contentWidth=%d\n", contentLeft, contentWidth); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // set frame colors and draw the frame with title and footer
@@ -613,8 +596,6 @@ HelpView::redraw( void )
 
     screen->placeCursor(cursorRow, contentLeft);
     screen->resetColors();
-
-    if (dbg) { fprintf(dbg, "redraw: done, flushing screen\n"); fflush(dbg); fclose(dbg); }
 
     screen->flush();
 }

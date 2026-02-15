@@ -45,17 +45,11 @@ static const char *STATUS_FILL = "=";
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 {
-    // DEBUG: open log file for startup diagnostics (commented out)
-    // FILE *dbg = fopen("/tmp/cm_debug.log", "w");
-    // if (dbg) { fprintf(dbg, "1: constructor start\n"); fflush(dbg); }
-
     // Block SIGWINCH during construction to prevent callbacks on partially-constructed objects
     sigset_t blockSet, oldSet;
     sigemptyset(&blockSet);
     sigaddset(&blockSet, SIGWINCH);
     sigprocmask(SIG_BLOCK, &blockSet, &oldSet);
-
-    // if (dbg) { fprintf(dbg, "2: signals blocked\n"); fflush(dbg); }
 
     // initialize command input state FIRST to ensure it's IDLE during all initialization
     _cmdInputState = CMD_INPUT_IDLE;
@@ -85,20 +79,17 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _splitMode = 0;     // single view mode
     _splitRow = 0;      // no split
     _activeView = 0;    // top/only view is active
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
     _mcpHandler = NULL;
 #endif
 
     programMode = ScreenEditor::EDIT;
-
-    // if (dbg) { fprintf(dbg, "3: pointers initialized\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // load the default setting file - check current directory first, then home directory
     //
     //---------------------------------------------------------------------------------------------
     programDefaults = new ProgramDefaults();
-    // if (dbg) { fprintf(dbg, "4: ProgramDefaults created\n"); fflush(dbg); }
 
     CxString configPath = ".cmrc";
     CxFile testFile;
@@ -137,10 +128,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     _currentCommand = NULL;
     initCommandCompleters();
 
-    // if (dbg) { fprintf(dbg, "5: command completers created\n"); fflush(dbg); }
-
     editBufferList = new CmEditBufferList();
-    // if (dbg) { fprintf(dbg, "6: editBufferList created\n"); fflush(dbg); }
     
     //---------------------------------------------------------------------------------------------
     // create a screen object
@@ -153,8 +141,6 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //
     //------------------------------------------------------------------------------
     keyboard = key;
-    
-    // if (dbg) { fprintf(dbg, "7: about to create CommandLineView\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // make a command line view where prompts and messages appear
@@ -168,15 +154,9 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
                                           1,
                                           screen->cols()-1);
 
-    // if (dbg) { fprintf(dbg, "8: CommandLineView created\n"); fflush(dbg); }
-
     commandLineView->setPrompt("");
 
-
-
     screen->clearScreen();
-
-    // if (dbg) { fprintf(dbg, "9: screen cleared\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // make an edit window where the editing happens
@@ -184,14 +164,11 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //---------------------------------------------------------------------------------------------
     editView = new EditView( programDefaults, screen );
 
-    // if (dbg) { fprintf(dbg, "10: EditView created\n"); fflush(dbg); }
-
     //---------------------------------------------------------------------------------------------
     // create a project object (regardless if there is a project)
     //
     //---------------------------------------------------------------------------------------------
     project = new Project();
-    // if (dbg) { fprintf(dbg, "11: Project created\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // Check to see if we are loading a project, if the filename ends in .project then its a
@@ -235,18 +212,12 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
  
     } else {
 
-        // if (dbg) { fprintf(dbg, "12: about to loadNewFile\n"); fflush(dbg); }
-
         //-----------------------------------------------------------------------------------------
         // not a project file so just load the referenced file
         //
         //-----------------------------------------------------------------------------------------
         loadNewFile( filePath, TRUE );
-
-        // if (dbg) { fprintf(dbg, "13: loadNewFile complete\n"); fflush(dbg); }
     }
-
-    // if (dbg) { fprintf(dbg, "14: about to create ProjectView\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create a file list view for the project
@@ -259,18 +230,12 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
                                     screen
                                     );
 
-    // if (dbg) { fprintf(dbg, "15: ProjectView created\n"); fflush(dbg); }
-
     //---------------------------------------------------------------------------------------------
     // create a help view for editor help
     //
     //---------------------------------------------------------------------------------------------
 
   	helpView = new HelpView(programDefaults, screen);
-
-    // if (dbg) { fprintf(dbg, "16: HelpView created\n"); fflush(dbg); }
-
-    // if (dbg) { fprintf(dbg, "17: help text loaded\n"); fflush(dbg); }
 
     //---------------------------------------------------------------------------------------------
     // create the build output system
@@ -286,19 +251,10 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     // update the screen and place the cursor
     //
     //---------------------------------------------------------------------------------------------
-    // if (dbg) { fprintf(dbg, "17a: editView ptr = %p\n", (void*)editView); fflush(dbg); }
-    // if (dbg) { fprintf(dbg, "17b: about to call editView->updateScreen()\n"); fflush(dbg); }
-
 	editView->updateScreen();
-
-    // if (dbg) { fprintf(dbg, "18: editView->updateScreen complete\n"); fflush(dbg); }
-
     editView->placeCursor();
 
-    // if (dbg) { fprintf(dbg, "19: editView->placeCursor complete\n"); fflush(dbg); }
-
-#if 0 // MCP disabled for debugging
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
     //---------------------------------------------------------------------------------------------
     // Start MCP handler thread for Claude Desktop integration
     //
@@ -308,7 +264,6 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // Register idle callback to check for MCP screen updates (~100ms intervals)
     keyboard->addIdleCallback( CxDeferCall( this, &ScreenEditor::mcpIdleCallback ));
-#endif
 #endif
 
     //---------------------------------------------------------------------------------------------
@@ -320,8 +275,6 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // Unblock SIGWINCH now that construction is complete
     sigprocmask(SIG_SETMASK, &oldSet, NULL);
-
-    // if (dbg) { fprintf(dbg, "20: constructor complete, signals unblocked\n"); fclose(dbg); }
 }
 
 
@@ -388,7 +341,7 @@ ScreenEditor::initCommandCompleters( void )
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::~ScreenEditor(void)
 {
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
     // Shutdown MCP handler thread
     if (_mcpHandler != NULL) {
         _mcpHandler->shutdown();
@@ -408,7 +361,7 @@ ScreenEditor::~ScreenEditor(void)
 }
 
 
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::mcpIdleCallback
 //
@@ -829,21 +782,12 @@ ScreenEditor::showProjectView(void)
 void
 ScreenEditor::showHelpView(void)
 {
-    FILE *dbg = fopen("/tmp/helpview_debug.log", "a");
-    if (dbg) { fprintf(dbg, "showHelpView: start\n"); fflush(dbg); }
-
     screen->flush();
     screen->hideCursor();
     helpView->setVisible(1);
     helpView->rebuildVisibleItems();
     helpView->recalcScreenPlacements();
-
-    if (dbg) { fprintf(dbg, "showHelpView: about to redraw\n"); fflush(dbg); }
-
     helpView->redraw();
-
-    if (dbg) { fprintf(dbg, "showHelpView: redraw done, setting mode to HELPVIEW\n"); fflush(dbg); fclose(dbg); }
-
     programMode = HELPVIEW;
 }
 
@@ -1152,8 +1096,7 @@ ScreenEditor::run(void)
         //-----------------------------------------------------------------------------------------
         CxKeyAction keyAction = keyboard->getAction();
 
-#if 0 // MCP disabled for debugging
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
         //-----------------------------------------------------------------------------------------
         // check if MCP handler modified buffers and needs a redraw
         //-----------------------------------------------------------------------------------------
@@ -1163,7 +1106,6 @@ ScreenEditor::run(void)
             activeEditView()->placeCursor();
             screen->flush();
         }
-#endif
 #endif
 
         //-----------------------------------------------------------------------------------------

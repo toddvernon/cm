@@ -39,7 +39,7 @@
 #include <cx/buildoutput/buildoutput.h>
 #include "BuildView.h"
 
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
 #include "MCPHandler.h"
 #endif
 
@@ -270,7 +270,7 @@ private:
     // resize callback - coordinates all redrawing based on programMode
     void screenResizeCallback(void);
 
-#if defined(_LINUX_) || defined(_OSX_)
+#ifdef CM_MCP_ENABLED
     MCPHandler *_mcpHandler;        // MCP socket handler thread
     void mcpIdleCallback();         // Called during keyboard idle to check for MCP updates
 #endif

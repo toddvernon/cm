@@ -63,8 +63,6 @@ ScreenEditor::ControlCmd ScreenEditor::_ctrlXCommands[] = {
 int
 ScreenEditor::loadNewFile( CxString filePath, int preload )
 {
-    //printf("loading %s\n", filePath.data());
-
     filePath = filePath.stripLeading(" \t\r\n");
     filePath = filePath.stripTrailing(" \t\r\n");
 

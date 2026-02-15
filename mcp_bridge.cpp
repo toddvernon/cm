@@ -50,22 +50,26 @@ static int g_nextRequestId = 1;
 static FILE* g_debugLog = NULL;
 
 //-------------------------------------------------------------------------
-// Debug log file
+// Debug log file - disabled by default, enable with CM_DEBUG_MCP
 //-------------------------------------------------------------------------
 static void openDebugLog() {
+#ifdef CM_DEBUG_MCP
     g_debugLog = fopen("/tmp/mcp_bridge.log", "a");
     if (g_debugLog) {
         fprintf(g_debugLog, "\n========== mcp_bridge started ==========\n");
         fflush(g_debugLog);
     }
+#endif
 }
 
 static void closeDebugLog() {
+#ifdef CM_DEBUG_MCP
     if (g_debugLog) {
         fprintf(g_debugLog, "========== mcp_bridge exiting ==========\n");
         fclose(g_debugLog);
         g_debugLog = NULL;
     }
+#endif
 }
 
 //-------------------------------------------------------------------------
