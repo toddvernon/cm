@@ -262,7 +262,7 @@ $(APP_OBJECT_DIR)/ScreenEditorCommands.o : ScreenEditorCommands.cpp
 $(APP_OBJECT_DIR)/ScreenEditorCore.o : ScreenEditorCore.cpp
 $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/ProjectView.o	: ProjectView.cpp
-$(APP_OBJECT_DIR)/HelpView.o	: HelpView.cpp
+$(APP_OBJECT_DIR)/HelpView.o	: HelpView.cpp CmVersion.h
 $(APP_OBJECT_DIR)/BuildView.o		: BuildView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
 $(APP_OBJECT_DIR)/MarkUpColorizers.o: MarkUpColorizers.cpp
@@ -279,7 +279,7 @@ endif
 
 
 $(OBJECTS):
-	$(CPP) $(CPPFLAGS) $(INC) -c $? -o $@
+	$(CPP) $(CPPFLAGS) $(INC) -c $< -o $@
 
 
 ########################################################################################
