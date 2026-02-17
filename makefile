@@ -119,13 +119,15 @@ OBJECTS = \
 	$(APP_OBJECT_DIR)/ProgramDefaults.o		 \
 	$(APP_OBJECT_DIR)/Project.o				 \
 	$(APP_OBJECT_DIR)/ProjectView.o		 \
-	$(APP_OBJECT_DIR)/HelpView.o		 \
 	$(APP_OBJECT_DIR)/BuildView.o            \
 	$(APP_OBJECT_DIR)/MarkUp.o               \
 	$(APP_OBJECT_DIR)/MarkUpColorizers.o     \
 	$(APP_OBJECT_DIR)/MarkUpParsing.o        \
 	$(APP_OBJECT_DIR)/CommandTable.o         \
 	$(APP_OBJECT_DIR)/UTFSymbols.o
+
+# HelpView depends on CmVersion.h and has its own build rule
+ALL_OBJECTS = $(OBJECTS) $(APP_OBJECT_DIR)/HelpView.o
 
 ## MCP Support (Linux/macOS only, developer builds) ###########
 #
@@ -242,8 +244,8 @@ endif
 install-all: install install-help
 
 
-$(APP_OBJECT_DIR)/cm: $(OBJECTS)
-	$(CPP) -v $(CPPFLAGS) $(INC) $(OBJECTS) -o $(APP_OBJECT_DIR)/cm $(ALL_LIBS)
+$(APP_OBJECT_DIR)/cm: $(ALL_OBJECTS)
+	$(CPP) -v $(CPPFLAGS) $(INC) $(ALL_OBJECTS) -o $(APP_OBJECT_DIR)/cm $(ALL_LIBS)
 ifeq ($(UNAME_S), darwin)
 	xattr -cr $(APP_OBJECT_DIR)/cm
 endif
@@ -263,6 +265,7 @@ $(APP_OBJECT_DIR)/ScreenEditorCore.o : ScreenEditorCore.cpp
 $(APP_OBJECT_DIR)/Project.o			: Project.cpp
 $(APP_OBJECT_DIR)/ProjectView.o	: ProjectView.cpp
 $(APP_OBJECT_DIR)/HelpView.o	: HelpView.cpp CmVersion.h
+	$(CPP) $(CPPFLAGS) $(INC) -c HelpView.cpp -o $@
 $(APP_OBJECT_DIR)/BuildView.o		: BuildView.cpp
 $(APP_OBJECT_DIR)/MarkUp.o			: MarkUp.cpp
 $(APP_OBJECT_DIR)/MarkUpColorizers.o: MarkUpColorizers.cpp
@@ -279,7 +282,7 @@ endif
 
 
 $(OBJECTS):
-	$(CPP) $(CPPFLAGS) $(INC) -c $< -o $@
+	$(CPP) $(CPPFLAGS) $(INC) -c $? -o $@
 
 
 ########################################################################################
