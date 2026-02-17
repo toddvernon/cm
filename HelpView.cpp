@@ -46,6 +46,7 @@ HelpView::HelpView( ProgramDefaults *pd, CxScreen *screenPtr )
     // initially not visible
     _visible = 0;
     _helpFileLoaded = 0;
+    _cachedContentWidth = 0;
 
     // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
@@ -268,6 +269,7 @@ HelpView::parseMarkdown( CxString filePath )
 //
 // Rebuild the flat list of visible items from the section structure.
 // Called on construction and whenever expand/collapse state changes.
+// Pre-computes formatted text for each item to avoid per-redraw computation.
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -276,6 +278,7 @@ HelpView::rebuildVisibleItems( void )
     _visibleItems.clearAndDelete();
 
     int sectionCount = (int)_sections.entries();
+    int contentWidth = _cachedContentWidth;
 
     for (int s = 0; s < sectionCount; s++) {
         HelpSection *sec = _sections.at(s);
@@ -285,6 +288,34 @@ HelpView::rebuildVisibleItems( void )
         secItem->type = HELPITEM_SECTION;
         secItem->sectionIndex = s;
         secItem->lineIndex = -1;
+
+        // pre-compute formatted text for section header
+        if (contentWidth > 0) {
+            CxString prefix = " ";
+            if (sec->isExpanded) {
+                prefix += EXPAND_INDICATOR;
+            } else {
+                prefix += COLLAPSE_INDICATOR;
+            }
+            prefix += " ";
+            int prefixDisplayWidth = 3;
+            int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+            CxString text = sec->title;
+            if ((int)text.length() > textAreaLen) {
+                text = text.subString(0, textAreaLen - 3);
+                text += "...";
+            }
+            int padNeeded = textAreaLen - (int)text.length();
+            if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                text += _paddingSpaces.subString(0, padNeeded);
+            }
+
+            secItem->formattedText = prefix;
+            secItem->formattedText += text;
+            secItem->formattedText += " ";
+        }
+
         _visibleItems.append(secItem);
 
         // if expanded, add content lines
@@ -300,6 +331,65 @@ HelpView::rebuildVisibleItems( void )
                 }
                 lineItem->sectionIndex = s;
                 lineItem->lineIndex = ln;
+
+                // pre-compute formatted text
+                if (contentWidth > 0) {
+                    if (lineItem->type == HELPITEM_BLANK) {
+                        // blank line - use pre-built empty line
+                        lineItem->formattedText = _emptyLine.subString(0, contentWidth - 1);
+                        lineItem->formattedText += " ";
+                    } else {
+                        // content line
+                        CxString prefix = "   ";
+                        int prefixDisplayWidth = 3;
+                        int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+                        CxString text = *lineText;
+
+#if defined(_LINUX_) || defined(_OSX_)
+                        // UTF-8 aware truncation and padding
+                        CxUTFString utfText;
+                        utfText.fromCxString(text, 1);
+                        int displayWidth = utfText.displayWidth();
+
+                        if (displayWidth > textAreaLen) {
+                            int targetCols = textAreaLen - 3;
+                            int cols = 0;
+                            int bytePos = 0;
+                            for (int ci = 0; ci < utfText.charCount(); ci++) {
+                                const CxUTFCharacter *ch = utfText.at(ci);
+                                int w = ch->displayWidth();
+                                if (cols + w > targetCols) break;
+                                cols += w;
+                                bytePos += ch->isTab() ? 1 : ch->byteCount();
+                            }
+                            text = text.subString(0, bytePos);
+                            text += "...";
+                            displayWidth = cols + 3;
+                        }
+
+                        int padNeeded = textAreaLen - displayWidth;
+                        if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                            text += _paddingSpaces.subString(0, padNeeded);
+                        }
+#else
+                        // simple byte-based truncation and padding
+                        if ((int)text.length() > textAreaLen) {
+                            text = text.subString(0, textAreaLen - 3);
+                            text += "...";
+                        }
+                        int padNeeded = textAreaLen - (int)text.length();
+                        if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                            text += _paddingSpaces.subString(0, padNeeded);
+                        }
+#endif
+
+                        lineItem->formattedText = prefix;
+                        lineItem->formattedText += text;
+                        lineItem->formattedText += " ";
+                    }
+                }
+
                 _visibleItems.append(lineItem);
             }
         } else {
@@ -309,6 +399,12 @@ HelpView::rebuildVisibleItems( void )
                 blankItem->type = HELPITEM_BLANK;
                 blankItem->sectionIndex = -1;
                 blankItem->lineIndex = -1;
+
+                if (contentWidth > 0) {
+                    blankItem->formattedText = _emptyLine.subString(0, contentWidth - 1);
+                    blankItem->formattedText += " ";
+                }
+
                 _visibleItems.append(blankItem);
             }
         }
@@ -383,6 +479,39 @@ HelpView::recalcScreenPlacements( void )
     if (selectedListItemIndex >= totalItems && totalItems > 0) {
         selectedListItemIndex = 0;
     }
+
+    // build pre-computed strings for efficient redraw
+    int contentWidth = frame->contentWidth();
+    if (contentWidth != _cachedContentWidth) {
+        _cachedContentWidth = contentWidth;
+
+        // build padding string (enough spaces to pad any line)
+        _paddingSpaces = "";
+        for (int i = 0; i < contentWidth + 10; i++) {
+            _paddingSpaces += " ";
+        }
+
+        // build separator line
+        _separatorLine = "";
+#if defined(_LINUX_) || defined(_OSX_)
+        for (int i = 0; i < contentWidth; i++) {
+            _separatorLine += "\xe2\x94\x80";  // ─ (U+2500)
+        }
+#else
+        for (int i = 0; i < contentWidth; i++) {
+            _separatorLine += "-";
+        }
+#endif
+
+        // build empty line
+        _emptyLine = "";
+        for (int i = 0; i < contentWidth; i++) {
+            _emptyLine += " ";
+        }
+
+        // rebuild visible items to recompute formatted text with new width
+        rebuildVisibleItems();
+    }
 }
 
 
@@ -417,7 +546,7 @@ HelpView::redraw( void )
     frame->drawWithTitleAndFooter(title, footer);
 
     //---------------------------------------------------------------------------------------------
-    // draw the visible items
+    // draw the visible items (using pre-computed formattedText)
     //---------------------------------------------------------------------------------------------
     for (int c = 0; c < screenHelpNumberOfLines; c++) {
 
@@ -434,123 +563,10 @@ HelpView::redraw( void )
             HelpViewItem *item = _visibleItems.at(logicalItem);
 
             //-------------------------------------------------------------------------------------
-            // build the display text based on item type
-            //-------------------------------------------------------------------------------------
-            CxString prefix;
-            int prefixDisplayWidth = 0;
-            CxString text;
-            int textExtraBytes = 0;  // bytes beyond display columns for multi-byte chars
-
-            switch (item->type) {
-
-                case HELPITEM_SECTION:
-                {
-                    HelpSection *sec = _sections.at(item->sectionIndex);
-                    prefix = " ";
-                    if (sec->isExpanded) {
-                        prefix += EXPAND_INDICATOR;
-                    } else {
-                        prefix += COLLAPSE_INDICATOR;
-                    }
-                    prefix += " ";
-                    prefixDisplayWidth = 3;
-                    // Note: UTF-8 indicator is in prefix, not text, so textExtraBytes stays 0
-                    text = sec->title;
-                }
-                break;
-
-                case HELPITEM_LINE:
-                {
-                    HelpSection *sec = _sections.at(item->sectionIndex);
-                    prefix = "   ";
-                    prefixDisplayWidth = 3;
-                    text = *(sec->lines.at(item->lineIndex));
-                }
-                break;
-
-                case HELPITEM_BLANK:
-                {
-                    prefix = "";
-                    prefixDisplayWidth = 0;
-                    text = "";
-                }
-                break;
-
-                case HELPITEM_SEPARATOR:
-                {
-                    prefix = "";
-                    prefixDisplayWidth = 0;
-                    text = "";
-#if defined(_LINUX_) || defined(_OSX_)
-                    for (int i = 0; i < contentWidth; i++) {
-                        text += "\xe2\x94\x80";  // ─ (U+2500)
-                    }
-#else
-                    for (int i = 0; i < contentWidth; i++) {
-                        text += "-";
-                    }
-#endif
-                }
-                break;
-            }
-
-            //-------------------------------------------------------------------------------------
-            // compute layout
-            //-------------------------------------------------------------------------------------
-            int textAreaLen = contentWidth - prefixDisplayWidth - 1;
-
-            // for separator, skip normal text layout; blank lines just pad with spaces
-            if (item->type == HELPITEM_BLANK) {
-                // fill blank line with spaces for proper selection highlighting
-                for (int i = 0; i < contentWidth - 1; i++) {
-                    text += " ";
-                }
-            } else if (item->type != HELPITEM_SEPARATOR) {
-#if defined(_LINUX_) || defined(_OSX_)
-                // UTF-8 aware: use display width for layout, not byte length
-                CxUTFString utfText;
-                utfText.fromCxString(text, 1);
-                int displayWidth = utfText.displayWidth();
-
-                if (displayWidth > textAreaLen) {
-                    // truncate to textAreaLen - 3 display columns, then add "..."
-                    int targetCols = textAreaLen - 3;
-                    int cols = 0;
-                    int bytePos = 0;
-                    for (int ci = 0; ci < utfText.charCount(); ci++) {
-                        const CxUTFCharacter *ch = utfText.at(ci);
-                        int w = ch->displayWidth();
-                        if (cols + w > targetCols) break;
-                        cols += w;
-                        bytePos += ch->isTab() ? 1 : ch->byteCount();
-                    }
-                    text = text.subString(0, bytePos);
-                    text += "...";
-                    displayWidth = cols + 3;
-                }
-
-                while (displayWidth < textAreaLen) {
-                    text += " ";
-                    displayWidth++;
-                }
-#else
-                if ((int)text.length() - textExtraBytes > textAreaLen) {
-                    text = text.subString(0, textAreaLen - 3 + textExtraBytes);
-                    text += "...";
-                }
-
-                while ((int)text.length() < textAreaLen + textExtraBytes) {
-                    text += " ";
-                }
-#endif
-            }
-
-            //-------------------------------------------------------------------------------------
             // draw with selection highlight or normal colors
             //-------------------------------------------------------------------------------------
             int isSelected = (selectedListItemIndex == logicalItem);
             int isSeparator = (item->type == HELPITEM_SEPARATOR);
-            int isBlank = (item->type == HELPITEM_BLANK);
             int isSection = (item->type == HELPITEM_SECTION);
 
             if (isSelected && !isSeparator) {
@@ -565,13 +581,12 @@ HelpView::redraw( void )
                 screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
             }
 
-            // draw the line
-            CxString line = prefix;
-            line += text;
-            if (!isSeparator) {
-                line += " ";
+            // draw the pre-computed line (or separator)
+            if (isSeparator) {
+                screen->writeText(_separatorLine);
+            } else {
+                screen->writeText(item->formattedText);
             }
-            screen->writeText(line);
 
             screen->resetColors();
 
@@ -585,11 +600,7 @@ HelpView::redraw( void )
         } else {
             screen->setForegroundColor(programDefaults->modalContentTextColor());
             screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-            CxString emptyLine;
-            for (int i = 0; i < contentWidth; i++) {
-                emptyLine += " ";
-            }
-            screen->writeText(emptyLine);
+            screen->writeText(_emptyLine);
             screen->resetColors();
         }
     }
@@ -597,7 +608,81 @@ HelpView::redraw( void )
     screen->placeCursor(cursorRow, contentLeft);
     screen->resetColors();
 
+    // cache the footer for change detection
+    _lastFooter = footer;
+
     screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// HelpView::redrawLine
+//
+// Redraw a single content line at the given logical index.
+// Used for incremental selection updates.
+//
+//-------------------------------------------------------------------------------------------------
+void
+HelpView::redrawLine( int logicalIndex, int isSelected )
+{
+    // check bounds
+    if (logicalIndex < firstVisibleListIndex ||
+        logicalIndex >= firstVisibleListIndex + screenHelpNumberOfLines) {
+        return;  // not visible
+    }
+
+    int contentLeft = frame->contentLeft();
+    int row = screenHelpFirstListLine + (logicalIndex - firstVisibleListIndex);
+
+    screen->placeCursor(row, contentLeft);
+
+    if (logicalIndex < (int)_visibleItems.entries()) {
+        HelpViewItem *item = _visibleItems.at(logicalIndex);
+        int isSeparator = (item->type == HELPITEM_SEPARATOR);
+        int isSection = (item->type == HELPITEM_SECTION);
+
+        if (isSelected && !isSeparator) {
+            screen->setForegroundColor(programDefaults->statusBarTextColor());
+            screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+        } else if (isSection) {
+            screen->setForegroundColor(programDefaults->keywordTextColor(14));
+            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+        } else {
+            screen->setForegroundColor(programDefaults->modalContentTextColor());
+            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+        }
+
+        if (isSeparator) {
+            screen->writeText(_separatorLine);
+        } else {
+            screen->writeText(item->formattedText);
+        }
+
+        screen->resetColors();
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// HelpView::redrawFooter
+//
+// Redraw just the footer line if it changed.
+//
+//-------------------------------------------------------------------------------------------------
+void
+HelpView::redrawFooter( void )
+{
+    CxString footer = getContextFooter();
+    if (footer == _lastFooter) {
+        return;  // no change
+    }
+
+    _lastFooter = footer;
+
+    // redraw just the footer using frame method
+    frame->setFrameColor(programDefaults->statusBarTextColor(),
+                         programDefaults->statusBarBackgroundColor());
+    frame->drawFooter(footer);
 }
 
 
@@ -701,11 +786,8 @@ HelpView::routeKeyAction( CxKeyAction keyAction )
     {
         case CxKeyAction::CURSOR:
         {
-            if (handleArrows(keyAction)) {
-                redraw();
-            }
-
-            screen->flush();
+            // handleArrows() does its own incremental redraw
+            handleArrows(keyAction);
         }
         break;
 
@@ -763,6 +845,7 @@ HelpView::reframe( void )
 //
 // Move selection up/down through the visible items list.
 // Skips non-selectable items (SEPARATOR, BLANK).
+// Does incremental redraw - only redraws changed lines.
 //
 //-------------------------------------------------------------------------------------------------
 int
@@ -785,6 +868,24 @@ HelpView::handleArrows( CxKeyAction keyAction )
         // if we ran off the end, stay put
         if (selectedListItemIndex >= totalItems) {
             selectedListItemIndex = prevIndex;
+            return(false);  // no change
+        }
+
+        // check if scroll needed
+        if (reframe()) {
+            // scroll happened - need full content redraw
+            redraw();
+        } else {
+            // no scroll - incremental redraw of just 2 lines + footer
+            redrawLine(prevIndex, 0);      // old line, not selected
+            redrawLine(selectedListItemIndex, 1);  // new line, selected
+            redrawFooter();
+
+            // position cursor on selected line
+            int contentLeft = frame->contentLeft();
+            int row = screenHelpFirstListLine + (selectedListItemIndex - firstVisibleListIndex);
+            screen->placeCursor(row, contentLeft);
+            screen->flush();
         }
 
         return(true);
@@ -804,6 +905,24 @@ HelpView::handleArrows( CxKeyAction keyAction )
         // if we ran past the top, stay put
         if (selectedListItemIndex < 0) {
             selectedListItemIndex = prevIndex;
+            return(false);  // no change
+        }
+
+        // check if scroll needed
+        if (reframe()) {
+            // scroll happened - need full content redraw
+            redraw();
+        } else {
+            // no scroll - incremental redraw of just 2 lines + footer
+            redrawLine(prevIndex, 0);      // old line, not selected
+            redrawLine(selectedListItemIndex, 1);  // new line, selected
+            redrawFooter();
+
+            // position cursor on selected line
+            int contentLeft = frame->contentLeft();
+            int row = screenHelpFirstListLine + (selectedListItemIndex - firstVisibleListIndex);
+            screen->placeCursor(row, contentLeft);
+            screen->flush();
         }
 
         return(true);

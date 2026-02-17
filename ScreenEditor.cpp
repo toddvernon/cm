@@ -182,31 +182,33 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     }
 
     if ( isProjectFile ) {
-        
-        CxString firstFilePath = filePath;
-    
+
         //-----------------------------------------------------------------------------------------
         // file is a project definition, so load the project, and load the project file into
-        // a buffer.
+        // a buffer. We only create buffers for files that are actually opened - the project
+        // file itself and the first source file. All other files remain as paths in the
+        // Project until the user opens them. This eliminates O(N²) findPath() overhead at
+        // startup and avoids creating N unnecessary CmEditBuffer objects.
         //-----------------------------------------------------------------------------------------
+        setMessage("(reading project...)");
+        commandLineView->updateScreen();
+        screen->flush();
+
         project->load( filePath );
         loadNewFile( filePath, TRUE );
 
         int numberOfFiles = project->numberOfFiles();
-        for (int c=0; c<numberOfFiles; c++) {
-            CxString nextFile = project->fileAt( c );
-            loadNewFile( nextFile, FALSE );
-			if ( c == 0) {
-				firstFilePath = nextFile;
-			}
+
+        // load the first project file into memory (if any)
+        if (numberOfFiles > 0) {
+            CxString firstFilePath = project->fileAt(0);
+            loadNewFile( firstFilePath, TRUE );
         }
-        
+
         char buffer[200];
-        sprintf(buffer, "(%d project files loaded from project %s)",
+        sprintf(buffer, "(%d project files available from project %s)",
                 numberOfFiles,
                 project->projectName().data() );
-        
-        loadNewFile( firstFilePath, TRUE );
 
         setMessage( buffer );
  
@@ -1385,6 +1387,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                         }
                     }
                 }
+                projectView->rebuildVisibleItems();  // refresh cached state after save
                 projectView->redraw();
             }
 
@@ -1405,6 +1408,7 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                 } else {
                     setMessage("(No modified files to save)");
                 }
+                projectView->rebuildVisibleItems();  // refresh cached state after save
                 projectView->redraw();
             }
 
@@ -2317,8 +2321,8 @@ ScreenEditor::executeCurrentCommand( void )
         return;
     }
 
-    // check if handler exists
-    if (_currentCommand->handler == NULL) {
+    // check if handler exists (use 0 instead of NULL for member pointer comparison)
+    if (_currentCommand->handler == 0) {
         setMessage( "(command not implemented)" );
         resetCommandInputState();
         exitCommandLineMode();

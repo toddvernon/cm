@@ -62,6 +62,10 @@ struct ProjectViewItem {
     int subprojectIndex;     // -1 for ALL, 0+ for subprojects/files
     int fileIndex;           // -1 for ALL and headers, 0+ for files
     int bufferIndex;         // index into editBufferList (-1 if N/A)
+    int isModified;          // cached: buffer has unsaved changes
+    int isInMemory;          // cached: buffer is loaded in memory
+    int hasModifiedFile;     // cached: subproject has modified files (for headers)
+    CxString formattedText;  // pre-computed display text (with padding)
 };
 
 
@@ -123,6 +127,12 @@ class ProjectView
     int reframe( void );
     // make sure selection is visible in list
 
+    void redrawLine( int logicalIndex, int isSelected );
+    // redraw a single content line
+
+    void redrawFooter( void );
+    // redraw just the footer
+
     CmEditBufferList *editBufferList;
     // pointer to the list of files being edited (for buffer status checks)
 
@@ -158,6 +168,14 @@ class ProjectView
     int _visible;  // whether modal is currently displayed
 
     int _otherFilesExpanded;  // expand/collapse state for "Other Files" section
+
+    // pre-built strings for efficient redraw (built in recalcScreenPlacements)
+    CxString _paddingSpaces;   // spaces for padding lines
+    CxString _separatorLine;   // pre-built separator line
+    CxString _emptyLine;       // pre-built empty line
+    int _cachedContentWidth;   // content width when strings were built
+
+    CxString _lastFooter;      // cached footer for change detection
 
 };
 

@@ -1,8 +1,8 @@
-# CMacs Help
+# cmacs Help
 
 ## Overview
-CMacs is a uEmacs-inspired terminal text editor written in C++.
-Unlike vim, CMacs is always in insert mode - just start typing.
+cmacs is a uEmacs-inspired terminal text editor written in C++.
+Unlike vim, cmacs is always in insert mode - just start typing.
 Use ESC to enter command mode, Ctrl keys for quick actions.
 
   ┌─────────┬─────────────────────┬──────────────────────────────┬────────────────────────────────────────────┐

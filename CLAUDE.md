@@ -1,7 +1,7 @@
-# CMacs Project Instructions
+# cmacs Project Instructions
 
 ## Overview
-CMacs is a uEmacs-like terminal text editor written in C++.
+cmacs is a uEmacs-like terminal text editor written in C++.
 
 ## Naming Conventions
 When the user refers to:
@@ -26,6 +26,13 @@ When the user refers to:
 ```bash
 make
 ```
+
+## Creating Archives
+Always use the make target to create distribution archives - never run tar manually:
+```bash
+make archive    # creates ../../ARCHIVE/cxapps_unix.tar
+```
+The make target excludes build outputs and other cruft that should not be distributed.
 
 ## Project Structure
 - `Cm.cpp` - main entry point

@@ -206,18 +206,38 @@ clean:
 	$(APP_OBJECT_DIR)/*.a
 
 install:
+ifeq ($(UNAME_S), linux)
 	sudo cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
 	sudo chmod 755 /usr/local/bin/cm
-ifeq ($(UNAME_S), darwin)
+else ifeq ($(UNAME_S), darwin)
+	sudo cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
+	sudo chmod 755 /usr/local/bin/cm
 	sudo xattr -cr /usr/local/bin/cm
+else
+	cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
+	chmod 755 /usr/local/bin/cm
 endif
 
 install-help:
+ifeq ($(UNAME_S), linux)
 	sudo mkdir -p /usr/local/share/cm
 	sudo cp cm_help.md /usr/local/share/cm/cm_help.md
 	sudo cp cm_help.txt /usr/local/share/cm/cm_help.txt
 	sudo chmod 644 /usr/local/share/cm/cm_help.md
 	sudo chmod 644 /usr/local/share/cm/cm_help.txt
+else ifeq ($(UNAME_S), darwin)
+	sudo mkdir -p /usr/local/share/cm
+	sudo cp cm_help.md /usr/local/share/cm/cm_help.md
+	sudo cp cm_help.txt /usr/local/share/cm/cm_help.txt
+	sudo chmod 644 /usr/local/share/cm/cm_help.md
+	sudo chmod 644 /usr/local/share/cm/cm_help.txt
+else
+	mkdir -p /usr/local/share/cm
+	cp cm_help.md /usr/local/share/cm/cm_help.md
+	cp cm_help.txt /usr/local/share/cm/cm_help.txt
+	chmod 644 /usr/local/share/cm/cm_help.md
+	chmod 644 /usr/local/share/cm/cm_help.txt
+endif
 
 install-all: install install-help
 

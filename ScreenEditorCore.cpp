@@ -69,8 +69,10 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
     // if the file path is actually some text
     if (filePath.length()) {
 
-        // if the file is readable path is readable, readwriteable, new but writeable
-        if ( checkFile( filePath ) == 0) {
+        // Skip file permission check for lazy-loaded files (preload=FALSE).
+        // The check will happen later when the file is actually loaded for editing.
+        // This avoids disk I/O for every file in a project at startup.
+        if ( !preload || checkFile( filePath ) == 0) {
 
             // return the editbuffer already in the list
             CmEditBuffer *editBuffer = editBufferList->findPath( filePath );

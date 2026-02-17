@@ -46,6 +46,9 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
     // "Other Files" section starts expanded
     _otherFilesExpanded = 1;
 
+    // pre-built strings not yet computed
+    _cachedContentWidth = 0;
+
     // NOTE: No resize callback here - ScreenEditor owns all resize handling
 
     // build the visible items from project structure
@@ -61,12 +64,22 @@ ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *p
 //
 // Rebuild the flat list of visible items from the project subproject structure.
 // Called on construction and whenever expand/collapse state changes.
+// Pre-computes formatted text and cached state for each item.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ProjectView::rebuildVisibleItems( void )
 {
     _visibleItems.clearAndDelete();
+
+    int contentWidth = _cachedContentWidth;
+
+    // build hash of project file paths for O(1) lookup (avoid O(n*m) isProjectFilePath calls)
+    CxHashmap<CxString, int> projectFilePaths;
+    int numProjectFiles = project->numberOfFiles();
+    for (int f = 0; f < numProjectFiles; f++) {
+        projectFilePaths.insert(project->fileAt(f), 1);
+    }
 
     // build "Other Files" section first (non-project buffers at top)
     int openFilesAdded = 0;
@@ -77,8 +90,8 @@ ProjectView::rebuildVisibleItems( void )
         CxString path = buf->getFilePath();
         if (path.length() == 0) continue;
 
-        // skip buffers that belong to a project subproject
-        if (project->subprojectCount() > 0 && isProjectFilePath(path)) {
+        // skip buffers that belong to a project subproject (O(1) hash lookup)
+        if (project->subprojectCount() > 0 && projectFilePaths.find(path) != 0) {
             continue;
         }
 
@@ -89,6 +102,32 @@ ProjectView::rebuildVisibleItems( void )
             hdrItem->subprojectIndex = -1;
             hdrItem->fileIndex = -1;
             hdrItem->bufferIndex = -1;
+            hdrItem->isModified = 0;
+            hdrItem->isInMemory = 0;
+            hdrItem->hasModifiedFile = 0;
+
+            // pre-compute formatted text
+            if (contentWidth > 0) {
+                CxString prefix = " ";
+                if (_otherFilesExpanded) {
+                    prefix += EXPAND_INDICATOR;
+                } else {
+                    prefix += COLLAPSE_INDICATOR;
+                }
+                prefix += " ";
+                int prefixDisplayWidth = 3;
+                int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+                CxString text = "Other Files";
+                int padNeeded = textAreaLen - (int)text.length();
+                if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                    text += _paddingSpaces.subString(0, padNeeded);
+                }
+                hdrItem->formattedText = prefix;
+                hdrItem->formattedText += text;
+                hdrItem->formattedText += " ";
+            }
+
             _visibleItems.append(hdrItem);
             openFilesAdded = 1;
         }
@@ -100,6 +139,56 @@ ProjectView::rebuildVisibleItems( void )
             openItem->subprojectIndex = -1;
             openItem->fileIndex = -1;
             openItem->bufferIndex = i;
+            openItem->isModified = buf->isTouched() ? 1 : 0;
+            openItem->isInMemory = buf->isInMemory() ? 1 : 0;
+            openItem->hasModifiedFile = 0;
+
+            // pre-compute formatted text
+            if (contentWidth > 0) {
+                CxString prefix = "     ";
+                int prefixDisplayWidth = 5;
+                int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+                // get filename from path
+                CxString text = path;
+                int lastSlash = path.lastChar('/');
+                if (lastSlash >= 0) {
+                    text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
+                }
+
+                // build tags
+                CxString tagMod = openItem->isModified ? "/modified" : "";
+                CxString tagMem = openItem->isInMemory ? "/in-memory" : "";
+                int totalTagLen = 0;
+                if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+                if (tagMem.length() > 0) {
+                    if (totalTagLen > 0) totalTagLen += 1;
+                    totalTagLen += (int)tagMem.length();
+                }
+
+                int maxTextLen = textAreaLen;
+                if (totalTagLen > 0) {
+                    maxTextLen = textAreaLen - totalTagLen - 1;
+                }
+
+                if ((int)text.length() > maxTextLen) {
+                    text = text.subString(0, maxTextLen - 3);
+                    text += "...";
+                }
+
+                int padNeeded = textAreaLen - (int)text.length() - totalTagLen;
+                if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                    text += _paddingSpaces.subString(0, padNeeded);
+                }
+                text += tagMod;
+                if (tagMod.length() > 0 && tagMem.length() > 0) text += " ";
+                text += tagMem;
+
+                openItem->formattedText = prefix;
+                openItem->formattedText += text;
+                openItem->formattedText += " ";
+            }
+
             _visibleItems.append(openItem);
         }
     }
@@ -113,6 +202,10 @@ ProjectView::rebuildVisibleItems( void )
             sepItem->subprojectIndex = -1;
             sepItem->fileIndex = -1;
             sepItem->bufferIndex = -1;
+            sepItem->isModified = 0;
+            sepItem->isInMemory = 0;
+            sepItem->hasModifiedFile = 0;
+            // formattedText not needed - we use _separatorLine
             _visibleItems.append(sepItem);
         }
 
@@ -122,6 +215,31 @@ ProjectView::rebuildVisibleItems( void )
         allItem->subprojectIndex = -1;
         allItem->fileIndex = -1;
         allItem->bufferIndex = -1;
+        allItem->isModified = 0;
+        allItem->isInMemory = 0;
+        allItem->hasModifiedFile = 0;
+
+        if (contentWidth > 0) {
+            CxString prefix = "   ";
+            int prefixDisplayWidth = 3;
+            int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+#if defined(_LINUX_) || defined(_OSX_)
+            CxString text = "All \xf0\x9f\x8e\xaf";  // 🎯
+            int textDisplayLen = 6;  // "All " + 2 for emoji
+#else
+            CxString text = "All (target)";
+            int textDisplayLen = (int)text.length();
+#endif
+            int padNeeded = textAreaLen - textDisplayLen;
+            if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                text += _paddingSpaces.subString(0, padNeeded);
+            }
+            allItem->formattedText = prefix;
+            allItem->formattedText += text;
+            allItem->formattedText += " ";
+        }
+
         _visibleItems.append(allItem);
 
         // add subprojects and their files
@@ -134,6 +252,56 @@ ProjectView::rebuildVisibleItems( void )
             subItem->subprojectIndex = s;
             subItem->fileIndex = -1;
             subItem->bufferIndex = -1;
+            subItem->isModified = 0;
+            subItem->isInMemory = 0;
+            subItem->hasModifiedFile = subprojectHasModifiedFile(sub) ? 1 : 0;
+
+            if (contentWidth > 0) {
+                CxString prefix = " ";
+                if (sub->isExpanded) {
+                    prefix += EXPAND_INDICATOR;
+                } else {
+                    prefix += COLLAPSE_INDICATOR;
+                }
+                prefix += " ";
+                int prefixDisplayWidth = 3;
+                int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+#if defined(_LINUX_) || defined(_OSX_)
+                CxString text = sub->name;
+                text += " \xf0\x9f\x8e\xaf";  // 🎯
+                int textExtraBytes = 2;  // emoji is 4 bytes but 2 display cols
+#else
+                CxString text = sub->name;
+                text += " (target)";
+                int textExtraBytes = 0;
+#endif
+                CxString tagMod = subItem->hasModifiedFile ? "/modified" : "";
+                int totalTagLen = (int)tagMod.length();
+
+                int maxTextLen = textAreaLen;
+                if (totalTagLen > 0) {
+                    maxTextLen = textAreaLen - totalTagLen - 1;
+                }
+
+                int textDisplayLen = (int)text.length() - textExtraBytes;
+                if (textDisplayLen > maxTextLen) {
+                    text = text.subString(0, maxTextLen - 3 + textExtraBytes);
+                    text += "...";
+                    textDisplayLen = maxTextLen;
+                }
+
+                int padNeeded = textAreaLen - textDisplayLen - totalTagLen;
+                if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                    text += _paddingSpaces.subString(0, padNeeded);
+                }
+                text += tagMod;
+
+                subItem->formattedText = prefix;
+                subItem->formattedText += text;
+                subItem->formattedText += " ";
+            }
+
             _visibleItems.append(subItem);
 
             // if expanded, add files
@@ -144,6 +312,58 @@ ProjectView::rebuildVisibleItems( void )
                     fileItem->subprojectIndex = s;
                     fileItem->fileIndex = f;
                     fileItem->bufferIndex = -1;
+                    fileItem->hasModifiedFile = 0;
+
+                    // look up buffer state
+                    CxString resolved = project->resolveFilePath(sub, sub->files.at(f));
+                    CmEditBuffer *buf = editBufferList->findPath(resolved);
+                    if (buf != NULL) {
+                        fileItem->isModified = buf->isTouched() ? 1 : 0;
+                        fileItem->isInMemory = buf->isInMemory() ? 1 : 0;
+                    } else {
+                        fileItem->isModified = 0;
+                        fileItem->isInMemory = 0;
+                    }
+
+                    if (contentWidth > 0) {
+                        CxString prefix = "     ";
+                        int prefixDisplayWidth = 5;
+                        int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+                        CxString text = sub->files.at(f);
+
+                        CxString tagMod = fileItem->isModified ? "/modified" : "";
+                        CxString tagMem = fileItem->isInMemory ? "/in-memory" : "";
+                        int totalTagLen = 0;
+                        if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+                        if (tagMem.length() > 0) {
+                            if (totalTagLen > 0) totalTagLen += 1;
+                            totalTagLen += (int)tagMem.length();
+                        }
+
+                        int maxTextLen = textAreaLen;
+                        if (totalTagLen > 0) {
+                            maxTextLen = textAreaLen - totalTagLen - 1;
+                        }
+
+                        if ((int)text.length() > maxTextLen) {
+                            text = text.subString(0, maxTextLen - 3);
+                            text += "...";
+                        }
+
+                        int padNeeded = textAreaLen - (int)text.length() - totalTagLen;
+                        if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                            text += _paddingSpaces.subString(0, padNeeded);
+                        }
+                        text += tagMod;
+                        if (tagMod.length() > 0 && tagMem.length() > 0) text += " ";
+                        text += tagMem;
+
+                        fileItem->formattedText = prefix;
+                        fileItem->formattedText += text;
+                        fileItem->formattedText += " ";
+                    }
+
                     _visibleItems.append(fileItem);
                 }
             }
@@ -270,6 +490,39 @@ ProjectView::recalcScreenPlacements(void)
     if (selectedListItemIndex >= totalItems && totalItems > 0) {
         selectedListItemIndex = 0;
     }
+
+    // build pre-computed strings for efficient redraw
+    int contentWidth = frame->contentWidth();
+    if (contentWidth != _cachedContentWidth) {
+        _cachedContentWidth = contentWidth;
+
+        // build padding string (enough spaces to pad any line)
+        _paddingSpaces = "";
+        for (int i = 0; i < contentWidth + 10; i++) {
+            _paddingSpaces += " ";
+        }
+
+        // build separator line
+        _separatorLine = "";
+#if defined(_LINUX_) || defined(_OSX_)
+        for (int i = 0; i < contentWidth; i++) {
+            _separatorLine += "\xe2\x94\x80";  // ─ (U+2500)
+        }
+#else
+        for (int i = 0; i < contentWidth; i++) {
+            _separatorLine += "-";
+        }
+#endif
+
+        // build empty line
+        _emptyLine = "";
+        for (int i = 0; i < contentWidth; i++) {
+            _emptyLine += " ";
+        }
+
+        // rebuild visible items to recompute formatted text with new width
+        rebuildVisibleItems();
+    }
 }
 
 
@@ -317,7 +570,7 @@ ProjectView::redraw( void )
     CxAnsiForegroundColor tagInMemoryColor("cyan");
 
     //---------------------------------------------------------------------------------------------
-    // draw the visible items
+    // draw the visible items (using cached state from rebuildVisibleItems)
     //---------------------------------------------------------------------------------------------
     for (int c = 0; c < screenProjectNumberOfLines; c++) {
 
@@ -334,7 +587,7 @@ ProjectView::redraw( void )
             ProjectViewItem *item = _visibleItems.at(logicalItem);
 
             //-------------------------------------------------------------------------------------
-            // build the display text and tag based on item type
+            // build the display text and tag based on item type (using cached values)
             //-------------------------------------------------------------------------------------
             CxString prefix;
             int prefixDisplayWidth;
@@ -376,7 +629,8 @@ ProjectView::redraw( void )
                     text += " (target)";
 #endif
 
-                    if (subprojectHasModifiedFile(sub)) {
+                    // use cached value instead of calling subprojectHasModifiedFile()
+                    if (item->hasModifiedFile) {
                         tagMod = "/modified";
                     }
                 }
@@ -389,15 +643,12 @@ ProjectView::redraw( void )
                     prefixDisplayWidth = 5;
                     text = sub->files.at(item->fileIndex);
 
-                    CxString resolved = project->resolveFilePath(sub, sub->files.at(item->fileIndex));
-                    CmEditBuffer *buf = editBufferList->findPath(resolved);
-                    if (buf != NULL) {
-                        if (buf->isTouched()) {
-                            tagMod = "/modified";
-                        }
-                        if (buf->isInMemory()) {
-                            tagMem = "/in-memory";
-                        }
+                    // use cached values instead of calling resolveFilePath + findPath
+                    if (item->isModified) {
+                        tagMod = "/modified";
+                    }
+                    if (item->isInMemory) {
+                        tagMem = "/in-memory";
                     }
                 }
                 break;
@@ -431,10 +682,11 @@ ProjectView::redraw( void )
                             text = path;
                         }
 
-                        if (buf->isTouched()) {
+                        // use cached values instead of calling isTouched/isInMemory
+                        if (item->isModified) {
                             tagMod = "/modified";
                         }
-                        if (buf->isInMemory()) {
+                        if (item->isInMemory) {
                             tagMem = "/in-memory";
                         }
                     } else {
@@ -445,18 +697,10 @@ ProjectView::redraw( void )
 
                 case PVITEM_SEPARATOR:
                 {
+                    // use pre-built separator line
                     prefix = "";
                     prefixDisplayWidth = 0;
                     text = "";
-#if defined(_LINUX_) || defined(_OSX_)
-                    for (int i = 0; i < contentWidth; i++) {
-                        text += "\xe2\x94\x80";  // ─ (U+2500)
-                    }
-#else
-                    for (int i = 0; i < contentWidth; i++) {
-                        text += "-";
-                    }
-#endif
                 }
                 break;
             }
@@ -486,8 +730,11 @@ ProjectView::redraw( void )
                     text += "...";
                 }
 
-                while ((int)text.length() < textAreaLen + textExtraBytes) {
-                    text += " ";
+                // use pre-built padding string instead of character-by-character loop
+                int textDisplayLen = (int)text.length() - textExtraBytes;
+                int padNeeded = textAreaLen - textDisplayLen;
+                if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                    text += _paddingSpaces.subString(0, padNeeded);
                 }
             }
 
@@ -505,7 +752,10 @@ ProjectView::redraw( void )
                 screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
             }
 
-            if (totalTagLen > 0 && !isSeparator) {
+            if (isSeparator) {
+                // use pre-built separator line
+                screen->writeText(_separatorLine);
+            } else if (totalTagLen > 0) {
                 // draw prefix + text up to tag position
                 int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
                 CxString textPart = text.subString(0, textBeforeTag);
@@ -556,9 +806,7 @@ ProjectView::redraw( void )
                 // no tag - simple line
                 CxString line = prefix;
                 line += text;
-                if (!isSeparator) {
-                    line += " ";
-                }
+                line += " ";
                 screen->writeText(line);
             }
 
@@ -569,23 +817,279 @@ ProjectView::redraw( void )
             }
 
         //-----------------------------------------------------------------------------------------
-        // draw empty line if beyond visible items
+        // draw empty line if beyond visible items (use pre-built empty line)
         //-----------------------------------------------------------------------------------------
         } else {
             screen->setForegroundColor(programDefaults->modalContentTextColor());
             screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-            CxString emptyLine;
-            for (int i = 0; i < contentWidth; i++) {
-                emptyLine += " ";
-            }
-            screen->writeText(emptyLine);
+            screen->writeText(_emptyLine);
             screen->resetColors();
         }
     }
 
     screen->placeCursor(cursorRow, contentLeft);
     screen->resetColors();
+
+    // cache the footer for change detection
+    _lastFooter = footer;
+
     screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::redrawLine
+//
+// Redraw a single content line at the given logical index.
+// Used for incremental selection updates.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::redrawLine( int logicalIndex, int isSelected )
+{
+    // check bounds
+    if (logicalIndex < firstVisibleListIndex ||
+        logicalIndex >= firstVisibleListIndex + screenProjectNumberOfLines) {
+        return;  // not visible
+    }
+
+    int contentLeft = frame->contentLeft();
+    int contentWidth = frame->contentWidth();
+    int row = screenProjectFirstListLine + (logicalIndex - firstVisibleListIndex);
+
+    screen->placeCursor(row, contentLeft);
+
+    if (logicalIndex < (int)_visibleItems.entries()) {
+        ProjectViewItem *item = _visibleItems.at(logicalIndex);
+        int isSeparator = (item->type == PVITEM_SEPARATOR);
+
+        // tag colors
+        CxAnsiForegroundColor tagModifiedColor("bright_red");
+        CxAnsiForegroundColor tagInMemoryColor("cyan");
+
+        // build display text (same logic as redraw)
+        CxString prefix;
+        int prefixDisplayWidth;
+        CxString text;
+        int textExtraBytes = 0;
+        CxString tagMod;
+        CxString tagMem;
+
+        switch (item->type) {
+
+            case PVITEM_ALL:
+                prefix = "   ";
+                prefixDisplayWidth = 3;
+#if defined(_LINUX_) || defined(_OSX_)
+                text = "All \xf0\x9f\x8e\xaf";
+                textExtraBytes = 2;
+#else
+                text = "All (target)";
+#endif
+                break;
+
+            case PVITEM_SUBPROJECT:
+            {
+                ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+                prefix = " ";
+                if (sub->isExpanded) {
+                    prefix += EXPAND_INDICATOR;
+                } else {
+                    prefix += COLLAPSE_INDICATOR;
+                }
+                prefix += " ";
+                prefixDisplayWidth = 3;
+
+                text = sub->name;
+#if defined(_LINUX_) || defined(_OSX_)
+                text += " \xf0\x9f\x8e\xaf";
+                textExtraBytes = 2;
+#else
+                text += " (target)";
+#endif
+
+                if (item->hasModifiedFile) {
+                    tagMod = "/modified";
+                }
+            }
+            break;
+
+            case PVITEM_FILE:
+            {
+                ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+                prefix = "     ";
+                prefixDisplayWidth = 5;
+                text = sub->files.at(item->fileIndex);
+
+                if (item->isModified) {
+                    tagMod = "/modified";
+                }
+                if (item->isInMemory) {
+                    tagMem = "/in-memory";
+                }
+            }
+            break;
+
+            case PVITEM_OPEN_HEADER:
+            {
+                prefix = " ";
+                if (_otherFilesExpanded) {
+                    prefix += EXPAND_INDICATOR;
+                } else {
+                    prefix += COLLAPSE_INDICATOR;
+                }
+                prefix += " ";
+                prefixDisplayWidth = 3;
+                text = "Other Files";
+            }
+            break;
+
+            case PVITEM_OPEN_FILE:
+            {
+                prefix = "     ";
+                prefixDisplayWidth = 5;
+
+                CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
+                if (buf != NULL) {
+                    CxString path = buf->getFilePath();
+                    int lastSlash = path.lastChar('/');
+                    if (lastSlash >= 0) {
+                        text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
+                    } else {
+                        text = path;
+                    }
+
+                    if (item->isModified) {
+                        tagMod = "/modified";
+                    }
+                    if (item->isInMemory) {
+                        tagMem = "/in-memory";
+                    }
+                } else {
+                    text = "(unknown)";
+                }
+            }
+            break;
+
+            case PVITEM_SEPARATOR:
+            {
+                prefix = "";
+                prefixDisplayWidth = 0;
+                text = "";
+            }
+            break;
+        }
+
+        // compute layout
+        int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+        int totalTagLen = 0;
+        if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+        if (tagMem.length() > 0) {
+            if (totalTagLen > 0) totalTagLen += 1;
+            totalTagLen += (int)tagMem.length();
+        }
+
+        int maxTextLen = textAreaLen;
+        if (totalTagLen > 0) {
+            maxTextLen = textAreaLen - totalTagLen - 1;
+        }
+
+        if (!isSeparator) {
+            if ((int)text.length() - textExtraBytes > maxTextLen) {
+                text = text.subString(0, maxTextLen - 3 + textExtraBytes);
+                text += "...";
+            }
+
+            int textDisplayLen = (int)text.length() - textExtraBytes;
+            int padNeeded = textAreaLen - textDisplayLen;
+            if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                text += _paddingSpaces.subString(0, padNeeded);
+            }
+        }
+
+        // draw with appropriate colors
+        if (isSelected && !isSeparator) {
+            screen->setForegroundColor(programDefaults->statusBarTextColor());
+            screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+        } else {
+            screen->setForegroundColor(programDefaults->modalContentTextColor());
+            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+        }
+
+        if (isSeparator) {
+            screen->writeText(_separatorLine);
+        } else if (totalTagLen > 0) {
+            int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
+            CxString textPart = text.subString(0, textBeforeTag);
+
+            CxString line = prefix;
+            line += textPart;
+            screen->writeText(line);
+
+            CxColor *tagBg = isSelected
+                ? programDefaults->statusBarBackgroundColor()
+                : programDefaults->modalContentBackgroundColor();
+
+            if (tagMod.length() > 0) {
+                screen->setForegroundColor(&tagModifiedColor);
+                screen->setBackgroundColor(tagBg);
+                screen->writeText(tagMod);
+            }
+
+            if (tagMem.length() > 0) {
+                if (tagMod.length() > 0) {
+                    if (isSelected) {
+                        screen->setForegroundColor(programDefaults->statusBarTextColor());
+                    } else {
+                        screen->setForegroundColor(programDefaults->modalContentTextColor());
+                    }
+                    screen->setBackgroundColor(tagBg);
+                    screen->writeText(" ");
+                }
+                screen->setForegroundColor(&tagInMemoryColor);
+                screen->setBackgroundColor(tagBg);
+                screen->writeText(tagMem);
+            }
+
+            if (isSelected) {
+                screen->setForegroundColor(programDefaults->statusBarTextColor());
+                screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+            } else {
+                screen->setForegroundColor(programDefaults->modalContentTextColor());
+                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+            }
+            screen->writeText(" ");
+        } else {
+            CxString line = prefix;
+            line += text;
+            line += " ";
+            screen->writeText(line);
+        }
+
+        screen->resetColors();
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::redrawFooter
+//
+// Redraw just the footer line if it changed.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::redrawFooter( void )
+{
+    CxString footer = getContextFooter();
+    if (footer == _lastFooter) {
+        return;  // no change
+    }
+
+    _lastFooter = footer;
+
+    frame->setFrameColor(programDefaults->statusBarTextColor(),
+                         programDefaults->statusBarBackgroundColor());
+    frame->drawFooter(footer);
 }
 
 
@@ -672,34 +1176,35 @@ ProjectView::getSelectedSubproject( void )
 CxString
 ProjectView::getContextFooter( void )
 {
-    ProjectViewItemType selType = getSelectedItemType();
+    if (selectedListItemIndex < 0 || selectedListItemIndex >= (int)_visibleItems.entries()) {
+        return "[Esc] Close";
+    }
 
-    // file items (project or non-project)
-    if (selType == PVITEM_FILE || selType == PVITEM_OPEN_FILE) {
-        CxString filePath = getSelectedItem();
-        CmEditBuffer *buf = editBufferList->findPath(filePath);
-        if (buf != NULL && buf->isTouched()) {
+    ProjectViewItem *item = _visibleItems.at(selectedListItemIndex);
+
+    // file items (project or non-project) - use cached isModified
+    if (item->type == PVITEM_FILE || item->type == PVITEM_OPEN_FILE) {
+        if (item->isModified) {
             return "[Enter] Open  [S] Save  [A] Save All  [Esc] Close";
         }
         return "[Enter] Open  [A] Save All  [Esc] Close";
     }
 
-    // subproject header
-    if (selType == PVITEM_SUBPROJECT) {
-        ProjectSubproject *sub = getSelectedSubproject();
-        if (sub != NULL && subprojectHasModifiedFile(sub)) {
+    // subproject header - use cached hasModifiedFile
+    if (item->type == PVITEM_SUBPROJECT) {
+        if (item->hasModifiedFile) {
             return "[S] Save All  [M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
         }
         return "[M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
     }
 
     // ALL row
-    if (selType == PVITEM_ALL) {
+    if (item->type == PVITEM_ALL) {
         return "[M] Make  [C] Clean  [Esc] Close";
     }
 
     // open header
-    if (selType == PVITEM_OPEN_HEADER) {
+    if (item->type == PVITEM_OPEN_HEADER) {
         return "[Enter] Expand/Collapse  [N] New  [Esc] Close";
     }
 
@@ -785,11 +1290,8 @@ ProjectView::routeKeyAction( CxKeyAction keyAction )
 	{
 		case CxKeyAction::CURSOR:
 			{
-                if (handleArrows( keyAction )) {
-                    redraw();
-                }
-
-                screen->flush();
+                // handleArrows() does its own incremental redraw
+                handleArrows( keyAction );
 			}
 			break;
 
@@ -846,6 +1348,7 @@ ProjectView::reframe( )
 // ProjectView::handleArrows
 //
 // Move selection up/down through the visible items list.
+// Does incremental redraw - only redraws changed lines.
 //
 //-------------------------------------------------------------------------------------------------
 int
@@ -867,9 +1370,27 @@ ProjectView::handleArrows( CxKeyAction keyAction )
         // if we ran off the end, stay put
         if (selectedListItemIndex >= totalItems) {
             selectedListItemIndex = prevIndex;
+            return(false);  // no change
         }
 
-        return( true );
+        // check if scroll needed
+        if (reframe()) {
+            // scroll happened - need full content redraw
+            redraw();
+        } else {
+            // no scroll - incremental redraw of just 2 lines + footer
+            redrawLine(prevIndex, 0);      // old line, not selected
+            redrawLine(selectedListItemIndex, 1);  // new line, selected
+            redrawFooter();
+
+            // position cursor on selected line
+            int contentLeft = frame->contentLeft();
+            int row = screenProjectFirstListLine + (selectedListItemIndex - firstVisibleListIndex);
+            screen->placeCursor(row, contentLeft);
+            screen->flush();
+        }
+
+        return(true);
     }
 
     if (keyAction.tag() == "<arrow-up>") {
@@ -885,9 +1406,27 @@ ProjectView::handleArrows( CxKeyAction keyAction )
         // if we ran past the top, stay put
         if (selectedListItemIndex < 0) {
             selectedListItemIndex = prevIndex;
+            return(false);  // no change
         }
 
-        return( true );
+        // check if scroll needed
+        if (reframe()) {
+            // scroll happened - need full content redraw
+            redraw();
+        } else {
+            // no scroll - incremental redraw of just 2 lines + footer
+            redrawLine(prevIndex, 0);      // old line, not selected
+            redrawLine(selectedListItemIndex, 1);  // new line, selected
+            redrawFooter();
+
+            // position cursor on selected line
+            int contentLeft = frame->contentLeft();
+            int row = screenProjectFirstListLine + (selectedListItemIndex - firstVisibleListIndex);
+            screen->placeCursor(row, contentLeft);
+            screen->flush();
+        }
+
+        return(true);
     }
 
     return(false);

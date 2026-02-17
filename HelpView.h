@@ -67,6 +67,7 @@ struct HelpViewItem {
     HelpViewItemType type;
     int sectionIndex;    // which HelpSection (0+), -1 for standalone
     int lineIndex;       // line within section, -1 for headers
+    CxString formattedText;  // pre-computed display text (with padding)
 };
 
 
@@ -129,6 +130,12 @@ class HelpView
     int reframe( void );
     // make sure selection is visible in list
 
+    void redrawLine( int logicalIndex, int isSelected );
+    // redraw a single content line
+
+    void redrawFooter( void );
+    // redraw just the footer
+
     ProgramDefaults *programDefaults;
     // pointer to the program defaults
 
@@ -161,6 +168,14 @@ class HelpView
 
     int _visible;           // whether modal is currently displayed
     int _helpFileLoaded;    // whether help file was successfully loaded
+
+    // pre-built strings for efficient redraw (built in recalcScreenPlacements)
+    CxString _paddingSpaces;   // spaces for padding lines
+    CxString _separatorLine;   // pre-built separator line
+    CxString _emptyLine;       // pre-built empty line
+    int _cachedContentWidth;   // content width when strings were built
+
+    CxString _lastFooter;      // cached footer for change detection
 
 };
 
