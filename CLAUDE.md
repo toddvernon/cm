@@ -60,6 +60,10 @@ The make target excludes build outputs and other cruft that should not be distri
 
 **NEVER** add resize callbacks to sub-elements. All resize coordination goes through ScreenEditor.
 
+## Makefile guidelines
+- When modifying makefiles, follow the patterns already present in the existing makefiles.
+- Makefiles must be portable across old make implementations (SunOS, IRIX, BSD). Only use features and automatic variables already present in the existing makefiles. Do not introduce GNU make extensions such as `$(filter ...)`, `$(wildcard ...)`, `$(patsubst ...)`, etc.
+
 ## Non-negotiable constraints
 - DO NOT use the C++ Standard Library: no `std::` anywhere.
 - DO NOT introduce templates, including template-based third-party libs.
