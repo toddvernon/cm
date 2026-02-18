@@ -229,7 +229,8 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     projectView = new ProjectView(programDefaults,
                                     editBufferList,
                                     project,
-                                    screen
+                                    screen,
+                                    this
                                     );
 
     //---------------------------------------------------------------------------------------------
@@ -772,6 +773,23 @@ ScreenEditor::showProjectView(void)
     projectView->recalcScreenPlacements();
     projectView->redraw();  // draws modal on top of existing screen content
     programMode = PROJECTVIEW;
+
+    //---------------------------------------------------------------------------------------------
+    // Auto-verify project files on display (modern platforms only)
+    // On vintage platforms, this flag is ignored to avoid blocking I/O on slow machines.
+    //---------------------------------------------------------------------------------------------
+    #if defined(_OSX_) || defined(_LINUX_)
+    if (programDefaults->projectAutoVerify() && project != NULL && project->subprojectCount() > 0) {
+        int totalMissing = projectView->verifyAllSubprojects();
+        if (totalMissing > 0) {
+            char buffer[100];
+            sprintf(buffer, "(%d missing file%s found)", totalMissing, totalMissing == 1 ? "" : "s");
+            setMessage(buffer);
+        } else {
+            setMessage("(all files verified)");
+        }
+    }
+    #endif
 }
 
 
@@ -1275,6 +1293,20 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
             if (itemType == PVITEM_FILE || itemType == PVITEM_OPEN_FILE) {
                 CxString filePath = projectView->getSelectedItem();
                 if (filePath.length() > 0) {
+
+                    // For project files, verify existence before loading
+                    // (prevents creating phantom buffers for renamed/deleted files)
+                    if (itemType == PVITEM_FILE) {
+                        CxFileAccess::status stat = CxFileAccess::checkStatus(filePath);
+                        if (stat == CxFileAccess::NOT_FOUND || stat == CxFileAccess::NOT_FOUND_W) {
+                            char buffer[256];
+                            sprintf(buffer, "(file not found: %s)", filePath.data());
+                            setMessage(buffer);
+                            // Stay in project view - don't dismiss, don't create buffer
+                            return;
+                        }
+                    }
+
                     projectView->setVisible(0);
                     loadNewFile(filePath, TRUE);
                     returnToEditMode();
@@ -1455,6 +1487,24 @@ ScreenEditor::focusProjectView( CxKeyAction keyAction )
                     _argBuffer = dirPath;
                     updateArgumentDisplay();
                     commandLineView->placeCursor();
+                }
+            }
+
+            // verify files - only on SUBPROJECT
+            if (keyAction.tag() == 'v' || keyAction.tag() == 'V')
+            {
+                if (selType == PVITEM_SUBPROJECT) {
+                    ProjectSubproject *sub = projectView->getSelectedSubproject();
+                    int fileCount = (sub != NULL) ? (int)sub->files.entries() : 0;
+                    int missing = projectView->verifySubprojectFiles();
+                    char buffer[100];
+                    if (missing == 0) {
+                        sprintf(buffer, "(all %d files verified)", fileCount);
+                    } else {
+                        sprintf(buffer, "(%d missing file%s found)", missing, missing == 1 ? "" : "s");
+                    }
+                    setMessage(buffer);
+                    // dialog already updated during verification
                 }
             }
         }

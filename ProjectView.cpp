@@ -13,6 +13,9 @@
 //-------------------------------------------------------------------------------------------------
 
 #include "ProjectView.h"
+#include "ScreenEditor.h"
+#include <time.h>
+#include <cx/base/fileaccess.h>
 
 //-------------------------------------------------------------------------------------------------
 // Platform-conditional expand/collapse indicators
@@ -30,12 +33,13 @@ static const char *COLLAPSE_INDICATOR = ">";
 // ProjectView::ProjectView (constructor)
 //
 //-------------------------------------------------------------------------------------------------
-ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr )
+ProjectView::ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screenPtr, ScreenEditor *se )
 {
     programDefaults = pd;
     editBufferList  = ebl;
     screen          = screenPtr;
     project         = proj;
+    _screenEditor   = se;
 
     // create the box frame for modal display
     frame = new CxBoxFrame(screen);
@@ -105,6 +109,7 @@ ProjectView::rebuildVisibleItems( void )
             hdrItem->isModified = 0;
             hdrItem->isInMemory = 0;
             hdrItem->hasModifiedFile = 0;
+            hdrItem->isMissing = 0;
 
             // pre-compute formatted text
             if (contentWidth > 0) {
@@ -142,6 +147,7 @@ ProjectView::rebuildVisibleItems( void )
             openItem->isModified = buf->isTouched() ? 1 : 0;
             openItem->isInMemory = buf->isInMemory() ? 1 : 0;
             openItem->hasModifiedFile = 0;
+            openItem->isMissing = 0;
 
             // pre-compute formatted text
             if (contentWidth > 0) {
@@ -205,6 +211,7 @@ ProjectView::rebuildVisibleItems( void )
             sepItem->isModified = 0;
             sepItem->isInMemory = 0;
             sepItem->hasModifiedFile = 0;
+            sepItem->isMissing = 0;
             // formattedText not needed - we use _separatorLine
             _visibleItems.append(sepItem);
         }
@@ -218,6 +225,7 @@ ProjectView::rebuildVisibleItems( void )
         allItem->isModified = 0;
         allItem->isInMemory = 0;
         allItem->hasModifiedFile = 0;
+        allItem->isMissing = 0;
 
         if (contentWidth > 0) {
             CxString prefix = "   ";
@@ -255,6 +263,7 @@ ProjectView::rebuildVisibleItems( void )
             subItem->isModified = 0;
             subItem->isInMemory = 0;
             subItem->hasModifiedFile = subprojectHasModifiedFile(sub) ? 1 : 0;
+            subItem->isMissing = 0;
 
             if (contentWidth > 0) {
                 CxString prefix = " ";
@@ -313,6 +322,7 @@ ProjectView::rebuildVisibleItems( void )
                     fileItem->fileIndex = f;
                     fileItem->bufferIndex = -1;
                     fileItem->hasModifiedFile = 0;
+                    fileItem->isMissing = 0;
 
                     // look up buffer state
                     CxString resolved = project->resolveFilePath(sub, sub->files.at(f));
@@ -565,7 +575,8 @@ ProjectView::redraw( void )
 
     frame->drawWithTitleAndFooter(title, footer);
 
-    // tag colors - bright_red for modified, cyan for in-memory
+    // tag colors - bright_yellow for missing, bright_red for modified, cyan for in-memory
+    CxAnsiForegroundColor tagMissingColor("bright_yellow");
     CxAnsiForegroundColor tagModifiedColor("bright_red");
     CxAnsiForegroundColor tagInMemoryColor("cyan");
 
@@ -593,8 +604,9 @@ ProjectView::redraw( void )
             int prefixDisplayWidth;
             CxString text;
             int textExtraBytes = 0;  // bytes beyond display columns for multi-byte chars
-            CxString tagMod;    // "/modified" or empty
-            CxString tagMem;    // "/in-memory" or empty
+            CxString tagMissing;  // "/missing" or empty
+            CxString tagMod;      // "/modified" or empty
+            CxString tagMem;      // "/in-memory" or empty
 
             switch (item->type) {
 
@@ -644,6 +656,9 @@ ProjectView::redraw( void )
                     text = sub->files.at(item->fileIndex);
 
                     // use cached values instead of calling resolveFilePath + findPath
+                    if (item->isMissing) {
+                        tagMissing = "/missing";
+                    }
                     if (item->isModified) {
                         tagMod = "/modified";
                     }
@@ -712,7 +727,11 @@ ProjectView::redraw( void )
 
             // total tag display width: each tag plus a space separator between them
             int totalTagLen = 0;
-            if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+            if (tagMissing.length() > 0) totalTagLen += (int)tagMissing.length();
+            if (tagMod.length() > 0) {
+                if (totalTagLen > 0) totalTagLen += 1;  // space between tags
+                totalTagLen += (int)tagMod.length();
+            }
             if (tagMem.length() > 0) {
                 if (totalTagLen > 0) totalTagLen += 1;  // space between tags
                 totalTagLen += (int)tagMem.length();
@@ -769,16 +788,36 @@ ProjectView::redraw( void )
                     ? programDefaults->statusBarBackgroundColor()
                     : programDefaults->modalContentBackgroundColor();
 
+                int tagsPrinted = 0;
+
+                // draw /missing tag in yellow (first)
+                if (tagMissing.length() > 0) {
+                    screen->setForegroundColor(&tagMissingColor);
+                    screen->setBackgroundColor(tagBg);
+                    screen->writeText(tagMissing);
+                    tagsPrinted = 1;
+                }
+
                 // draw /modified tag in red
                 if (tagMod.length() > 0) {
+                    if (tagsPrinted) {
+                        if (isSelected) {
+                            screen->setForegroundColor(programDefaults->statusBarTextColor());
+                        } else {
+                            screen->setForegroundColor(programDefaults->modalContentTextColor());
+                        }
+                        screen->setBackgroundColor(tagBg);
+                        screen->writeText(" ");
+                    }
                     screen->setForegroundColor(&tagModifiedColor);
                     screen->setBackgroundColor(tagBg);
                     screen->writeText(tagMod);
+                    tagsPrinted = 1;
                 }
 
                 // draw /in-memory tag in cyan
                 if (tagMem.length() > 0) {
-                    if (tagMod.length() > 0) {
+                    if (tagsPrinted) {
                         // space between tags in normal text color
                         if (isSelected) {
                             screen->setForegroundColor(programDefaults->statusBarTextColor());
@@ -864,6 +903,7 @@ ProjectView::redrawLine( int logicalIndex, int isSelected )
         int isSeparator = (item->type == PVITEM_SEPARATOR);
 
         // tag colors
+        CxAnsiForegroundColor tagMissingColor("bright_yellow");
         CxAnsiForegroundColor tagModifiedColor("bright_red");
         CxAnsiForegroundColor tagInMemoryColor("cyan");
 
@@ -872,6 +912,7 @@ ProjectView::redrawLine( int logicalIndex, int isSelected )
         int prefixDisplayWidth;
         CxString text;
         int textExtraBytes = 0;
+        CxString tagMissing;
         CxString tagMod;
         CxString tagMem;
 
@@ -921,6 +962,9 @@ ProjectView::redrawLine( int logicalIndex, int isSelected )
                 prefixDisplayWidth = 5;
                 text = sub->files.at(item->fileIndex);
 
+                if (item->isMissing) {
+                    tagMissing = "/missing";
+                }
                 if (item->isModified) {
                     tagMod = "/modified";
                 }
@@ -983,7 +1027,11 @@ ProjectView::redrawLine( int logicalIndex, int isSelected )
         // compute layout
         int textAreaLen = contentWidth - prefixDisplayWidth - 1;
         int totalTagLen = 0;
-        if (tagMod.length() > 0) totalTagLen += (int)tagMod.length();
+        if (tagMissing.length() > 0) totalTagLen += (int)tagMissing.length();
+        if (tagMod.length() > 0) {
+            if (totalTagLen > 0) totalTagLen += 1;
+            totalTagLen += (int)tagMod.length();
+        }
         if (tagMem.length() > 0) {
             if (totalTagLen > 0) totalTagLen += 1;
             totalTagLen += (int)tagMem.length();
@@ -1030,14 +1078,36 @@ ProjectView::redrawLine( int logicalIndex, int isSelected )
                 ? programDefaults->statusBarBackgroundColor()
                 : programDefaults->modalContentBackgroundColor();
 
+            int tagsPrinted = 0;
+
+            // draw /missing tag in yellow (first)
+            if (tagMissing.length() > 0) {
+                screen->setForegroundColor(&tagMissingColor);
+                screen->setBackgroundColor(tagBg);
+                screen->writeText(tagMissing);
+                tagsPrinted = 1;
+            }
+
+            // draw /modified tag in red
             if (tagMod.length() > 0) {
+                if (tagsPrinted) {
+                    if (isSelected) {
+                        screen->setForegroundColor(programDefaults->statusBarTextColor());
+                    } else {
+                        screen->setForegroundColor(programDefaults->modalContentTextColor());
+                    }
+                    screen->setBackgroundColor(tagBg);
+                    screen->writeText(" ");
+                }
                 screen->setForegroundColor(&tagModifiedColor);
                 screen->setBackgroundColor(tagBg);
                 screen->writeText(tagMod);
+                tagsPrinted = 1;
             }
 
+            // draw /in-memory tag in cyan
             if (tagMem.length() > 0) {
-                if (tagMod.length() > 0) {
+                if (tagsPrinted) {
                     if (isSelected) {
                         screen->setForegroundColor(programDefaults->statusBarTextColor());
                     } else {
@@ -1193,9 +1263,9 @@ ProjectView::getContextFooter( void )
     // subproject header - use cached hasModifiedFile
     if (item->type == PVITEM_SUBPROJECT) {
         if (item->hasModifiedFile) {
-            return "[S] Save All  [M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
+            return "[V] Verify  [S] Save All  [M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
         }
-        return "[M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
+        return "[V] Verify  [M] Make  [C] Clean  [T] Test  [N] New  [Esc] Close";
     }
 
     // ALL row
@@ -1261,6 +1331,225 @@ ProjectView::toggleSelectedSubproject( void )
             selectedListItemIndex = 0;
         }
     }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::verifySubprojectFiles
+//
+// Check existence of all files in the selected subproject. Mark missing files with isMissing=1.
+// Updates status bar with progress. On modern platforms, scrolls through files during check.
+// Returns count of missing files.
+//
+//-------------------------------------------------------------------------------------------------
+int
+ProjectView::verifySubprojectFiles( void )
+{
+    ProjectSubproject *sub = getSelectedSubproject();
+    if (sub == NULL) return 0;
+
+    // get subproject index from selected item
+    ProjectViewItem *selectedItem = _visibleItems.at(selectedListItemIndex);
+    int subIndex = selectedItem->subprojectIndex;
+
+    int fileCount = (int)sub->files.entries();
+    int missingCount = 0;
+
+    // auto-expand subproject if collapsed so files are visible
+    if (!sub->isExpanded) {
+        sub->isExpanded = 1;
+        rebuildVisibleItems();
+        redraw();
+    }
+
+    // time-based throttling for status bar updates (vintage platforms)
+    time_t lastStatusUpdate = 0;
+
+    // iterate through visible items for this subproject
+    int fileNum = 0;
+    for (int i = 0; i < (int)_visibleItems.entries(); i++) {
+        ProjectViewItem *item = _visibleItems.at(i);
+        if (item->type != PVITEM_FILE || item->subprojectIndex != subIndex) {
+            continue;
+        }
+
+        fileNum++;
+
+        //-------------------------------------------------------------------------
+        // MODERN PLATFORMS: update status bar every file, scroll through list
+        //-------------------------------------------------------------------------
+        #if defined(_OSX_) || defined(_LINUX_)
+        {
+            // update status bar with progress
+            char progressMsg[100];
+            sprintf(progressMsg, "(Verifying %s... %d/%d)",
+                    sub->name.data(), fileNum, fileCount);
+            _screenEditor->setMessage(progressMsg);
+
+            // scroll to show this file
+            if (i < firstVisibleListIndex ||
+                i >= firstVisibleListIndex + screenProjectNumberOfLines) {
+                firstVisibleListIndex = i - (screenProjectNumberOfLines / 2);
+                if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
+                redraw();
+            }
+            screen->flush();
+        }
+        //-------------------------------------------------------------------------
+        // VINTAGE PLATFORMS: time-throttled status bar, no scrolling
+        //-------------------------------------------------------------------------
+        #else
+        {
+            time_t now = time(NULL);
+            if (now > lastStatusUpdate) {
+                char progressMsg[100];
+                sprintf(progressMsg, "(Verifying %s... %d/%d)",
+                        sub->name.data(), fileNum, fileCount);
+                _screenEditor->setMessage(progressMsg);
+                lastStatusUpdate = now;
+            }
+            // no scrolling, no flush per-file
+        }
+        #endif
+
+        // check file existence (stat only, no buffer creation)
+        CxString resolved = project->resolveFilePath(sub, sub->files.at(item->fileIndex));
+        CxFileAccess::status stat = CxFileAccess::checkStatus(resolved);
+
+        if (stat == CxFileAccess::NOT_FOUND || stat == CxFileAccess::NOT_FOUND_W) {
+            item->isMissing = 1;
+            missingCount++;
+
+            #if defined(_OSX_) || defined(_LINUX_)
+            // immediately redraw this line to show /missing tag
+            redrawLine(i, (i == selectedListItemIndex) ? 1 : 0);
+            screen->flush();
+            #endif
+            // vintage: isMissing is set, but redraw deferred to end
+        } else {
+            item->isMissing = 0;
+        }
+    }
+
+    //-------------------------------------------------------------------------
+    // VINTAGE PLATFORMS: single redraw at end to reveal all /missing tags
+    //-------------------------------------------------------------------------
+    #if !defined(_OSX_) && !defined(_LINUX_)
+    if (missingCount > 0) {
+        redraw();
+        screen->flush();
+    }
+    #endif
+
+    return missingCount;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::verifyAllSubprojects
+//
+// Check existence of all files in all subprojects. Auto-expands collapsed subprojects.
+// Used by projectAutoVerify setting on modern platforms.
+// Returns total count of missing files across all subprojects.
+//
+//-------------------------------------------------------------------------------------------------
+int
+ProjectView::verifyAllSubprojects( void )
+{
+    if (project == NULL || project->subprojectCount() == 0) {
+        return 0;
+    }
+
+    int totalMissing = 0;
+
+    // First, expand all collapsed subprojects so files are visible
+    int needRebuild = 0;
+    for (int s = 0; s < project->subprojectCount(); s++) {
+        ProjectSubproject *sub = project->subprojectAt(s);
+        if (!sub->isExpanded) {
+            sub->isExpanded = 1;
+            needRebuild = 1;
+        }
+    }
+
+    if (needRebuild) {
+        rebuildVisibleItems();
+        redraw();
+    }
+
+    // Now verify all files across all subprojects
+    int totalFiles = 0;
+    for (int s = 0; s < project->subprojectCount(); s++) {
+        ProjectSubproject *sub = project->subprojectAt(s);
+        totalFiles += (int)sub->files.entries();
+    }
+
+    int fileNum = 0;
+    time_t lastStatusUpdate = 0;
+
+    for (int i = 0; i < (int)_visibleItems.entries(); i++) {
+        ProjectViewItem *item = _visibleItems.at(i);
+        if (item->type != PVITEM_FILE) {
+            continue;
+        }
+
+        fileNum++;
+        ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+
+        // Update status bar with progress
+        #if defined(_OSX_) || defined(_LINUX_)
+        {
+            char progressMsg[100];
+            sprintf(progressMsg, "(Verifying all... %d/%d)", fileNum, totalFiles);
+            _screenEditor->setMessage(progressMsg);
+
+            // Scroll to show this file
+            if (i < firstVisibleListIndex ||
+                i >= firstVisibleListIndex + screenProjectNumberOfLines) {
+                firstVisibleListIndex = i - (screenProjectNumberOfLines / 2);
+                if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
+                redraw();
+            }
+            screen->flush();
+        }
+        #else
+        {
+            time_t now = time(NULL);
+            if (now > lastStatusUpdate) {
+                char progressMsg[100];
+                sprintf(progressMsg, "(Verifying all... %d/%d)", fileNum, totalFiles);
+                _screenEditor->setMessage(progressMsg);
+                lastStatusUpdate = now;
+            }
+        }
+        #endif
+
+        // Check file existence
+        CxString resolved = project->resolveFilePath(sub, sub->files.at(item->fileIndex));
+        CxFileAccess::status stat = CxFileAccess::checkStatus(resolved);
+
+        if (stat == CxFileAccess::NOT_FOUND || stat == CxFileAccess::NOT_FOUND_W) {
+            item->isMissing = 1;
+            totalMissing++;
+
+            #if defined(_OSX_) || defined(_LINUX_)
+            redrawLine(i, (i == selectedListItemIndex) ? 1 : 0);
+            screen->flush();
+            #endif
+        } else {
+            item->isMissing = 0;
+        }
+    }
+
+    // Vintage platforms: single redraw at end
+    #if !defined(_OSX_) && !defined(_LINUX_)
+    if (totalMissing > 0) {
+        redraw();
+        screen->flush();
+    }
+    #endif
+
+    return totalMissing;
 }
 
 

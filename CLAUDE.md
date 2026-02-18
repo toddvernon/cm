@@ -75,6 +75,24 @@ The make target excludes build outputs and other cruft that should not be distri
 - Code must compile on: macOS (darwin), Linux, SunOS/Solaris, IRIX.
 - Assume older compilers. Avoid modern language features (C++11+), unless the codebase already uses them everywhere.
 
+## Platform classification
+
+For features with platform-specific behavior (e.g., UI responsiveness, I/O intensity):
+
+- **Modern platforms**: macOS (`_OSX_`), Linux (`_LINUX_`)
+  - Can afford more screen I/O, visual effects, real-time updates
+- **Vintage platforms**: Everything else (`_SUNOS_`, `_SOLARIS6_`, `_SOLARIS10_`, `_IRIX6_`, `_NETBSD_`, `_NEXT_`)
+  - Minimize screen I/O, avoid unnecessary redraws, batch updates
+
+Use this pattern for platform-specific code:
+```c
+#if defined(_OSX_) || defined(_LINUX_)
+    // Modern: richer UI behavior
+#else
+    // Vintage: minimal I/O
+#endif
+```
+
 ## Language/feature restrictions (assume old toolchains)
 - Avoid: auto, nullptr, constexpr, lambda, range-for, threads, regex, exceptions (unless already widely used).
 - Avoid: <iostream>, <string>, <vector>, <map>, <memory>, <algorithm>, <functional>, <type_traits>, etc.

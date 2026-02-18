@@ -116,6 +116,9 @@ public:
     int liveStatusLine(void);
     // should the status line have the current cursor position and percentage
 
+    int projectAutoVerify(void);
+    // should the project view auto-verify files when displayed (modern platforms only)
+
 private:
     
     int readFile( CxString fname );
@@ -166,6 +169,7 @@ private:
 	int _autoSaveOnBufferChange;
     int _colorizeSyntax;
     int _liveStatusLine;
+    int _projectAutoVerify;
 
     CxJSONBase *_baseNode;
 };

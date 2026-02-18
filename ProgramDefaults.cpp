@@ -43,8 +43,10 @@ ProgramDefaults::ProgramDefaults(void)
 	_autoSaveOnBufferChange(FALSE),
     _colorizeSyntax(FALSE),
 #if defined(_OSX_) || defined(_LINUX_)
+    _projectAutoVerify(TRUE),
     _liveStatusLine(TRUE)
 #else
+    _projectAutoVerify(FALSE),
     _liveStatusLine(FALSE)
 #endif
 {
@@ -204,7 +206,8 @@ ProgramDefaults::loadDefaults( CxString fname )
             parseBooleanField( object, "autoSaveOnBufferChange", &_autoSaveOnBufferChange );
             parseBooleanField( object, "colorizeSyntax", &_colorizeSyntax );
             parseBooleanField( object, "liveStatusLines", &_liveStatusLine );
-            
+            parseBooleanField( object, "projectAutoVerify", &_projectAutoVerify );
+
             //-------------------------------------------------------------------------------------
             // get the colors member
             //
@@ -564,7 +567,14 @@ int
 ProgramDefaults::autoSaveOnBufferChange(void)
 {
     return( _autoSaveOnBufferChange );
+}
 
+
+// should the project view auto-verify files when displayed (modern platforms only)
+int
+ProgramDefaults::projectAutoVerify(void)
+{
+    return( _projectAutoVerify );
 }
 
 
@@ -783,6 +793,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *strColor  = "RGB:150,230,150";
     const char *number    = "RGB:180,220,255";
     const char *liveStatus = "true";
+    const char *projectVerify = "true";
 #elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
     const char *hdr  = "# Uses XTERM 256 color palette for broad terminal compatibility";
     const char *statusFg  = "XTERM256:White";
@@ -798,6 +809,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *strColor  = "XTERM256:PaleGreen1";
     const char *number    = "XTERM256:LightSteelBlue1";
     const char *liveStatus = "false";
+    const char *projectVerify = "false";
 #else
     const char *hdr  = "# Uses ANSI 16-color palette for maximum terminal compatibility";
     const char *statusFg  = "ANSI:BRIGHT_WHITE";
@@ -813,6 +825,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *strColor  = "ANSI:GREEN";
     const char *number    = "ANSI:CYAN";
     const char *liveStatus = "false";
+    const char *projectVerify = "false";
 #endif
 
     file.printf("# .cmrc defaults file\n");
@@ -827,6 +840,7 @@ ProgramDefaults::writeDefaults(CxString path)
     file.printf("    \"colorizeSyntax\": true,\n");
     file.printf("    \"liveStatusLines\": %s,\n", liveStatus);
     file.printf("    \"autoSaveOnBufferChange\": false,\n");
+    file.printf("    \"projectAutoVerify\": %s,\n", projectVerify);
     file.printf("\n");
 
     // UI colors

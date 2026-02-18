@@ -34,6 +34,8 @@
 #ifndef _ProjectView_h_
 #define _ProjectView_h_
 
+class ScreenEditor;  // forward declaration for status bar updates
+
 
 //-------------------------------------------------------------------------------------------------
 // ProjectViewItemType
@@ -65,6 +67,7 @@ struct ProjectViewItem {
     int isModified;          // cached: buffer has unsaved changes
     int isInMemory;          // cached: buffer is loaded in memory
     int hasModifiedFile;     // cached: subproject has modified files (for headers)
+    int isMissing;           // cached: file doesn't exist on disk (set by verify)
     CxString formattedText;  // pre-computed display text (with padding)
 };
 
@@ -80,7 +83,7 @@ class ProjectView
 {
   public:
 
-    ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screen );
+    ProjectView( ProgramDefaults *pd, CmEditBufferList *ebl, Project *proj, CxScreen *screen, ScreenEditor *se );
     // Constructor
 
     void routeKeyAction( CxKeyAction keyAction );
@@ -112,6 +115,16 @@ class ProjectView
 
     CxString getContextFooter( void );
     // build footer string based on currently selected item type
+
+    int verifySubprojectFiles( void );
+    // Check existence of all files in selected subproject, mark missing ones.
+    // Updates status bar with progress, scrolls on modern platforms.
+    // Returns: count of missing files
+
+    int verifyAllSubprojects( void );
+    // Check existence of all files in all subprojects.
+    // Auto-expands collapsed subprojects. Used by projectAutoVerify setting.
+    // Returns: total count of missing files across all subprojects.
 
   private:
 
@@ -176,6 +189,8 @@ class ProjectView
     int _cachedContentWidth;   // content width when strings were built
 
     CxString _lastFooter;      // cached footer for change detection
+
+    ScreenEditor *_screenEditor;  // for status bar updates during verify
 
 };
 
