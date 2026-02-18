@@ -14,7 +14,13 @@
         "statusBarTextColor": "ANSI:BRIGHT_WHITE",
         "statusBarBackgroundColor": "ANSI:BLUE",
         "lineNumberTextColor": "ANSI:BRIGHT_BLACK",
-        "commandLineMessageTextColor": "ANSI:BRIGHT_CYAN"
+        "commandLineMessageTextColor": "ANSI:BRIGHT_CYAN",
+        "modalFrameTextColor": "ANSI:BRIGHT_WHITE",
+        "modalFrameBackgroundColor": "ANSI:BLUE",
+        "modalContentTextColor": "ANSI:WHITE",
+        "modalContentBackgroundColor": "ANSI:BLACK",
+        "modalSelectionTextColor": "ANSI:BLACK",
+        "modalSelectionBackgroundColor": "ANSI:WHITE"
     },
 
     "syntaxColors": {

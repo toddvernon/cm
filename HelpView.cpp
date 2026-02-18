@@ -59,6 +59,17 @@ HelpView::HelpView( ProgramDefaults *pd, CxScreen *screenPtr )
 
 
 //-------------------------------------------------------------------------------------------------
+// fileIsReadable - helper to check if a file exists and is readable
+//-------------------------------------------------------------------------------------------------
+static int
+fileIsReadable( CxString path )
+{
+    CxFileAccess::status stat = CxFileAccess::checkStatus(path);
+    return (stat == CxFileAccess::FOUND_R || stat == CxFileAccess::FOUND_RW);
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // HelpView::findHelpFile
 //
 // Search for help file in standard locations. Returns TRUE and sets outPath if found.
@@ -68,84 +79,47 @@ int
 HelpView::findHelpFile( CxString *outPath )
 {
     CxString path;
+    char *home = getenv("HOME");
 
 #if defined(_LINUX_) || defined(_OSX_)
     // Modern platforms: try .md first, then .txt
 
     // 1. CWD - development
     path = "./cm_help.md";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
     path = "./cm_help.txt";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
 
     // 2. $HOME/.cm/
-    char *home = getenv("HOME");
     if (home != NULL) {
         path = CxString(home) + "/.cm/cm_help.md";
-        if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-            CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-            *outPath = path;
-            return TRUE;
-        }
+        if (fileIsReadable(path)) { *outPath = path; return TRUE; }
         path = CxString(home) + "/.cm/cm_help.txt";
-        if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-            CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-            *outPath = path;
-            return TRUE;
-        }
+        if (fileIsReadable(path)) { *outPath = path; return TRUE; }
     }
 
     // 3. /usr/local/share/cm/
     path = "/usr/local/share/cm/cm_help.md";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
     path = "/usr/local/share/cm/cm_help.txt";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
 
 #else
     // Old platforms: only try .txt
 
     // 1. CWD
     path = "./cm_help.txt";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
 
     // 2. $HOME/.cm/
-    char *home = getenv("HOME");
     if (home != NULL) {
         path = CxString(home) + "/.cm/cm_help.txt";
-        if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-            CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-            *outPath = path;
-            return TRUE;
-        }
+        if (fileIsReadable(path)) { *outPath = path; return TRUE; }
     }
 
     // 3. /usr/local/share/cm/
     path = "/usr/local/share/cm/cm_help.txt";
-    if (CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_R ||
-        CxFileAccess::checkStatus(path) == CxFileAccess::FOUND_RW) {
-        *outPath = path;
-        return TRUE;
-    }
+    if (fileIsReadable(path)) { *outPath = path; return TRUE; }
 
 #endif
 
@@ -577,8 +551,7 @@ HelpView::redraw( void )
                 screen->setForegroundColor(programDefaults->keywordTextColor(14));
                 screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
             } else {
-                screen->setForegroundColor(programDefaults->modalContentTextColor());
-                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+                programDefaults->applyModalContentColors(screen);
             }
 
             // draw the pre-computed line (or separator)
@@ -598,8 +571,7 @@ HelpView::redraw( void )
         // draw empty line if beyond visible items
         //-----------------------------------------------------------------------------------------
         } else {
-            screen->setForegroundColor(programDefaults->modalContentTextColor());
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+            programDefaults->applyModalContentColors(screen);
             screen->writeText(_emptyLine);
             screen->resetColors();
         }
@@ -648,8 +620,7 @@ HelpView::redrawLine( int logicalIndex, int isSelected )
             screen->setForegroundColor(programDefaults->keywordTextColor(14));
             screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
         } else {
-            screen->setForegroundColor(programDefaults->modalContentTextColor());
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+            programDefaults->applyModalContentColors(screen);
         }
 
         if (isSeparator) {

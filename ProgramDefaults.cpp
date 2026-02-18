@@ -12,6 +12,7 @@
 //-------------------------------------------------------------------------------------------------
 
 #include "ProgramDefaults.h"
+#include <cx/screen/screen.h>
 
 
 //-------------------------------------------------------------------------------------------------
@@ -240,6 +241,14 @@ ProgramDefaults::loadDefaults( CxString fname )
                     parseColorFromJSON(colorObject, "cppLanguageTypesTextColor", &_cppLanguageTypesTextColor, FALSE);
                     parseColorFromJSON(colorObject, "cppLanguageElementsTextColor", &_cppLanguageElementsTextColor, FALSE);
                     parseColorFromJSON(colorObject, "cppLanguageMethodDefinitionTextColor", &_cppLanguageMethodDefinitionTextColor, FALSE);
+
+                    // modal dialog colors
+                    parseColorFromJSON(colorObject, "modalFrameTextColor", &_modalFrameTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "modalFrameBackgroundColor", &_modalFrameBackgroundColor, TRUE);
+                    parseColorFromJSON(colorObject, "modalContentTextColor", &_modalContentTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "modalContentBackgroundColor", &_modalContentBackgroundColor, TRUE);
+                    parseColorFromJSON(colorObject, "modalSelectionTextColor", &_modalSelectionTextColor, FALSE);
+                    parseColorFromJSON(colorObject, "modalSelectionBackgroundColor", &_modalSelectionBackgroundColor, TRUE);
 
                 }
             }
@@ -541,6 +550,34 @@ ProgramDefaults::modalSelectionBackgroundColor(void)
 
 
 //-------------------------------------------------------------------------------------------------
+// ProgramDefaults::applyModalContentColors
+//
+// Apply modal content foreground and background colors to the screen.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProgramDefaults::applyModalContentColors(CxScreen *screen)
+{
+    screen->setForegroundColor(_modalContentTextColor);
+    screen->setBackgroundColor(_modalContentBackgroundColor);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProgramDefaults::applyModalSelectionColors
+//
+// Apply modal selection foreground and background colors to the screen.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProgramDefaults::applyModalSelectionColors(CxScreen *screen)
+{
+    screen->setForegroundColor(_modalSelectionTextColor);
+    screen->setBackgroundColor(_modalSelectionBackgroundColor);
+}
+
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 CxColor *
 ProgramDefaults::cppLanguageMethodDefinitionTextColor( void )
@@ -792,6 +829,12 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *methodDef = "RGB:130,220,130";
     const char *strColor  = "RGB:150,230,150";
     const char *number    = "RGB:180,220,255";
+    const char *modalFrameFg    = "RGB:250,250,245";
+    const char *modalFrameBg    = "RGB:60,70,100";
+    const char *modalContentFg  = "RGB:220,220,220";
+    const char *modalContentBg  = "RGB:40,45,55";
+    const char *modalSelectFg   = "RGB:30,30,35";
+    const char *modalSelectBg   = "RGB:180,200,255";
     const char *liveStatus = "true";
     const char *projectVerify = "true";
 #elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
@@ -808,6 +851,12 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *methodDef = "XTERM256:LightGreen";
     const char *strColor  = "XTERM256:PaleGreen1";
     const char *number    = "XTERM256:LightSteelBlue1";
+    const char *modalFrameFg    = "XTERM256:White";
+    const char *modalFrameBg    = "XTERM256:DarkBlue";
+    const char *modalContentFg  = "XTERM256:Grey84";
+    const char *modalContentBg  = "XTERM256:Grey19";
+    const char *modalSelectFg   = "XTERM256:Black";
+    const char *modalSelectBg   = "XTERM256:LightSteelBlue1";
     const char *liveStatus = "false";
     const char *projectVerify = "false";
 #else
@@ -824,6 +873,12 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *methodDef = "ANSI:BRIGHT_GREEN";
     const char *strColor  = "ANSI:GREEN";
     const char *number    = "ANSI:CYAN";
+    const char *modalFrameFg    = "ANSI:BRIGHT_WHITE";
+    const char *modalFrameBg    = "ANSI:BLUE";
+    const char *modalContentFg  = "ANSI:WHITE";
+    const char *modalContentBg  = "ANSI:BLACK";
+    const char *modalSelectFg   = "ANSI:BLACK";
+    const char *modalSelectBg   = "ANSI:WHITE";
     const char *liveStatus = "false";
     const char *projectVerify = "false";
 #endif
@@ -848,7 +903,13 @@ ProgramDefaults::writeDefaults(CxString path)
     file.printf("        \"statusBarTextColor\": \"%s\",\n", statusFg);
     file.printf("        \"statusBarBackgroundColor\": \"%s\",\n", statusBg);
     file.printf("        \"lineNumberTextColor\": \"%s\",\n", lineNum);
-    file.printf("        \"commandLineMessageTextColor\": \"%s\"\n", cmdMsg);
+    file.printf("        \"commandLineMessageTextColor\": \"%s\",\n", cmdMsg);
+    file.printf("        \"modalFrameTextColor\": \"%s\",\n", modalFrameFg);
+    file.printf("        \"modalFrameBackgroundColor\": \"%s\",\n", modalFrameBg);
+    file.printf("        \"modalContentTextColor\": \"%s\",\n", modalContentFg);
+    file.printf("        \"modalContentBackgroundColor\": \"%s\",\n", modalContentBg);
+    file.printf("        \"modalSelectionTextColor\": \"%s\",\n", modalSelectFg);
+    file.printf("        \"modalSelectionBackgroundColor\": \"%s\"\n", modalSelectBg);
     file.printf("    },\n");
     file.printf("\n");
 

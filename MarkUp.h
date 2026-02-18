@@ -15,7 +15,6 @@
 #include <math.h>
 
 #include <sys/types.h>
-#include <iostream>
 #include <cx/base/string.h>
 #include <cx/screen/screen.h>
 

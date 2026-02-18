@@ -537,21 +537,313 @@ ProjectView::recalcScreenPlacements(void)
 
 
 //-------------------------------------------------------------------------------------------------
+//
+// REDRAW ARCHITECTURE - Two-tier strategy for vintage platform performance
+//
+// On slow terminals (vintage serial connections, limited bandwidth), redrawing the entire
+// dialog for every keystroke is expensive. We optimize by separating:
+//
+//   redraw()         - Full content redraw. Used after scroll, expand/collapse, or resize.
+//                      Redraws frame, title, all visible lines, and footer.
+//
+//   redrawLine()     - Incremental single-line update. Used for arrow key navigation.
+//                      Only redraws the old selection (unhighlight) and new selection
+//                      (highlight), plus footer if context changed. 2 lines vs 20+.
+//
+// Both methods delegate actual line rendering to renderItemToScreen(), eliminating the
+// code duplication that would otherwise exist between full and incremental paths.
+//
+//-------------------------------------------------------------------------------------------------
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::renderItemToScreen
+//
+// Render a single item at its screen position. Shared by redraw() and redrawLine().
+// Handles all item types, tag coloring, and selection highlighting.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::renderItemToScreen( int logicalIndex, int isSelected )
+{
+    int contentLeft = frame->contentLeft();
+    int contentWidth = frame->contentWidth();
+    int row = screenProjectFirstListLine + (logicalIndex - firstVisibleListIndex);
+
+    screen->placeCursor(row, contentLeft);
+
+    // if beyond visible items, draw empty line
+    if (logicalIndex >= (int)_visibleItems.entries()) {
+        programDefaults->applyModalContentColors(screen);
+        screen->writeText(_emptyLine);
+        screen->resetColors();
+        return;
+    }
+
+    ProjectViewItem *item = _visibleItems.at(logicalIndex);
+    int isSeparator = (item->type == PVITEM_SEPARATOR);
+
+    // tag colors
+    CxAnsiForegroundColor tagMissingColor("bright_yellow");
+    CxAnsiForegroundColor tagModifiedColor("bright_red");
+    CxAnsiForegroundColor tagInMemoryColor("cyan");
+
+    //---------------------------------------------------------------------------------------------
+    // build display text based on item type
+    //---------------------------------------------------------------------------------------------
+    CxString prefix;
+    int prefixDisplayWidth = 0;
+    CxString text;
+    int textExtraBytes = 0;
+    CxString tagMissing;
+    CxString tagMod;
+    CxString tagMem;
+
+    switch (item->type) {
+
+        case PVITEM_ALL:
+            prefix = "   ";
+            prefixDisplayWidth = 3;
+#if defined(_LINUX_) || defined(_OSX_)
+            text = "All \xf0\x9f\x8e\xaf";
+            textExtraBytes = 2;
+#else
+            text = "All (target)";
+#endif
+            break;
+
+        case PVITEM_SUBPROJECT:
+        {
+            ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+            prefix = " ";
+            if (sub->isExpanded) {
+                prefix += EXPAND_INDICATOR;
+            } else {
+                prefix += COLLAPSE_INDICATOR;
+            }
+            prefix += " ";
+            prefixDisplayWidth = 3;
+
+            text = sub->name;
+#if defined(_LINUX_) || defined(_OSX_)
+            text += " \xf0\x9f\x8e\xaf";
+            textExtraBytes = 2;
+#else
+            text += " (target)";
+#endif
+
+            if (item->hasModifiedFile) {
+                tagMod = "/modified";
+            }
+        }
+        break;
+
+        case PVITEM_FILE:
+        {
+            ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
+            prefix = "     ";
+            prefixDisplayWidth = 5;
+            text = sub->files.at(item->fileIndex);
+
+            if (item->isMissing) {
+                tagMissing = "/missing";
+            }
+            if (item->isModified) {
+                tagMod = "/modified";
+            }
+            if (item->isInMemory) {
+                tagMem = "/in-memory";
+            }
+        }
+        break;
+
+        case PVITEM_OPEN_HEADER:
+        {
+            prefix = " ";
+            if (_otherFilesExpanded) {
+                prefix += EXPAND_INDICATOR;
+            } else {
+                prefix += COLLAPSE_INDICATOR;
+            }
+            prefix += " ";
+            prefixDisplayWidth = 3;
+            text = "Other Files";
+        }
+        break;
+
+        case PVITEM_OPEN_FILE:
+        {
+            prefix = "     ";
+            prefixDisplayWidth = 5;
+
+            CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
+            if (buf != NULL) {
+                CxString path = buf->getFilePath();
+                int lastSlash = path.lastChar('/');
+                if (lastSlash >= 0) {
+                    text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
+                } else {
+                    text = path;
+                }
+
+                if (item->isModified) {
+                    tagMod = "/modified";
+                }
+                if (item->isInMemory) {
+                    tagMem = "/in-memory";
+                }
+            } else {
+                text = "(unknown)";
+            }
+        }
+        break;
+
+        case PVITEM_SEPARATOR:
+        {
+            prefix = "";
+            prefixDisplayWidth = 0;
+            text = "";
+        }
+        break;
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // compute layout: text area, tag placement
+    //---------------------------------------------------------------------------------------------
+    int textAreaLen = contentWidth - prefixDisplayWidth - 1;
+
+    int totalTagLen = 0;
+    if (tagMissing.length() > 0) totalTagLen += (int)tagMissing.length();
+    if (tagMod.length() > 0) {
+        if (totalTagLen > 0) totalTagLen += 1;
+        totalTagLen += (int)tagMod.length();
+    }
+    if (tagMem.length() > 0) {
+        if (totalTagLen > 0) totalTagLen += 1;
+        totalTagLen += (int)tagMem.length();
+    }
+
+    int maxTextLen = textAreaLen;
+    if (totalTagLen > 0) {
+        maxTextLen = textAreaLen - totalTagLen - 1;
+    }
+
+    if (!isSeparator) {
+        if ((int)text.length() - textExtraBytes > maxTextLen) {
+            text = text.subString(0, maxTextLen - 3 + textExtraBytes);
+            text += "...";
+        }
+
+        int textDisplayLen = (int)text.length() - textExtraBytes;
+        int padNeeded = textAreaLen - textDisplayLen;
+        if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+            text += _paddingSpaces.subString(0, padNeeded);
+        }
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // draw with selection highlight or normal colors
+    //---------------------------------------------------------------------------------------------
+    if (isSelected && !isSeparator) {
+        screen->setForegroundColor(programDefaults->statusBarTextColor());
+        screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+    } else {
+        programDefaults->applyModalContentColors(screen);
+    }
+
+    if (isSeparator) {
+        screen->writeText(_separatorLine);
+    } else if (totalTagLen > 0) {
+        // draw prefix + text up to tag position
+        int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
+        CxString textPart = text.subString(0, textBeforeTag);
+
+        CxString line = prefix;
+        line += textPart;
+        screen->writeText(line);
+
+        // set background for tags
+        CxColor *tagBg = isSelected
+            ? programDefaults->statusBarBackgroundColor()
+            : programDefaults->modalContentBackgroundColor();
+
+        int tagsPrinted = 0;
+
+        // draw /missing tag in yellow
+        if (tagMissing.length() > 0) {
+            screen->setForegroundColor(&tagMissingColor);
+            screen->setBackgroundColor(tagBg);
+            screen->writeText(tagMissing);
+            tagsPrinted = 1;
+        }
+
+        // draw /modified tag in red
+        if (tagMod.length() > 0) {
+            if (tagsPrinted) {
+                if (isSelected) {
+                    screen->setForegroundColor(programDefaults->statusBarTextColor());
+                } else {
+                    screen->setForegroundColor(programDefaults->modalContentTextColor());
+                }
+                screen->setBackgroundColor(tagBg);
+                screen->writeText(" ");
+            }
+            screen->setForegroundColor(&tagModifiedColor);
+            screen->setBackgroundColor(tagBg);
+            screen->writeText(tagMod);
+            tagsPrinted = 1;
+        }
+
+        // draw /in-memory tag in cyan
+        if (tagMem.length() > 0) {
+            if (tagsPrinted) {
+                if (isSelected) {
+                    screen->setForegroundColor(programDefaults->statusBarTextColor());
+                } else {
+                    screen->setForegroundColor(programDefaults->modalContentTextColor());
+                }
+                screen->setBackgroundColor(tagBg);
+                screen->writeText(" ");
+            }
+            screen->setForegroundColor(&tagInMemoryColor);
+            screen->setBackgroundColor(tagBg);
+            screen->writeText(tagMem);
+        }
+
+        // trailing space in normal colors
+        if (isSelected) {
+            screen->setForegroundColor(programDefaults->statusBarTextColor());
+            screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+        } else {
+            programDefaults->applyModalContentColors(screen);
+        }
+        screen->writeText(" ");
+    } else {
+        // no tag - simple line
+        CxString line = prefix;
+        line += text;
+        line += " ";
+        screen->writeText(line);
+    }
+
+    screen->resetColors();
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ProjectView::redraw
 //
-// Draw centered modal dialog with box frame, title, grouped subproject content, and footer.
+// Full content redraw. Draws frame, title, all visible lines, and footer.
+// Used after scroll, expand/collapse, resize, or initial display.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ProjectView::redraw( void )
 {
-    int cursorRow = 0;
-
     reframe();
 
     // get frame content bounds
-    int contentLeft  = frame->contentLeft();
-    int contentWidth = frame->contentWidth();
+    int contentLeft = frame->contentLeft();
 
     //---------------------------------------------------------------------------------------------
     // set frame colors and draw the frame with title and footer
@@ -575,294 +867,21 @@ ProjectView::redraw( void )
 
     frame->drawWithTitleAndFooter(title, footer);
 
-    // tag colors - bright_yellow for missing, bright_red for modified, cyan for in-memory
-    CxAnsiForegroundColor tagMissingColor("bright_yellow");
-    CxAnsiForegroundColor tagModifiedColor("bright_red");
-    CxAnsiForegroundColor tagInMemoryColor("cyan");
-
     //---------------------------------------------------------------------------------------------
-    // draw the visible items (using cached state from rebuildVisibleItems)
+    // draw all visible items using shared renderer
     //---------------------------------------------------------------------------------------------
+    int cursorRow = screenProjectFirstListLine;
     for (int c = 0; c < screenProjectNumberOfLines; c++) {
-
-        // get the logical list index
         int logicalItem = firstVisibleListIndex + c;
-        int row = screenProjectFirstListLine + c;
+        int isSelected = (selectedListItemIndex == logicalItem);
 
-        // position cursor at start of content area
-        screen->placeCursor(row, contentLeft);
+        renderItemToScreen(logicalItem, isSelected);
 
-        // if this item exists in the visible list
-        if (logicalItem < (int)_visibleItems.entries()) {
-
+        if (isSelected && logicalItem < (int)_visibleItems.entries()) {
             ProjectViewItem *item = _visibleItems.at(logicalItem);
-
-            //-------------------------------------------------------------------------------------
-            // build the display text and tag based on item type (using cached values)
-            //-------------------------------------------------------------------------------------
-            CxString prefix;
-            int prefixDisplayWidth;
-            CxString text;
-            int textExtraBytes = 0;  // bytes beyond display columns for multi-byte chars
-            CxString tagMissing;  // "/missing" or empty
-            CxString tagMod;      // "/modified" or empty
-            CxString tagMem;      // "/in-memory" or empty
-
-            switch (item->type) {
-
-                case PVITEM_ALL:
-                    prefix = "   ";
-                    prefixDisplayWidth = 3;
-#if defined(_LINUX_) || defined(_OSX_)
-                    text = "All \xf0\x9f\x8e\xaf";  // 🎯
-                    textExtraBytes = 2;  // 4 bytes, 2 display columns
-#else
-                    text = "All (target)";
-#endif
-                    break;
-
-                case PVITEM_SUBPROJECT:
-                {
-                    ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
-                    prefix = " ";
-                    if (sub->isExpanded) {
-                        prefix += EXPAND_INDICATOR;
-                    } else {
-                        prefix += COLLAPSE_INDICATOR;
-                    }
-                    prefix += " ";
-                    prefixDisplayWidth = 3;
-
-                    text = sub->name;
-#if defined(_LINUX_) || defined(_OSX_)
-                    text += " \xf0\x9f\x8e\xaf";  // 🎯
-                    textExtraBytes = 2;
-#else
-                    text += " (target)";
-#endif
-
-                    // use cached value instead of calling subprojectHasModifiedFile()
-                    if (item->hasModifiedFile) {
-                        tagMod = "/modified";
-                    }
-                }
-                break;
-
-                case PVITEM_FILE:
-                {
-                    ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
-                    prefix = "     ";
-                    prefixDisplayWidth = 5;
-                    text = sub->files.at(item->fileIndex);
-
-                    // use cached values instead of calling resolveFilePath + findPath
-                    if (item->isMissing) {
-                        tagMissing = "/missing";
-                    }
-                    if (item->isModified) {
-                        tagMod = "/modified";
-                    }
-                    if (item->isInMemory) {
-                        tagMem = "/in-memory";
-                    }
-                }
-                break;
-
-                case PVITEM_OPEN_HEADER:
-                {
-                    prefix = " ";
-                    if (_otherFilesExpanded) {
-                        prefix += EXPAND_INDICATOR;
-                    } else {
-                        prefix += COLLAPSE_INDICATOR;
-                    }
-                    prefix += " ";
-                    prefixDisplayWidth = 3;
-                    text = "Other Files";
-                }
-                break;
-
-                case PVITEM_OPEN_FILE:
-                {
-                    prefix = "     ";
-                    prefixDisplayWidth = 5;
-
-                    CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
-                    if (buf != NULL) {
-                        CxString path = buf->getFilePath();
-                        int lastSlash = path.lastChar('/');
-                        if (lastSlash >= 0) {
-                            text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
-                        } else {
-                            text = path;
-                        }
-
-                        // use cached values instead of calling isTouched/isInMemory
-                        if (item->isModified) {
-                            tagMod = "/modified";
-                        }
-                        if (item->isInMemory) {
-                            tagMem = "/in-memory";
-                        }
-                    } else {
-                        text = "(unknown)";
-                    }
-                }
-                break;
-
-                case PVITEM_SEPARATOR:
-                {
-                    // use pre-built separator line
-                    prefix = "";
-                    prefixDisplayWidth = 0;
-                    text = "";
-                }
-                break;
-            }
-
-            //-------------------------------------------------------------------------------------
-            // compute layout: text area, tag placement
-            //-------------------------------------------------------------------------------------
-            int textAreaLen = contentWidth - prefixDisplayWidth - 1;
-
-            // total tag display width: each tag plus a space separator between them
-            int totalTagLen = 0;
-            if (tagMissing.length() > 0) totalTagLen += (int)tagMissing.length();
-            if (tagMod.length() > 0) {
-                if (totalTagLen > 0) totalTagLen += 1;  // space between tags
-                totalTagLen += (int)tagMod.length();
-            }
-            if (tagMem.length() > 0) {
-                if (totalTagLen > 0) totalTagLen += 1;  // space between tags
-                totalTagLen += (int)tagMem.length();
-            }
-
-            int maxTextLen = textAreaLen;
-            if (totalTagLen > 0) {
-                maxTextLen = textAreaLen - totalTagLen - 1;  // 1 space before tags
-            }
-
-            // for separator, skip normal text layout
             if (item->type != PVITEM_SEPARATOR) {
-                if ((int)text.length() - textExtraBytes > maxTextLen) {
-                    text = text.subString(0, maxTextLen - 3 + textExtraBytes);
-                    text += "...";
-                }
-
-                // use pre-built padding string instead of character-by-character loop
-                int textDisplayLen = (int)text.length() - textExtraBytes;
-                int padNeeded = textAreaLen - textDisplayLen;
-                if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
-                    text += _paddingSpaces.subString(0, padNeeded);
-                }
+                cursorRow = screenProjectFirstListLine + c;
             }
-
-            //-------------------------------------------------------------------------------------
-            // draw with selection highlight or normal colors
-            //-------------------------------------------------------------------------------------
-            int isSelected = (selectedListItemIndex == logicalItem);
-            int isSeparator = (item->type == PVITEM_SEPARATOR);
-
-            if (isSelected && !isSeparator) {
-                screen->setForegroundColor(programDefaults->statusBarTextColor());
-                screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-            } else {
-                screen->setForegroundColor(programDefaults->modalContentTextColor());
-                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-            }
-
-            if (isSeparator) {
-                // use pre-built separator line
-                screen->writeText(_separatorLine);
-            } else if (totalTagLen > 0) {
-                // draw prefix + text up to tag position
-                int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
-                CxString textPart = text.subString(0, textBeforeTag);
-
-                CxString line = prefix;
-                line += textPart;
-                screen->writeText(line);
-
-                // set background for tags
-                CxColor *tagBg = isSelected
-                    ? programDefaults->statusBarBackgroundColor()
-                    : programDefaults->modalContentBackgroundColor();
-
-                int tagsPrinted = 0;
-
-                // draw /missing tag in yellow (first)
-                if (tagMissing.length() > 0) {
-                    screen->setForegroundColor(&tagMissingColor);
-                    screen->setBackgroundColor(tagBg);
-                    screen->writeText(tagMissing);
-                    tagsPrinted = 1;
-                }
-
-                // draw /modified tag in red
-                if (tagMod.length() > 0) {
-                    if (tagsPrinted) {
-                        if (isSelected) {
-                            screen->setForegroundColor(programDefaults->statusBarTextColor());
-                        } else {
-                            screen->setForegroundColor(programDefaults->modalContentTextColor());
-                        }
-                        screen->setBackgroundColor(tagBg);
-                        screen->writeText(" ");
-                    }
-                    screen->setForegroundColor(&tagModifiedColor);
-                    screen->setBackgroundColor(tagBg);
-                    screen->writeText(tagMod);
-                    tagsPrinted = 1;
-                }
-
-                // draw /in-memory tag in cyan
-                if (tagMem.length() > 0) {
-                    if (tagsPrinted) {
-                        // space between tags in normal text color
-                        if (isSelected) {
-                            screen->setForegroundColor(programDefaults->statusBarTextColor());
-                        } else {
-                            screen->setForegroundColor(programDefaults->modalContentTextColor());
-                        }
-                        screen->setBackgroundColor(tagBg);
-                        screen->writeText(" ");
-                    }
-                    screen->setForegroundColor(&tagInMemoryColor);
-                    screen->setBackgroundColor(tagBg);
-                    screen->writeText(tagMem);
-                }
-
-                // trailing space in normal colors
-                if (isSelected) {
-                    screen->setForegroundColor(programDefaults->statusBarTextColor());
-                    screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-                } else {
-                    screen->setForegroundColor(programDefaults->modalContentTextColor());
-                    screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-                }
-                screen->writeText(" ");
-            } else {
-                // no tag - simple line
-                CxString line = prefix;
-                line += text;
-                line += " ";
-                screen->writeText(line);
-            }
-
-            screen->resetColors();
-
-            if (isSelected && !isSeparator) {
-                cursorRow = row;
-            }
-
-        //-----------------------------------------------------------------------------------------
-        // draw empty line if beyond visible items (use pre-built empty line)
-        //-----------------------------------------------------------------------------------------
-        } else {
-            screen->setForegroundColor(programDefaults->modalContentTextColor());
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-            screen->writeText(_emptyLine);
-            screen->resetColors();
         }
     }
 
@@ -879,265 +898,21 @@ ProjectView::redraw( void )
 //-------------------------------------------------------------------------------------------------
 // ProjectView::redrawLine
 //
-// Redraw a single content line at the given logical index.
-// Used for incremental selection updates.
+// Incremental single-line update. Redraws only the specified line.
+// Used for arrow key navigation - only old and new selection need updating.
+// This is significantly faster than full redraw on vintage terminals.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ProjectView::redrawLine( int logicalIndex, int isSelected )
 {
-    // check bounds
+    // check bounds - only render if line is currently visible
     if (logicalIndex < firstVisibleListIndex ||
         logicalIndex >= firstVisibleListIndex + screenProjectNumberOfLines) {
-        return;  // not visible
+        return;
     }
 
-    int contentLeft = frame->contentLeft();
-    int contentWidth = frame->contentWidth();
-    int row = screenProjectFirstListLine + (logicalIndex - firstVisibleListIndex);
-
-    screen->placeCursor(row, contentLeft);
-
-    if (logicalIndex < (int)_visibleItems.entries()) {
-        ProjectViewItem *item = _visibleItems.at(logicalIndex);
-        int isSeparator = (item->type == PVITEM_SEPARATOR);
-
-        // tag colors
-        CxAnsiForegroundColor tagMissingColor("bright_yellow");
-        CxAnsiForegroundColor tagModifiedColor("bright_red");
-        CxAnsiForegroundColor tagInMemoryColor("cyan");
-
-        // build display text (same logic as redraw)
-        CxString prefix;
-        int prefixDisplayWidth;
-        CxString text;
-        int textExtraBytes = 0;
-        CxString tagMissing;
-        CxString tagMod;
-        CxString tagMem;
-
-        switch (item->type) {
-
-            case PVITEM_ALL:
-                prefix = "   ";
-                prefixDisplayWidth = 3;
-#if defined(_LINUX_) || defined(_OSX_)
-                text = "All \xf0\x9f\x8e\xaf";
-                textExtraBytes = 2;
-#else
-                text = "All (target)";
-#endif
-                break;
-
-            case PVITEM_SUBPROJECT:
-            {
-                ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
-                prefix = " ";
-                if (sub->isExpanded) {
-                    prefix += EXPAND_INDICATOR;
-                } else {
-                    prefix += COLLAPSE_INDICATOR;
-                }
-                prefix += " ";
-                prefixDisplayWidth = 3;
-
-                text = sub->name;
-#if defined(_LINUX_) || defined(_OSX_)
-                text += " \xf0\x9f\x8e\xaf";
-                textExtraBytes = 2;
-#else
-                text += " (target)";
-#endif
-
-                if (item->hasModifiedFile) {
-                    tagMod = "/modified";
-                }
-            }
-            break;
-
-            case PVITEM_FILE:
-            {
-                ProjectSubproject *sub = project->subprojectAt(item->subprojectIndex);
-                prefix = "     ";
-                prefixDisplayWidth = 5;
-                text = sub->files.at(item->fileIndex);
-
-                if (item->isMissing) {
-                    tagMissing = "/missing";
-                }
-                if (item->isModified) {
-                    tagMod = "/modified";
-                }
-                if (item->isInMemory) {
-                    tagMem = "/in-memory";
-                }
-            }
-            break;
-
-            case PVITEM_OPEN_HEADER:
-            {
-                prefix = " ";
-                if (_otherFilesExpanded) {
-                    prefix += EXPAND_INDICATOR;
-                } else {
-                    prefix += COLLAPSE_INDICATOR;
-                }
-                prefix += " ";
-                prefixDisplayWidth = 3;
-                text = "Other Files";
-            }
-            break;
-
-            case PVITEM_OPEN_FILE:
-            {
-                prefix = "     ";
-                prefixDisplayWidth = 5;
-
-                CmEditBuffer *buf = editBufferList->at(item->bufferIndex);
-                if (buf != NULL) {
-                    CxString path = buf->getFilePath();
-                    int lastSlash = path.lastChar('/');
-                    if (lastSlash >= 0) {
-                        text = path.subString(lastSlash + 1, path.length() - lastSlash - 1);
-                    } else {
-                        text = path;
-                    }
-
-                    if (item->isModified) {
-                        tagMod = "/modified";
-                    }
-                    if (item->isInMemory) {
-                        tagMem = "/in-memory";
-                    }
-                } else {
-                    text = "(unknown)";
-                }
-            }
-            break;
-
-            case PVITEM_SEPARATOR:
-            {
-                prefix = "";
-                prefixDisplayWidth = 0;
-                text = "";
-            }
-            break;
-        }
-
-        // compute layout
-        int textAreaLen = contentWidth - prefixDisplayWidth - 1;
-        int totalTagLen = 0;
-        if (tagMissing.length() > 0) totalTagLen += (int)tagMissing.length();
-        if (tagMod.length() > 0) {
-            if (totalTagLen > 0) totalTagLen += 1;
-            totalTagLen += (int)tagMod.length();
-        }
-        if (tagMem.length() > 0) {
-            if (totalTagLen > 0) totalTagLen += 1;
-            totalTagLen += (int)tagMem.length();
-        }
-
-        int maxTextLen = textAreaLen;
-        if (totalTagLen > 0) {
-            maxTextLen = textAreaLen - totalTagLen - 1;
-        }
-
-        if (!isSeparator) {
-            if ((int)text.length() - textExtraBytes > maxTextLen) {
-                text = text.subString(0, maxTextLen - 3 + textExtraBytes);
-                text += "...";
-            }
-
-            int textDisplayLen = (int)text.length() - textExtraBytes;
-            int padNeeded = textAreaLen - textDisplayLen;
-            if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
-                text += _paddingSpaces.subString(0, padNeeded);
-            }
-        }
-
-        // draw with appropriate colors
-        if (isSelected && !isSeparator) {
-            screen->setForegroundColor(programDefaults->statusBarTextColor());
-            screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-        } else {
-            screen->setForegroundColor(programDefaults->modalContentTextColor());
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-        }
-
-        if (isSeparator) {
-            screen->writeText(_separatorLine);
-        } else if (totalTagLen > 0) {
-            int textBeforeTag = textAreaLen - totalTagLen + textExtraBytes;
-            CxString textPart = text.subString(0, textBeforeTag);
-
-            CxString line = prefix;
-            line += textPart;
-            screen->writeText(line);
-
-            CxColor *tagBg = isSelected
-                ? programDefaults->statusBarBackgroundColor()
-                : programDefaults->modalContentBackgroundColor();
-
-            int tagsPrinted = 0;
-
-            // draw /missing tag in yellow (first)
-            if (tagMissing.length() > 0) {
-                screen->setForegroundColor(&tagMissingColor);
-                screen->setBackgroundColor(tagBg);
-                screen->writeText(tagMissing);
-                tagsPrinted = 1;
-            }
-
-            // draw /modified tag in red
-            if (tagMod.length() > 0) {
-                if (tagsPrinted) {
-                    if (isSelected) {
-                        screen->setForegroundColor(programDefaults->statusBarTextColor());
-                    } else {
-                        screen->setForegroundColor(programDefaults->modalContentTextColor());
-                    }
-                    screen->setBackgroundColor(tagBg);
-                    screen->writeText(" ");
-                }
-                screen->setForegroundColor(&tagModifiedColor);
-                screen->setBackgroundColor(tagBg);
-                screen->writeText(tagMod);
-                tagsPrinted = 1;
-            }
-
-            // draw /in-memory tag in cyan
-            if (tagMem.length() > 0) {
-                if (tagsPrinted) {
-                    if (isSelected) {
-                        screen->setForegroundColor(programDefaults->statusBarTextColor());
-                    } else {
-                        screen->setForegroundColor(programDefaults->modalContentTextColor());
-                    }
-                    screen->setBackgroundColor(tagBg);
-                    screen->writeText(" ");
-                }
-                screen->setForegroundColor(&tagInMemoryColor);
-                screen->setBackgroundColor(tagBg);
-                screen->writeText(tagMem);
-            }
-
-            if (isSelected) {
-                screen->setForegroundColor(programDefaults->statusBarTextColor());
-                screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
-            } else {
-                screen->setForegroundColor(programDefaults->modalContentTextColor());
-                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
-            }
-            screen->writeText(" ");
-        } else {
-            CxString line = prefix;
-            line += text;
-            line += " ";
-            screen->writeText(line);
-        }
-
-        screen->resetColors();
-    }
+    renderItemToScreen(logicalIndex, isSelected);
 }
 
 

@@ -15,7 +15,13 @@
         "statusBarTextColor": "RGB:250,250,245",
         "statusBarBackgroundColor": "RGB:60,70,100",
         "lineNumberTextColor": "RGB:100,100,110",
-        "commandLineMessageTextColor": "RGB:180,150,220"
+        "commandLineMessageTextColor": "RGB:180,150,220",
+        "modalFrameTextColor": "RGB:250,250,245",
+        "modalFrameBackgroundColor": "RGB:60,70,100",
+        "modalContentTextColor": "RGB:220,220,220",
+        "modalContentBackgroundColor": "RGB:40,45,55",
+        "modalSelectionTextColor": "RGB:30,30,35",
+        "modalSelectionBackgroundColor": "RGB:180,200,255"
     },
 
     "syntaxColors": {

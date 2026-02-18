@@ -15,7 +15,6 @@
 #include <math.h>
 
 #include <sys/types.h>
-#include <iostream>
 #include <cx/base/string.h>
 #include <cx/base/slist.h>
 #include <cx/base/star.h>
@@ -141,7 +140,10 @@ class ProjectView
     // make sure selection is visible in list
 
     void redrawLine( int logicalIndex, int isSelected );
-    // redraw a single content line
+    // redraw a single content line (incremental update for arrow navigation)
+
+    void renderItemToScreen( int logicalIndex, int isSelected );
+    // render a single item at screen position - shared by redraw() and redrawLine()
 
     void redrawFooter( void );
     // redraw just the footer

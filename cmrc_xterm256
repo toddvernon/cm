@@ -15,7 +15,13 @@
         "statusBarTextColor": "XTERM256:White",
         "statusBarBackgroundColor": "XTERM256:DarkBlue",
         "lineNumberTextColor": "XTERM256:Grey42",
-        "commandLineMessageTextColor": "XTERM256:MediumOrchid1"
+        "commandLineMessageTextColor": "XTERM256:MediumOrchid1",
+        "modalFrameTextColor": "XTERM256:White",
+        "modalFrameBackgroundColor": "XTERM256:DarkBlue",
+        "modalContentTextColor": "XTERM256:Grey84",
+        "modalContentBackgroundColor": "XTERM256:Grey19",
+        "modalSelectionTextColor": "XTERM256:Black",
+        "modalSelectionBackgroundColor": "XTERM256:LightSteelBlue1"
     },
 
     "syntaxColors": {

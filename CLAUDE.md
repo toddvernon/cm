@@ -40,7 +40,6 @@ The make target excludes build outputs and other cruft that should not be distri
 - `EditView.*` - text editing view (includes EditViewDisplay.cpp, EditViewInput.cpp)
 - `CommandLineView.*` - command line interface
 - `CommandTable.*` - static ESC command table (data only)
-- `FileListView.*` - file browser
 - `HelpView.*` - help display
 - `BuildView.*` - build output display
 - `ProjectView.*` - project/buffer list view
@@ -51,7 +50,7 @@ The make target excludes build outputs and other cruft that should not be distri
 
 ## Screen Resize Architecture
 
-**ScreenEditor owns the single resize callback.** Sub-elements (EditView, CommandLineView, FileListView, HelpView) do NOT register their own callbacks with the OS.
+**ScreenEditor owns the single resize callback.** Sub-elements (EditView, CommandLineView, HelpView) do NOT register their own callbacks with the OS.
 
 - ScreenEditor registers ONE callback via `screen->addScreenSizeCallback()`
 - On resize, ScreenEditor coordinates ALL recalcs first, THEN all redraws in correct z-order

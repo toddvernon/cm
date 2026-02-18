@@ -21,6 +21,8 @@
 #include <cx/json/json_factory.h>
 #include <cx/screen/color.h>
 
+class CxScreen;  // forward declaration for color helpers
+
 //-------------------------------------------------------------------------------------------------
 // Number of supported languages (must match LanguageMode enum in MarkUp.h)
 //-------------------------------------------------------------------------------------------------
@@ -74,6 +76,10 @@ public:
     CxColor *modalContentBackgroundColor(void);
     CxColor *modalSelectionTextColor(void);
     CxColor *modalSelectionBackgroundColor(void);
+
+    // Modal color helpers - apply foreground and background in one call
+    void applyModalContentColors(CxScreen *screen);
+    void applyModalSelectionColors(CxScreen *screen);
 
     // legacy color accessors (use default language colors)
     CxColor *commentTextColor(void);

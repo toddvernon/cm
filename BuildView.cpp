@@ -271,8 +271,7 @@ BuildView::drawLine( int screenRow, int logicalIndex )
             } else {
 
                 // use modal content colors
-                screen->setForegroundColor(programDefaults->modalContentTextColor());
-                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+                programDefaults->applyModalContentColors(screen);
 
                 // Prefix with indicator for errors/warnings
                 CxString displayLine;
@@ -300,8 +299,7 @@ BuildView::drawLine( int screenRow, int logicalIndex )
     //-----------------------------------------------------------------------------------------
     } else {
         // fill empty lines with modal background
-        screen->setForegroundColor(programDefaults->modalContentTextColor());
-        screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
+        programDefaults->applyModalContentColors(screen);
         CxString emptyLine;
         for (int i = 0; i < contentWidth; i++) {
             emptyLine += " ";
