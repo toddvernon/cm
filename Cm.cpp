@@ -57,9 +57,6 @@ int main(int argc, char **argv)
 	// get the current cursor position
 	CxScreen::getCursorPosition( &row, &col );
 
-	// save the cursor position
-//	CxScreen::saveCursorPosition();
-
 	// open alternate screen to preserve the existing screen
     CxScreen::openAlternateScreen();
     CxScreen::clearScreen();
