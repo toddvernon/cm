@@ -15,6 +15,11 @@
 
 #include "EditView.h"
 
+#if defined(_LINUX_) || defined(_OSX_)
+#include <cx/base/file.h>
+#include <cx/base/fileaccess.h>
+#endif
+
 //-------------------------------------------------------------------------------------------------
 // EditView::EditView (constructor)
 //
@@ -102,6 +107,10 @@ EditView::setEditBuffer( CmEditBuffer *eb)
     // setup some key windowing variables
     recalcVisibleBufferFromTopEditLine( _visibleEditBufferOffset );
 
+#if defined(_LINUX_) || defined(_OSX_)
+    // update cached git branch for status bar
+    updateGitBranch();
+#endif
 }
 
 
@@ -808,4 +817,63 @@ EditView::getEditBuffer(void)
 {
     return(editBuffer);
 }
+
+
+#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::updateGitBranch
+//
+// Read .git/HEAD to get the current branch name. Walks up directories from the
+// file's location to find the repository root. Fails silently if not in a git repo.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::updateGitBranch(void)
+{
+    _gitBranch = "";
+
+    if (editBuffer == NULL) return;
+
+    CxString filePath = editBuffer->getFilePath();
+    if (filePath.length() == 0) return;
+
+    // extract directory from file path
+    CxString dir = filePath;
+    int lastSlash = dir.lastChar('/');
+    if (lastSlash < 0) return;
+    dir = dir.subString(0, lastSlash);
+
+    // walk up directories looking for .git/HEAD
+    while (dir.length() > 0) {
+        CxString gitHead = dir + "/.git/HEAD";
+
+        CxFileAccess::status stat = CxFileAccess::checkStatus(gitHead);
+        if (stat == CxFileAccess::FOUND_R || stat == CxFileAccess::FOUND_RW) {
+            // found .git/HEAD - read it
+            CxFile file;
+            if (file.open(gitHead, "r")) {
+                CxString content = file.getUntil('\n');
+                file.close();
+
+                // parse "ref: refs/heads/branchname"
+                // check if content starts with "ref: refs/heads/"
+                CxString prefix = "ref: refs/heads/";
+                if (content.index(prefix) == 0) {
+                    // extract branch name (skip 16 chars of prefix)
+                    _gitBranch = content.subString(16, content.length() - 16);
+                    // trim any trailing whitespace
+                    _gitBranch.stripTrailing(" \t\r\n");
+                }
+                // detached HEAD or other format - leave _gitBranch empty
+            }
+            return;
+        }
+
+        // move up one directory
+        lastSlash = dir.lastChar('/');
+        if (lastSlash <= 0) break;  // hit root
+        dir = dir.subString(0, lastSlash);
+    }
+}
+#endif
 

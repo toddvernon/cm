@@ -307,6 +307,12 @@ class EditView
 #if defined(_LINUX_) || defined(_OSX_)
     int _mcpConnected;
     // is MCP bridge connected
+
+    CxString _gitBranch;
+    // cached git branch name for status bar display
+
+    void updateGitBranch(void);
+    // update cached git branch from .git/HEAD
 #endif
 
 };

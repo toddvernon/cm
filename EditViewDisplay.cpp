@@ -67,6 +67,16 @@ EditView::updateStatusLine(void)
     // The prefix is 2 fill chars + space + text = 3 display columns for "── " or "== "
     int leftDisplayWidth = 3 + 14 + editBuffer->getFilePath().length() + 3;
 
+#if defined(_LINUX_) || defined(_OSX_)
+    // Add git branch name if available
+    if (_gitBranch.length() > 0) {
+        statusLineTextLeft += "(git:";
+        statusLineTextLeft += _gitBranch;
+        statusLineTextLeft += ") ";
+        leftDisplayWidth += 5 + _gitBranch.length() + 2;  // "(git:" + branch + ") "
+    }
+#endif
+
     //---------------------------------------------------------------------------------------------
     // do the line part of the status line
     //
