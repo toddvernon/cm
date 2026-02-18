@@ -27,6 +27,8 @@ When the user refers to:
 make
 ```
 
+**Always run a complete `make` after code changes** - never compile individual files separately. The build is fast and a full make avoids occasional app crashes that can occur when only some files are recompiled.
+
 ## Creating Archives
 Always use the make target to create distribution archives - never run tar manually:
 ```bash
