@@ -51,6 +51,10 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
 #if defined(_LINUX_) || defined(_OSX_)
     // MCP connection status (updated by ScreenEditor)
     _mcpConnected = 0;
+
+    // block comment state tracking
+    _blockCommentState = NULL;
+    _blockCommentStateSize = 0;
 #endif
 
     // there is not initial editbuffer, the next step creates it.
@@ -110,6 +114,9 @@ EditView::setEditBuffer( CmEditBuffer *eb)
 #if defined(_LINUX_) || defined(_OSX_)
     // update cached git branch for status bar
     updateGitBranch();
+
+    // recompute block comment state for entire buffer
+    recomputeBlockCommentState(0);
 #endif
 }
 
@@ -1085,6 +1092,121 @@ EditView::applySearchHighlights(CxString text, int bufferRow, int visibleStartCo
     }
 
     return result;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::ensureBlockCommentStateSize
+//
+// Make sure the block comment state array is large enough for the buffer.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::ensureBlockCommentStateSize(int lineCount)
+{
+    if (lineCount <= _blockCommentStateSize) return;
+
+    // allocate with some extra room to avoid frequent reallocation
+    int newSize = lineCount + 256;
+    int *newState = new int[newSize];
+
+    // copy existing state if any
+    if (_blockCommentState != NULL) {
+        for (int i = 0; i < _blockCommentStateSize; i++) {
+            newState[i] = _blockCommentState[i];
+        }
+        delete[] _blockCommentState;
+    }
+
+    // initialize new entries to 0
+    for (int i = _blockCommentStateSize; i < newSize; i++) {
+        newState[i] = 0;
+    }
+
+    _blockCommentState = newState;
+    _blockCommentStateSize = newSize;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::recomputeBlockCommentState
+//
+// Scan the buffer from the given line forward, tracking /* and */ to determine
+// which lines are inside block comments.
+//
+// The state array stores whether each line ENDS inside a block comment.
+// To check if a line STARTS inside a block comment, look at the previous line's state.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::recomputeBlockCommentState(int fromLine)
+{
+    if (editBuffer == NULL) return;
+
+    int lineCount = (int)editBuffer->numberOfLines();
+    if (lineCount == 0) return;
+
+    ensureBlockCommentStateSize(lineCount);
+
+    // get the state at the start of fromLine (from previous line's end state)
+    int inComment = 0;
+    if (fromLine > 0 && fromLine <= _blockCommentStateSize) {
+        inComment = _blockCommentState[fromLine - 1];
+    }
+
+    // scan from fromLine to end of buffer
+    for (int lineNum = fromLine; lineNum < lineCount; lineNum++) {
+#ifdef CM_UTF8_SUPPORT
+        CxUTFString *utfLine = editBuffer->line(lineNum);
+        if (utfLine == NULL) {
+            _blockCommentState[lineNum] = inComment;
+            continue;
+        }
+        CxString lineText = utfLine->toBytes();
+#else
+        CxString *linePtr = editBuffer->line(lineNum);
+        if (linePtr == NULL) {
+            _blockCommentState[lineNum] = inComment;
+            continue;
+        }
+        CxString lineText = *linePtr;
+#endif
+
+        // scan for /* and */ in this line
+        int len = (int)lineText.length();
+        for (int i = 0; i < len - 1; i++) {
+            char c = lineText.charAt(i);
+            char c2 = lineText.charAt(i + 1);
+
+            if (!inComment && c == '/' && c2 == '*') {
+                inComment = 1;
+                i++;  // skip the *
+            } else if (inComment && c == '*' && c2 == '/') {
+                inComment = 0;
+                i++;  // skip the /
+            }
+        }
+
+        _blockCommentState[lineNum] = inComment;
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::isLineInsideBlockComment
+//
+// Returns 1 if the given line starts inside a block comment.
+// This checks the PREVIOUS line's end state.
+//
+//-------------------------------------------------------------------------------------------------
+int
+EditView::isLineInsideBlockComment(int lineNum)
+{
+    if (lineNum <= 0) return 0;
+    if (_blockCommentState == NULL) return 0;
+    if (lineNum > _blockCommentStateSize) return 0;
+
+    return _blockCommentState[lineNum - 1];
 }
 #endif
 

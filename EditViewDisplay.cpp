@@ -398,9 +398,29 @@ EditView::formatEditorLine(unsigned long bufferRow )
     //
     //---------------------------------------------------------------------------------------------
     if (programDefaults->colorizeSyntax() ) {
-        // use simple colorization without block comment state scanning
-        // (block comment state tracking is done in formatMultipleEditorLines for efficiency)
+#if defined(_LINUX_) || defined(_OSX_)
+        // check if line is inside a block comment (modern platforms only)
+        // line is part of block comment if:
+        //   - it STARTS inside a block comment (previous line ended inside), OR
+        //   - it ENDS inside a block comment (this line contains /* that opens one)
+        int startsInside = isLineInsideBlockComment((int)bufferRow);
+        int endsInside = ((int)bufferRow < _blockCommentStateSize) ? _blockCommentState[bufferRow] : 0;
+
+        if (startsInside || endsInside) {
+            // entire line is part of /* */ block comment - apply comment color
+            int lang = (int)markUp->getLanguageMode();
+            CxString commentColor = programDefaults->commentTextColor(lang)->terminalString();
+            if (commentColor.length() == 0) {
+                commentColor = programDefaults->commentTextColor()->terminalString();
+            }
+            CxString resetColor = "\033[0m";
+            visibleText = commentColor + visibleText + resetColor;
+        } else {
+            visibleText = markUp->colorizeText( fullText, visibleText );
+        }
+#else
         visibleText = markUp->colorizeText( fullText, visibleText );
+#endif
     }
 
 #if defined(_LINUX_) || defined(_OSX_)

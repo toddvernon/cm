@@ -153,6 +153,9 @@ class EditView
 
     void clearSearchMatches(void);
     // clear all search matches (called on edit or pattern change)
+
+    int isLineInsideBlockComment(int lineNum);
+    // returns 1 if the given line starts inside a /* */ block comment
 #endif
 
   private:
@@ -336,6 +339,21 @@ class EditView
 
     CxString applySearchHighlights(CxString text, int bufferRow, int visibleStartCol);
     // apply highlight coloring to any matches in the visible portion of the line
+
+    //---------------------------------------------------------------------------------------------
+    // Block comment state - modern platforms only
+    //
+    // Track which lines are inside /* */ block comments for proper colorization.
+    // State is recomputed on buffer load and edit.
+    //---------------------------------------------------------------------------------------------
+    int *_blockCommentState;      // array: 1 if line ENDS inside a block comment, 0 otherwise
+    int _blockCommentStateSize;   // allocated size of array
+
+    void recomputeBlockCommentState(int fromLine);
+    // recompute block comment state from the given line forward
+
+    void ensureBlockCommentStateSize(int lineCount);
+    // ensure state array is large enough for the buffer
 #endif
 
 };

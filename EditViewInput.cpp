@@ -257,6 +257,9 @@ EditView::updateAfterEdit( CxEditHint& hint, CxString& lineText )
 #if defined(_LINUX_) || defined(_OSX_)
     // clear search highlights on any edit - matches may be invalid now
     clearSearchMatches();
+
+    // recompute block comment state from start - line insertions/deletions shift everything
+    recomputeBlockCommentState(0);
 #endif
 
     reframe();
@@ -445,6 +448,10 @@ EditView::routeKeyAction( CxKeyAction keyAction )
       	case CxKeyAction::NEWLINE:
 			{
 				editBuffer->addReturn();
+#if defined(_LINUX_) || defined(_OSX_)
+                clearSearchMatches();
+                recomputeBlockCommentState(0);
+#endif
                 reframe();
                 updateScreen();
 			}
