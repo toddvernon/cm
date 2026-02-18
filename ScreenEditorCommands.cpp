@@ -876,6 +876,11 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
         count++;
     }
 
+#if defined(_LINUX_) || defined(_OSX_)
+    // clear search highlights before refresh - matches are now invalid
+    activeEditView()->clearSearchMatches();
+#endif
+
     // single screen refresh after all replacements
     activeEditView()->reframeAndUpdateScreen();
 

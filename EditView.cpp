@@ -404,12 +404,22 @@ EditView::recalcScreenPlacements(void)
 int
 EditView::findString( CxString findString )
 {
+#if defined(_LINUX_) || defined(_OSX_)
+    // populate search matches for highlight-all on modern platforms
+    findAllSearchMatches(findString);
+#endif
+
     // try and find the string starting at loc
 	int result = editBuffer->findString( findString );
-    
+
     CxEditBufferPosition loc = editBuffer->cursor;
     cursorGotoPosition( loc );
-    
+
+#if defined(_LINUX_) || defined(_OSX_)
+    // force full redraw to show all highlights
+    reframeAndUpdateScreen();
+#endif
+
     return( result );
 }
 
@@ -424,11 +434,26 @@ EditView::findString( CxString findString )
 int
 EditView::findAgain( CxString findString  )
 {
+#if defined(_LINUX_) || defined(_OSX_)
+    // repopulate search matches if pattern changed
+    int patternChanged = (_searchPattern != findString);
+    if (patternChanged) {
+        findAllSearchMatches(findString);
+    }
+#endif
+
     int result = editBuffer->findAgain( findString, TRUE );
-    
+
     CxEditBufferPosition loc = editBuffer->cursor;
     cursorGotoPosition( loc );
-    
+
+#if defined(_LINUX_) || defined(_OSX_)
+    // force full redraw to show all highlights if pattern changed
+    if (patternChanged) {
+        reframeAndUpdateScreen();
+    }
+#endif
+
     return( result );
 }
 
@@ -874,6 +899,192 @@ EditView::updateGitBranch(void)
         if (lastSlash <= 0) break;  // hit root
         dir = dir.subString(0, lastSlash);
     }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::findAllSearchMatches
+//
+// Scan the entire buffer for all occurrences of the search pattern.
+// Called when a search is initiated to populate the highlight list.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::findAllSearchMatches(CxString pattern)
+{
+    // clear existing matches
+    clearSearchMatches();
+
+    if (pattern.length() == 0) return;
+    if (editBuffer == NULL) return;
+
+    _searchPattern = pattern;
+    int patternLen = (int)pattern.length();
+
+    // scan every line in the buffer
+    unsigned long lineCount = editBuffer->numberOfLines();
+    for (unsigned long lineNum = 0; lineNum < lineCount; lineNum++) {
+#ifdef CM_UTF8_SUPPORT
+        CxUTFString *utfLine = editBuffer->line(lineNum);
+        if (utfLine == NULL) continue;
+        CxString lineText = utfLine->toBytes();
+#else
+        CxString *linePtr = editBuffer->line(lineNum);
+        if (linePtr == NULL) continue;
+        CxString lineText = *linePtr;
+#endif
+        int pos = 0;
+
+        // find all occurrences in this line
+        while (pos < (int)lineText.length()) {
+            int found = lineText.index(pattern, pos);
+            if (found < 0) break;
+
+            SearchMatch *match = new SearchMatch();
+            match->line = (int)lineNum;
+            match->startCol = found;
+            match->endCol = found + patternLen;
+            _searchMatches.append(match);
+
+            pos = found + 1;  // advance past this match to find overlapping matches
+        }
+    }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::clearSearchMatches
+//
+// Clear all search matches. Called on edit or when search pattern changes.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::clearSearchMatches(void)
+{
+    _searchMatches.clearAndDelete();
+    _searchPattern = "";
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::applySearchHighlights
+//
+// Given a line of text (already syntax-colored), apply search highlight background
+// to any matches that fall within the visible portion.
+//
+// The input text contains ANSI escape codes from syntax highlighting. We need to
+// insert reverse video codes at the correct DISPLAY column positions, which means
+// skipping over escape sequences when counting columns.
+//
+// Parameters:
+//   text           - the colorized text (with ANSI escape codes)
+//   bufferRow      - which buffer line this is
+//   visibleStartCol - the first visible column (for horizontal scroll offset)
+//
+// Returns the text with search highlights applied.
+//
+//-------------------------------------------------------------------------------------------------
+CxString
+EditView::applySearchHighlights(CxString text, int bufferRow, int visibleStartCol)
+{
+    if (_searchPattern.length() == 0) return text;
+    if (_searchMatches.entries() == 0) return text;
+
+    // collect matches for this line that are visible
+    // match columns are in BUFFER coordinates, we need to convert to visible coordinates
+    int visibleEndCol = visibleStartCol + (int)_screenEditNumberOfCols;
+    int matchCount = 0;
+
+    // build arrays of start/end positions in VISIBLE coordinates (0 = first visible column)
+    // limit to reasonable number of matches per line
+    int matchStarts[32];
+    int matchEnds[32];
+
+    for (int i = 0; i < (int)_searchMatches.entries() && matchCount < 32; i++) {
+        SearchMatch *m = _searchMatches.at(i);
+        if (m->line == bufferRow) {
+            // check if any part is visible
+            if (m->endCol > visibleStartCol && m->startCol < visibleEndCol) {
+                // convert to visible coordinates (0-based from visible start)
+                int visStart = m->startCol - visibleStartCol;
+                int visEnd = m->endCol - visibleStartCol;
+                if (visStart < 0) visStart = 0;
+                if (visEnd > (int)_screenEditNumberOfCols) visEnd = (int)_screenEditNumberOfCols;
+                matchStarts[matchCount] = visStart;
+                matchEnds[matchCount] = visEnd;
+                matchCount++;
+            }
+        }
+    }
+
+    if (matchCount == 0) return text;
+
+    // reverse video escape codes
+    const char *highlightOn = "\033[7m";
+    const char *highlightOff = "\033[27m";
+
+    // scan through the colorized text, tracking display column
+    // insert highlight codes at the right positions
+    CxString result;
+    int displayCol = 0;  // current display column (0 = first visible column)
+    int inHighlight = 0;
+    int textLen = (int)text.length();
+
+    for (int i = 0; i < textLen; i++) {
+        char c = text.charAt(i);
+
+        // check for ANSI escape sequence (ESC [ ... m)
+        if (c == '\033' && i + 1 < textLen && text.charAt(i + 1) == '[') {
+            // copy the escape sequence as-is
+            result += c;
+            i++;
+            while (i < textLen) {
+                c = text.charAt(i);
+                result += c;
+                if (c == 'm') break;  // end of SGR sequence
+                i++;
+            }
+            continue;
+        }
+
+        // before outputting this character, check if we need to toggle highlight
+        // check if entering a match
+        if (!inHighlight) {
+            for (int mi = 0; mi < matchCount; mi++) {
+                if (displayCol >= matchStarts[mi] && displayCol < matchEnds[mi]) {
+                    result += highlightOn;
+                    inHighlight = 1;
+                    break;
+                }
+            }
+        }
+
+        // output the character
+        result += c;
+        displayCol++;
+
+        // check if exiting all matches
+        if (inHighlight) {
+            int stillInMatch = 0;
+            for (int mi = 0; mi < matchCount; mi++) {
+                if (displayCol >= matchStarts[mi] && displayCol < matchEnds[mi]) {
+                    stillInMatch = 1;
+                    break;
+                }
+            }
+            if (!stillInMatch) {
+                result += highlightOff;
+                inHighlight = 0;
+            }
+        }
+    }
+
+    // close any open highlight
+    if (inHighlight) {
+        result += highlightOff;
+    }
+
+    return result;
 }
 #endif
 

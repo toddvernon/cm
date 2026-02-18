@@ -403,6 +403,14 @@ EditView::formatEditorLine(unsigned long bufferRow )
         visibleText = markUp->colorizeText( fullText, visibleText );
     }
 
+#if defined(_LINUX_) || defined(_OSX_)
+    //---------------------------------------------------------------------------------------------
+    // apply search highlights on modern platforms
+    //
+    //---------------------------------------------------------------------------------------------
+    visibleText = applySearchHighlights(visibleText, bufferRow, (int)_visibleFirstEditBufferCol);
+#endif
+
     //---------------------------------------------------------------------------------------------
     // turn off any text attributes that might have terminated the text
     //

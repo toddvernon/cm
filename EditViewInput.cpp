@@ -254,6 +254,11 @@ EditView::colVisible( unsigned long bufferCol )
 void
 EditView::updateAfterEdit( CxEditHint& hint, CxString& lineText )
 {
+#if defined(_LINUX_) || defined(_OSX_)
+    // clear search highlights on any edit - matches may be invalid now
+    clearSearchMatches();
+#endif
+
     reframe();
 
     if (hint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT) {

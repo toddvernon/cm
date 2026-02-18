@@ -150,6 +150,9 @@ class EditView
 #if defined(_LINUX_) || defined(_OSX_)
     void setMcpConnected( int connected );
     // set MCP connection status for status bar display
+
+    void clearSearchMatches(void);
+    // clear all search matches (called on edit or pattern change)
 #endif
 
   private:
@@ -312,6 +315,27 @@ class EditView
 
     void updateGitBranch(void);
     // update cached git branch from .git/HEAD
+
+    //---------------------------------------------------------------------------------------------
+    // Search highlight all - modern platforms only
+    //
+    // When a search is performed, we find all matches in the buffer and highlight them
+    // during display. Matches are cleared on edit or when search pattern changes.
+    //---------------------------------------------------------------------------------------------
+    struct SearchMatch {
+        int line;       // buffer line number (0-based)
+        int startCol;   // start column in line
+        int endCol;     // end column (exclusive)
+    };
+
+    CxSList<SearchMatch*> _searchMatches;
+    CxString _searchPattern;
+
+    void findAllSearchMatches(CxString pattern);
+    // scan buffer for all occurrences of pattern, populate _searchMatches
+
+    CxString applySearchHighlights(CxString text, int bufferRow, int visibleStartCol);
+    // apply highlight coloring to any matches in the visible portion of the line
 #endif
 
 };
