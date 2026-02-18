@@ -211,11 +211,13 @@ install:
 ifeq ($(UNAME_S), linux)
 	sudo cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
 	sudo chmod 755 /usr/local/bin/cm
-else ifeq ($(UNAME_S), darwin)
+endif
+ifeq ($(UNAME_S), darwin)
 	sudo cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
 	sudo chmod 755 /usr/local/bin/cm
 	sudo xattr -cr /usr/local/bin/cm
-else
+endif
+ifeq ($(UNAME_S), sunos)
 	cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
 	chmod 755 /usr/local/bin/cm
 endif
@@ -227,13 +229,15 @@ ifeq ($(UNAME_S), linux)
 	sudo cp cm_help.txt /usr/local/share/cm/cm_help.txt
 	sudo chmod 644 /usr/local/share/cm/cm_help.md
 	sudo chmod 644 /usr/local/share/cm/cm_help.txt
-else ifeq ($(UNAME_S), darwin)
+endif
+ifeq ($(UNAME_S), darwin)
 	sudo mkdir -p /usr/local/share/cm
 	sudo cp cm_help.md /usr/local/share/cm/cm_help.md
 	sudo cp cm_help.txt /usr/local/share/cm/cm_help.txt
 	sudo chmod 644 /usr/local/share/cm/cm_help.md
 	sudo chmod 644 /usr/local/share/cm/cm_help.txt
-else
+endif
+ifeq ($(UNAME_S), sunos)
 	mkdir -p /usr/local/share/cm
 	cp cm_help.md /usr/local/share/cm/cm_help.md
 	cp cm_help.txt /usr/local/share/cm/cm_help.txt
