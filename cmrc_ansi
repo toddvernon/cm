@@ -9,6 +9,7 @@
     "colorizeSyntax": true,
     "liveStatusLines": true,
     "autoSaveOnBufferChange": false,
+    "projectAutoVerify": false,
 
     "colors": {
         "statusBarTextColor": "ANSI:BRIGHT_WHITE",
