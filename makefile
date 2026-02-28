@@ -298,8 +298,7 @@ archive:
 	@echo "Creating cxapps_unix.tar..."
 	@echo "  (extracts to cx_apps/cm/ when untarred from parent directory)"
 	@test -d ../../ARCHIVE || mkdir ../../ARCHIVE
-	@tar cvf ../../ARCHIVE/cxapps_unix.tar \
-		--transform 's,^\./,cx_apps/cm/,' \
+	@cd ../.. && tar cvf ARCHIVE/cxapps_unix.tar \
 		--exclude='*.o' \
 		--exclude='*.a' \
 		--exclude='.git' \
@@ -320,7 +319,7 @@ archive:
 		--exclude='*.mode2v3' \
 		--exclude='*.perspectivev3' \
 		--exclude='*.xcuserstate' \
-		.
+		cx_apps/cm
 	@echo "Archive created: ../../ARCHIVE/cxapps_unix.tar"
 
 
