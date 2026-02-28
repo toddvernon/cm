@@ -178,6 +178,9 @@ void
 ScreenEditor::CONTROL_ToggleLineNumbers( void )
 {
     activeEditView()->toggleLineNumbers();
+    activeEditView()->updateScreen();
+    activeEditView()->placeCursor();
+    screen->flush();
     setMessage("(toggled line numbers)");
 }
 
