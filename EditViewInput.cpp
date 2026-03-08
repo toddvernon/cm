@@ -658,13 +658,27 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 		//-----------------------------------------------------------------------------------------
       	case CxKeyAction::NEWLINE:
 			{
-				editBuffer->addReturn();
+				CxEditHint hint = editBuffer->addReturn();
 #if defined(_LINUX_) || defined(_OSX_)
                 clearSearchMatches();
                 recomputeBlockCommentState(0);
-#endif
+
+                // Try efficient terminal insert line if cursor stays visible
+                if (!reframe()) {
+                    // No scrolling needed - try terminal insert optimization
+                    if (!terminalInsertLineAndDraw(hint.startRow())) {
+                        // Optimization failed, fall back to full redraw
+                        updateScreen();
+                    }
+                } else {
+                    // Scrolling was needed - full redraw
+                    updateScreen();
+                }
+#else
+                // Vintage platforms: simple full redraw
                 reframe();
                 updateScreen();
+#endif
 			}
 			break;
 
@@ -674,8 +688,37 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 		//-----------------------------------------------------------------------------------------
      	case CxKeyAction::BACKSPACE:
 			{
-				CxEditHint editHint = editBuffer->addBackspace();
+#if defined(_LINUX_) || defined(_OSX_)
+                // Check if this will be a line join (cursor at col 0, not at row 0)
+                int isLineJoin = (editBuffer->cursor.col == 0 && editBuffer->cursor.row > 0);
+                unsigned long joinedRow = editBuffer->cursor.row - 1;
+
+                CxEditHint editHint = editBuffer->addBackspace();
+
+                if (isLineJoin) {
+                    clearSearchMatches();
+                    recomputeBlockCommentState(0);
+
+                    // Try efficient terminal delete line if row stays visible
+                    if (!reframe()) {
+                        // No scrolling needed - try terminal delete optimization
+                        if (!terminalDeleteLineAndDraw(joinedRow)) {
+                            // Optimization failed, fall back to normal update
+                            updateAfterEdit(editHint, lineText);
+                        }
+                    } else {
+                        // Scrolling was needed - normal update
+                        updateAfterEdit(editHint, lineText);
+                    }
+                } else {
+                    // Normal character delete - use standard update
+                    updateAfterEdit(editHint, lineText);
+                }
+#else
+                // Vintage platforms: standard behavior
+                CxEditHint editHint = editBuffer->addBackspace();
 				updateAfterEdit(editHint, lineText);
+#endif
 			}
 			break;
 

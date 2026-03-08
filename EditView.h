@@ -332,6 +332,16 @@ class EditView
     void terminalScrollAndDraw(int direction, int lines);
     // use terminal scroll sequences to shift content, then draw only new line(s)
 
+    int terminalInsertLineAndDraw(unsigned long originalRow);
+    // use terminal insert line to efficiently handle Enter key
+    // originalRow is where the line was split (hint.startRow from addReturn)
+    // returns 1 if optimization was used, 0 if caller should do full redraw
+
+    int terminalDeleteLineAndDraw(unsigned long joinedRow);
+    // use terminal delete line to efficiently handle line join (backspace at start of line)
+    // joinedRow is where lines were merged
+    // returns 1 if optimization was used, 0 if caller should do full redraw
+
     int _mcpConnected;
     // is MCP bridge connected
 

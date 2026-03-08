@@ -554,5 +554,112 @@ EditView::terminalScrollAndDraw(int direction, int lines)
     updateStatusLine();
     screen->flush();
 }
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::terminalInsertLineAndDraw
+//
+// Efficiently handle Enter key using terminal insert line sequence.
+// When a line is split, instead of redrawing from that point to bottom:
+//   1. Position cursor at the row AFTER the split
+//   2. Insert 1 blank line (pushes existing content down)
+//   3. Redraw the split line (now truncated) and the new line (wrapped content)
+//
+// Returns 1 if optimization was used, 0 if caller should do full redraw.
+//
+//-------------------------------------------------------------------------------------------------
+int
+EditView::terminalInsertLineAndDraw(unsigned long originalRow)
+{
+    // Check if both the original row and the new row are visible
+    // The new row is originalRow + 1 (where the wrapped content went)
+    unsigned long newRow = originalRow + 1;
+
+    if (!rowVisible(originalRow) || !rowVisible(newRow)) {
+        return 0;  // Need full redraw - affected rows not visible
+    }
+
+    // Get screen coordinates
+    unsigned long screenRowForNew = bufferRowToScreenRow(newRow);
+
+    // Set scroll region to edit area (so insert doesn't affect status bar)
+    CxScreen::setScrollRegion((int)_screenEditFirstRow, (int)_screenEditLastRow);
+
+    // Position cursor at the screen row where we want to insert
+    CxScreen::placeCursor((int)screenRowForNew, 0);
+
+    // Insert one blank line - this pushes all content from here down
+    CxScreen::insertLines(1);
+
+    // Reset scroll region before drawing
+    CxScreen::resetScrollRegion();
+
+    // Redraw the two affected lines:
+    // - originalRow: now contains truncated content (before cursor)
+    // - newRow: contains the wrapped content (after cursor)
+    CxString content;
+    content += formatEditorLine(originalRow);
+    content += formatEditorLine(newRow);
+
+    content = CxStringUtils::replaceTabExtensionsWithSpaces(content);
+    fputs(content.data(), stdout);
+
+    // Update status line and flush
+    updateStatusLine();
+    screen->flush();
+
+    return 1;  // Optimization was used
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::terminalDeleteLineAndDraw
+//
+// Efficiently handle line join (backspace at start of line) using terminal delete line.
+// When lines are joined, instead of redrawing from that point to bottom:
+//   1. Position cursor at the joined row
+//   2. Delete 1 line (pulls existing content up)
+//   3. Redraw the joined line (now contains merged content)
+//
+// Returns 1 if optimization was used, 0 if caller should do full redraw.
+//
+//-------------------------------------------------------------------------------------------------
+int
+EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
+{
+    // Check if the joined row is visible
+    if (!rowVisible(joinedRow)) {
+        return 0;  // Need full redraw - affected row not visible
+    }
+
+    // Get screen coordinate
+    unsigned long screenRow = bufferRowToScreenRow(joinedRow);
+
+    // Set scroll region to edit area
+    CxScreen::setScrollRegion((int)_screenEditFirstRow, (int)_screenEditLastRow);
+
+    // Position cursor at the row BELOW the joined row (the line being removed)
+    // Actually, we delete at joinedRow + 1 (the old next line position)
+    // Wait - after the join, the old "next line" no longer exists in the buffer.
+    // The terminal still shows it, so we delete it to pull content up.
+    CxScreen::placeCursor((int)screenRow + 1, 0);
+
+    // Delete one line - this pulls all content below up
+    CxScreen::deleteLines(1);
+
+    // Reset scroll region before drawing
+    CxScreen::resetScrollRegion();
+
+    // Redraw the joined line (contains merged content)
+    CxString content = formatEditorLine(joinedRow);
+    content = CxStringUtils::replaceTabExtensionsWithSpaces(content);
+    fputs(content.data(), stdout);
+
+    // Update status line and flush
+    updateStatusLine();
+    screen->flush();
+
+    return 1;  // Optimization was used
+}
 #endif
 
