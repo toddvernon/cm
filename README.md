@@ -146,7 +146,6 @@ Common operations have single CTRL key bindings instead of chords.
 | C-b | Show build output |
 | C-f | Find again (repeat last search) |
 | C-h | Show help |
-| C-j | Toggle jump scroll |
 | C-k | Cut to end of line |
 | C-l | Toggle line numbers |
 | C-n | Next buffer |
@@ -233,6 +232,7 @@ Press ESC to enter command mode, then type a command name. Commands follow a cat
 |---------|-------------|
 | view-build | Show build output |
 | view-help | Show help screen |
+| view-jump-scroll | Toggle jump scroll mode |
 | view-split | Split screen horizontally |
 | view-unsplit | Return to single view |
 

@@ -211,6 +211,13 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_Unsplit,
       NULL },
 
+    { "view-jump-scroll",
+      NULL,
+      "Toggle jump scroll mode",
+      0,
+      &ScreenEditor::CMD_ToggleJumpScroll,
+      NULL },
+
     //--- project (standalone, opens dialog) ----------------------------------
     { "project",
       NULL,

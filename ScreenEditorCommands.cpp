@@ -200,6 +200,20 @@ ScreenEditor::CONTROL_ToggleJumpScroll( void )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_ToggleJumpScroll
+//
+// ESC command to toggle jump scrolling on and off
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_ToggleJumpScroll( CxString commandLine )
+{
+    activeEditView()->toggleJumpScroll();
+    setMessage("(toggled jump scrolling)");
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CONTROL_FindAgain
 //
 // Repeat the last find command finding the last find string beyond the current cursor

@@ -474,3 +474,85 @@ EditView::updateRemainderOfWindowLine(unsigned long bufferRow, unsigned long buf
 
 }
 
+
+#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::terminalScrollAndDraw
+//
+// Use terminal scroll escape sequences to efficiently update the screen when scrolling.
+// Instead of redrawing all visible lines, we:
+//   1. Set scroll region to this view's edit area
+//   2. Scroll the terminal content (existing text shifts)
+//   3. Draw only the newly revealed line(s)
+//   4. Reset scroll region
+//
+// Parameters:
+//   direction: +1 = scrolling down (content moves up, new lines at bottom)
+//              -1 = scrolling up (content moves down, new lines at top)
+//   lines:     number of lines to scroll
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::terminalScrollAndDraw(int direction, int lines)
+{
+    if (lines <= 0) return;
+
+    //---------------------------------------------------------------------------------------------
+    // Set scroll region to just the edit area (not including status bar)
+    // CxScreen uses 0-indexed rows internally
+    //---------------------------------------------------------------------------------------------
+    CxScreen::setScrollRegion((int)_screenEditFirstRow, (int)_screenEditLastRow);
+
+    //---------------------------------------------------------------------------------------------
+    // Perform the terminal scroll
+    //---------------------------------------------------------------------------------------------
+    if (direction > 0) {
+        // Scrolling down: content moves up, new blank lines appear at bottom
+        CxScreen::scrollUp(lines);
+    } else {
+        // Scrolling up: content moves down, new blank lines appear at top
+        CxScreen::scrollDown(lines);
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // Reset scroll region before drawing (drawing may use cursor positioning)
+    //---------------------------------------------------------------------------------------------
+    CxScreen::resetScrollRegion();
+
+    //---------------------------------------------------------------------------------------------
+    // Draw only the newly revealed lines
+    //---------------------------------------------------------------------------------------------
+    CxString newContent;
+
+    if (direction > 0) {
+        // Scrolled down - new lines appear at the bottom of the visible area
+        // Draw the last 'lines' lines of the visible buffer
+        unsigned long startRow = _visibleLastEditBufferRow - (unsigned long)(lines - 1);
+        for (int i = 0; i < lines; i++) {
+            unsigned long bufferRow = startRow + (unsigned long)i;
+            if (bufferRow <= _visibleLastEditBufferRow) {
+                newContent += formatEditorLine(bufferRow);
+            }
+        }
+    } else {
+        // Scrolled up - new lines appear at the top of the visible area
+        // Draw the first 'lines' lines of the visible buffer
+        for (int i = 0; i < lines; i++) {
+            unsigned long bufferRow = _visibleFirstEditBufferRow + (unsigned long)i;
+            if (bufferRow <= _visibleLastEditBufferRow) {
+                newContent += formatEditorLine(bufferRow);
+            }
+        }
+    }
+
+    newContent = CxStringUtils::replaceTabExtensionsWithSpaces(newContent);
+    fputs(newContent.data(), stdout);
+
+    //---------------------------------------------------------------------------------------------
+    // Update status line and flush
+    //---------------------------------------------------------------------------------------------
+    updateStatusLine();
+    screen->flush();
+}
+#endif
+

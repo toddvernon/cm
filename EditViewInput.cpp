@@ -132,6 +132,157 @@ EditView::reframe( void )
 }
 
 
+#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::reframeWithScrollInfo
+//
+// Like reframe() but returns detailed scroll information for terminal scrolling optimization.
+// Returns direction (+1 = scrolling down/content up, -1 = scrolling up/content down) and
+// the number of lines scrolled.
+//
+//-------------------------------------------------------------------------------------------------
+EditView::ScrollResult
+EditView::reframeWithScrollInfo( void )
+{
+    ScrollResult result;
+    result.scrolled = 0;
+    result.direction = 0;
+    result.lines = 0;
+
+    unsigned long bufferRow = editBuffer->cursor.row;
+    unsigned long bufferCol = editBuffer->cursor.col;
+
+    //---------------------------------------------------------------------------------------------
+    // if cursor is visible on the screen, no scrolling needed
+    //---------------------------------------------------------------------------------------------
+    if (rowVisible(bufferRow) && colVisible(bufferCol)) {
+        return result;
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // remember old visible range to calculate scroll amount
+    //---------------------------------------------------------------------------------------------
+    unsigned long oldFirstRow = _visibleFirstEditBufferRow;
+
+    //---------------------------------------------------------------------------------------------
+    // check vertical scrolling
+    //---------------------------------------------------------------------------------------------
+
+    // cursor above visible area - scroll up (content moves down)
+    if (bufferRow < _visibleFirstEditBufferRow) {
+        recalcVisibleBufferFromTopEditLine( bufferRow );
+        result.scrolled = 1;
+        result.direction = -1;  // scrolling up
+        result.lines = (int)(oldFirstRow - _visibleFirstEditBufferRow);
+    }
+
+    // cursor below visible area - scroll down (content moves up)
+    if (bufferRow > _visibleLastEditBufferRow) {
+        recalcVisibleBufferFromBottomEditLine( bufferRow );
+        result.scrolled = 1;
+        result.direction = +1;  // scrolling down
+        result.lines = (int)(_visibleFirstEditBufferRow - oldFirstRow);
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // check horizontal scrolling - if horizontal scroll needed, disable terminal scroll
+    // optimization (full redraw is simpler for horizontal)
+    //---------------------------------------------------------------------------------------------
+    if (bufferCol < _visibleFirstEditBufferCol) {
+        recalcVisibleBufferFromLeft( bufferCol );
+        result.direction = 0;  // force full redraw
+    }
+
+    if (bufferCol > _visibleLastEditBufferCol) {
+        recalcVisibleBufferFromRight( bufferCol );
+        result.direction = 0;  // force full redraw
+    }
+
+    return result;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::reframeJumpWithScrollInfo
+//
+// Like reframe_jump() but returns detailed scroll information for terminal scrolling.
+// Jump scroll moves by half a screen rather than single lines.
+//
+//-------------------------------------------------------------------------------------------------
+EditView::ScrollResult
+EditView::reframeJumpWithScrollInfo( void )
+{
+    ScrollResult result;
+    result.scrolled = 0;
+    result.direction = 0;
+    result.lines = 0;
+
+    unsigned long bufferRow = editBuffer->cursor.row;
+    unsigned long bufferCol = editBuffer->cursor.col;
+
+    //---------------------------------------------------------------------------------------------
+    // if cursor is visible on the screen, no scrolling needed
+    //---------------------------------------------------------------------------------------------
+    if (rowVisible(bufferRow) && colVisible(bufferCol)) {
+        return result;
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // remember old visible range to calculate scroll amount
+    //---------------------------------------------------------------------------------------------
+    unsigned long oldFirstRow = _visibleFirstEditBufferRow;
+
+    //---------------------------------------------------------------------------------------------
+    // check vertical scrolling - jump scroll logic (half screen jumps)
+    //---------------------------------------------------------------------------------------------
+
+    // cursor above visible area - scroll up (content moves down)
+    if (bufferRow < _visibleFirstEditBufferRow) {
+        unsigned long newBufferTargetRow = 0;
+
+        if (bufferRow < (_screenEditNumberOfLines/2)) {
+            newBufferTargetRow = 0;
+        } else {
+            newBufferTargetRow = bufferRow - (_screenEditNumberOfLines/2);
+        }
+
+        recalcVisibleBufferFromTopEditLine( newBufferTargetRow );
+        result.scrolled = 1;
+        result.direction = -1;  // scrolling up
+        result.lines = (int)(oldFirstRow - _visibleFirstEditBufferRow);
+    }
+
+    // cursor below visible area - scroll down (content moves up)
+    if (bufferRow > _visibleLastEditBufferRow) {
+        unsigned long newBufferRowTarget = bufferRow + (_screenEditNumberOfLines/2);
+        if (newBufferRowTarget > editBuffer->numberOfLines()) {
+            newBufferRowTarget = editBuffer->numberOfLines();
+        }
+
+        recalcVisibleBufferFromBottomEditLine( newBufferRowTarget );
+        result.scrolled = 1;
+        result.direction = +1;  // scrolling down
+        result.lines = (int)(_visibleFirstEditBufferRow - oldFirstRow);
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // check horizontal scrolling - if horizontal scroll needed, disable terminal scroll
+    //---------------------------------------------------------------------------------------------
+    if (bufferCol < _visibleFirstEditBufferCol) {
+        recalcVisibleBufferFromLeft( bufferCol );
+        result.direction = 0;  // force full redraw
+    }
+
+    if (bufferCol > _visibleLastEditBufferCol) {
+        recalcVisibleBufferFromRight( bufferCol );
+        result.direction = 0;  // force full redraw
+    }
+
+    return result;
+}
+#endif
+
+
 //-------------------------------------------------------------------------------------------------
 // EditView::reframe_jump
 //
@@ -325,6 +476,33 @@ EditView::handleArrows( CxKeyAction keyAction )
 
         CxEditHint hint = editBuffer->cursorDownRequest();
 
+#if defined(_LINUX_) || defined(_OSX_)
+        // Use terminal scrolling for efficient scroll on modern platforms
+        if (_jumpScroll) {
+            ScrollResult sr = reframeJumpWithScrollInfo();
+            if (sr.scrolled) {
+                if (sr.direction != 0 && sr.lines > 0 && sr.lines < (int)_screenEditNumberOfLines) {
+                    // Can use terminal scroll optimization
+                    terminalScrollAndDraw(sr.direction, sr.lines);
+                } else {
+                    // Horizontal scroll or scroll amount >= screen - full redraw
+                    updateScreen();
+                }
+            }
+        } else {
+            ScrollResult sr = reframeWithScrollInfo();
+            if (sr.scrolled) {
+                if (sr.direction != 0 && sr.lines > 0 && sr.lines <= (int)_screenEditNumberOfLines) {
+                    // Can use terminal scroll optimization
+                    terminalScrollAndDraw(sr.direction, sr.lines);
+                } else {
+                    // Horizontal scroll or large jump - full redraw
+                    updateScreen();
+                }
+            }
+        }
+#else
+        // Vintage platforms: use simple full redraw
         if (_jumpScroll) {
             if (reframe_jump()) {
                 updateScreen();
@@ -334,6 +512,7 @@ EditView::handleArrows( CxKeyAction keyAction )
                 updateScreen();
             }
         }
+#endif
 
         placeCursor();
 	}
@@ -342,6 +521,33 @@ EditView::handleArrows( CxKeyAction keyAction )
 
 		CxEditHint hint = editBuffer->cursorUpRequest();
 
+#if defined(_LINUX_) || defined(_OSX_)
+        // Use terminal scrolling for efficient scroll on modern platforms
+        if (_jumpScroll) {
+            ScrollResult sr = reframeJumpWithScrollInfo();
+            if (sr.scrolled) {
+                if (sr.direction != 0 && sr.lines > 0 && sr.lines < (int)_screenEditNumberOfLines) {
+                    // Can use terminal scroll optimization
+                    terminalScrollAndDraw(sr.direction, sr.lines);
+                } else {
+                    // Horizontal scroll or scroll amount >= screen - full redraw
+                    updateScreen();
+                }
+            }
+        } else {
+            ScrollResult sr = reframeWithScrollInfo();
+            if (sr.scrolled) {
+                if (sr.direction != 0 && sr.lines > 0 && sr.lines <= (int)_screenEditNumberOfLines) {
+                    // Can use terminal scroll optimization
+                    terminalScrollAndDraw(sr.direction, sr.lines);
+                } else {
+                    // Horizontal scroll or large jump - full redraw
+                    updateScreen();
+                }
+            }
+        }
+#else
+        // Vintage platforms: use simple full redraw
         if (_jumpScroll) {
             if (reframe_jump()) {
                 updateScreen();
@@ -351,6 +557,7 @@ EditView::handleArrows( CxKeyAction keyAction )
                 updateScreen();
             }
         }
+#endif
 
         placeCursor();
 	}

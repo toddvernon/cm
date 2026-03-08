@@ -174,7 +174,7 @@ s = search-     text, replace, replace-all
 g = goto-       error, line
 i = insert-     box, comment-block, symbol
 t = text-       count, detab, entab, trim-trailing
-v = view-       build, help, split, unsplit
+v = view-       build, help, jump-scroll, split, unsplit
 p = project     (standalone, opens project dialog)
 ```
 
@@ -183,11 +183,11 @@ p = project     (standalone, opens project dialog)
 C-b   Show build output          C-p   Project/buffer list
 C-f   Find again                 C-r   Replace again
 C-h   Show help                  C-s   Split screen
-C-j   Toggle jump scroll         C-u   Unsplit screen
-C-k   Cut to end of line         C-v   Page down
-C-l   Toggle line numbers        C-w   Cut mark to cursor
-C-n   Next buffer                C-y   Paste
-C-o   Switch split view          C-z   Page up
+C-k   Cut to end of line         C-u   Unsplit screen
+C-l   Toggle line numbers        C-v   Page down
+C-n   Next buffer                C-w   Cut mark to cursor
+C-o   Switch split view          C-y   Paste
+                                 C-z   Page up
 ```
 
 ### CTRL-X Chord

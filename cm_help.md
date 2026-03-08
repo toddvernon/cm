@@ -14,8 +14,6 @@ Use ESC to enter command mode, Ctrl keys for quick actions.
   ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
   │ C-h     │ Show help           │ Find and replace             │ Yes                                        │
   ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-j     │ Toggle jump scroll  │ Toggle panel                 │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
   │ C-k     │ Cut to end of line  │ Chord prefix (C-k C-c, etc.) │ Yes                                        │
   ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
   │ C-l     │ Toggle line numbers │ Go to line                   │ Yes                                        │
@@ -88,6 +86,7 @@ that category. TAB completes, ENTER executes.
 ### view-
   view-build                Show build output
   view-help                 Show help screen
+  view-jump-scroll          Toggle jump scroll mode
   view-split                Split screen horizontally
   view-unsplit              Return to single view
 
@@ -101,7 +100,6 @@ These work directly without entering command mode:
   Ctrl-B        Show build output
   Ctrl-F        Find again (repeat last search)
   Ctrl-H        Show this help
-  Ctrl-J        Toggle jump scroll
   Ctrl-K        Cut to end of line
   Ctrl-L        Toggle line numbers
   Ctrl-N        Next buffer
@@ -137,7 +135,6 @@ Two-key sequences starting with Ctrl-X:
   ├── C-b ─────── Show build output
   ├── C-f ─────── Find again (repeat last search)
   ├── C-h ─────── Show help
-  ├── C-j ─────── Toggle jump scroll
   ├── C-k ─────── Cut to end of line
   ├── C-l ─────── Toggle line numbers
   ├── C-n ─────── Next buffer
@@ -193,6 +190,7 @@ Two-key sequences starting with Ctrl-X:
   ├── v ── view-
   │        ├── view-build ──────────── Show build output
   │        ├── view-help ───────────── Show help screen
+  │        ├── view-jump-scroll ────── Toggle jump scroll mode
   │        ├── view-split ──────────── Split screen
   │        └── view-unsplit ────────── Unsplit screen
   │

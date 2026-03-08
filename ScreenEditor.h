@@ -145,6 +145,7 @@ class ScreenEditor {
     void CMD_ShowBuild( CxString commandLine );
     void CMD_Split( CxString commandLine );
     void CMD_Unsplit( CxString commandLine );
+    void CMD_ToggleJumpScroll( CxString commandLine );
 #ifdef CM_UTF8_SUPPORT
     void CMD_InsertUTFBox( CxString commandLine );
     void CMD_InsertUTFSymbol( CxString commandLine );

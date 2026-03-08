@@ -27,7 +27,6 @@
 // The table is terminated by a NULL tag entry.
 //-------------------------------------------------------------------------------------------------
 ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
-    { "J",    &ScreenEditor::CONTROL_ToggleJumpScroll,  NULL },
     { "F",    &ScreenEditor::CONTROL_FindAgain,         NULL },
     { "R",    &ScreenEditor::CONTROL_ReplaceAgain,      NULL },
     { "L",    &ScreenEditor::CONTROL_ToggleLineNumbers, NULL },

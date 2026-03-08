@@ -310,6 +310,28 @@ class EditView
 
 
 #if defined(_LINUX_) || defined(_OSX_)
+    //---------------------------------------------------------------------------------------------
+    // Terminal scroll support - modern platforms only
+    //
+    // Uses ANSI escape sequences (DECSTBM, CSI S/T) for efficient scrolling.
+    // Instead of redrawing all visible lines, we scroll the terminal content
+    // and only draw the newly revealed line(s).
+    //---------------------------------------------------------------------------------------------
+    struct ScrollResult {
+        int scrolled;       // non-zero if scrolling occurred
+        int direction;      // +1 = down (content moves up), -1 = up (content moves down)
+        int lines;          // number of lines scrolled
+    };
+
+    ScrollResult reframeWithScrollInfo(void);
+    // like reframe() but returns scroll direction and amount for terminal scrolling
+
+    ScrollResult reframeJumpWithScrollInfo(void);
+    // like reframe_jump() but returns scroll direction and amount for terminal scrolling
+
+    void terminalScrollAndDraw(int direction, int lines);
+    // use terminal scroll sequences to shift content, then draw only new line(s)
+
     int _mcpConnected;
     // is MCP bridge connected
 
