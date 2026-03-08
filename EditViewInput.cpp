@@ -262,18 +262,22 @@ EditView::updateAfterEdit( CxEditHint& hint, CxString& lineText )
     recomputeBlockCommentState(0);
 #endif
 
-    reframe();
+    if (reframe()) {
+        // Horizontal or vertical scroll happened - need full redraw
+        updateScreen();
+    } else {
+        // No scrolling - use efficient hint-based partial update
+        if (hint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT) {
+            lineText = formatMultipleEditorLines(hint.startRow(), hint.startCol());
+        }
 
-    if (hint.updateHint() == CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT) {
-        lineText = formatMultipleEditorLines(hint.startRow(), hint.startCol());
-    }
+        if (hint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT) {
+            lineText = formatEditorLine(hint.startRow());
+        }
 
-    if (hint.updateHint() == CxEditHint::UPDATE_HINT_LINE_PAST_POINT) {
-        lineText = formatEditorLine(hint.startRow());
-    }
-
-    if (hint.updateHint() == CxEditHint::UPDATE_HINT_LINE) {
-        lineText = formatEditorLine(hint.startRow());
+        if (hint.updateHint() == CxEditHint::UPDATE_HINT_LINE) {
+            lineText = formatEditorLine(hint.startRow());
+        }
     }
 
     if (programDefaults->liveStatusLine()) updateStatusLine();
