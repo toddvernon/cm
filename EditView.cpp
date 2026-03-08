@@ -143,9 +143,19 @@ EditView::reframeAndUpdateScreen(void)
 void
 EditView::updateScreen(void)
 {
+#if defined(_LINUX_) || defined(_OSX_)
+    // Use synchronized output to eliminate flicker on supported terminals
+    CxScreen::beginSyncUpdate();
+#endif
+
     CxString text = formatMultipleEditorLines(0,0);
     fputs( text.data() , stdout);
     updateStatusLine();
+
+#if defined(_LINUX_) || defined(_OSX_)
+    CxScreen::endSyncUpdate();
+#endif
+
     screen->flush();
 }
 

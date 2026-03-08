@@ -497,6 +497,9 @@ EditView::terminalScrollAndDraw(int direction, int lines)
 {
     if (lines <= 0) return;
 
+    // Use synchronized output to eliminate flicker
+    CxScreen::beginSyncUpdate();
+
     //---------------------------------------------------------------------------------------------
     // Set scroll region to just the edit area (not including status bar)
     // CxScreen uses 0-indexed rows internally
@@ -552,6 +555,7 @@ EditView::terminalScrollAndDraw(int direction, int lines)
     // Update status line and flush
     //---------------------------------------------------------------------------------------------
     updateStatusLine();
+    CxScreen::endSyncUpdate();
     screen->flush();
 }
 
@@ -578,6 +582,9 @@ EditView::terminalInsertLineAndDraw(unsigned long originalRow)
     if (!rowVisible(originalRow) || !rowVisible(newRow)) {
         return 0;  // Need full redraw - affected rows not visible
     }
+
+    // Use synchronized output to eliminate flicker
+    CxScreen::beginSyncUpdate();
 
     // Get screen coordinates
     unsigned long screenRowForNew = bufferRowToScreenRow(newRow);
@@ -606,6 +613,7 @@ EditView::terminalInsertLineAndDraw(unsigned long originalRow)
 
     // Update status line and flush
     updateStatusLine();
+    CxScreen::endSyncUpdate();
     screen->flush();
 
     return 1;  // Optimization was used
@@ -632,6 +640,9 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
         return 0;  // Need full redraw - affected row not visible
     }
 
+    // Use synchronized output to eliminate flicker
+    CxScreen::beginSyncUpdate();
+
     // Get screen coordinate
     unsigned long screenRow = bufferRowToScreenRow(joinedRow);
 
@@ -657,6 +668,7 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
 
     // Update status line and flush
     updateStatusLine();
+    CxScreen::endSyncUpdate();
     screen->flush();
 
     return 1;  // Optimization was used
