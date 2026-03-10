@@ -53,6 +53,9 @@ that category. TAB completes, ENTER executes.
 ### project
   project                   Open project dialog (same as Ctrl-P)
 
+## uEmacs Compatibility
+  ESC Space     Set mark (same as edit-mark)
+
 ## Control Key Shortcuts
 These work directly without entering command mode:
 

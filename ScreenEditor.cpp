@@ -2221,8 +2221,17 @@ ScreenEditor::handleCommandModeInput( CxKeyAction keyAction )
         return;
     }
 
-    // SPACE - transition to argument if at command level with exact match
+    // SPACE handling
     if (keyAction.tag() == ' ') {
+        // ESC-Space with no input = set mark (uEmacs compatibility)
+        if (_cmdBuffer.length() == 0) {
+            activeEditView()->setMark();
+            setMessage("(mark set)");
+            resetCommandInputState();
+            exitCommandLineMode();
+            return;
+        }
+        // transition to argument if at command level with exact match
         if (_activeCompleter == &_commandCompleter) {
             CompleterResult result = _activeCompleter->processEnter( _cmdBuffer );
             if (result.getStatus() == COMPLETER_SELECTED) {
