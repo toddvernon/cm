@@ -256,6 +256,7 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     //---------------------------------------------------------------------------------------------
 	editView->updateScreen();
     editView->placeCursor();
+    updateWindowTitle();
 
 #ifdef CM_MCP_ENABLED
     //---------------------------------------------------------------------------------------------
@@ -278,6 +279,25 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
 
     // Unblock SIGWINCH now that construction is complete
     sigprocmask(SIG_SETMASK, &oldSet, NULL);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::updateWindowTitle
+//
+// Sets the terminal window/tab title to reflect the currently active file.
+// Called whenever the active file changes (buffer switch, file load, split switch).
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::updateWindowTitle(void)
+{
+    CxString filePath = activeEditView()->currentFilePath();
+    if (filePath.length() > 0) {
+        CxScreen::setWindowTitle(CxString("cm: ") + filePath);
+    } else {
+        CxScreen::setWindowTitle("cm");
+    }
 }
 
 
@@ -560,6 +580,7 @@ ScreenEditor::switchActiveView(void)
 
     // Final explicit cursor placement in the active view
     activeEditView()->placeCursor();
+    updateWindowTitle();
     screen->flush();
 }
 

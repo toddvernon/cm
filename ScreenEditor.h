@@ -101,6 +101,7 @@ class ScreenEditor {
 
     void resetPrompt(void);
     void setMessage(CxString message);
+    void updateWindowTitle(void);
 
     int handleControl( CxKeyAction keyAction);
     

@@ -102,6 +102,7 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 // set the edit buffer in the edit view
                 activeEditView()->setEditBuffer( editBuffer );
 
+                updateWindowTitle();
                 commandLineView->updateScreen();
                 return(1);  // Success - existing buffer
 
@@ -134,6 +135,7 @@ ScreenEditor::loadNewFile( CxString filePath, int preload )
                 // set teh editbuffer in the edit view
                 activeEditView()->setEditBuffer( editBuffer );
 
+                updateWindowTitle();
                 commandLineView->updateScreen();
                 return(1);  // Success - new buffer created
 
@@ -205,6 +207,7 @@ ScreenEditor::nextBuffer(void)
 
     // redraw the edit view
     activeEditView()->reframeAndUpdateScreen();
+    updateWindowTitle();
 
 }
 
@@ -238,6 +241,7 @@ ScreenEditor::previousBuffer(void)
 
     // redraw the edit view
     activeEditView()->reframeAndUpdateScreen();
+    updateWindowTitle();
 }
 
 

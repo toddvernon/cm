@@ -492,6 +492,7 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
 
     editBuffer->saveText( fileName );
 
+    updateWindowTitle();
     setMessage("(file saved)");
 }
 
@@ -720,6 +721,7 @@ ScreenEditor::CMD_GotoError( CxString commandLine )
 
     targetBuffer->cursorGotoRequest(targetLine, targetCol);
     activeEditView()->reframeAndUpdateScreen();
+    updateWindowTitle();
 
     char msg[120];
     sprintf(msg, "(%s:%d)", err.filename.data(), err.line);
