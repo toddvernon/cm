@@ -86,6 +86,10 @@ EditView::updateStatusLine(void)
     CxString statusLineTextRight;
     int rightDisplayWidth = 0;
 
+    // Add persistent help hint
+    statusLineTextRight += " Ctrl+H: Help ";
+    rightDisplayWidth += 15;
+
     if (programDefaults->liveStatusLine()) {
 
         char buffer[100];
