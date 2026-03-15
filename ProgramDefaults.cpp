@@ -43,6 +43,7 @@ ProgramDefaults::ProgramDefaults(void)
 	_showLineNumbers(TRUE),
 	_autoSaveOnBufferChange(FALSE),
     _colorizeSyntax(FALSE),
+    _firstRun(FALSE),
 #if defined(_OSX_) || defined(_LINUX_)
     _projectAutoVerify(TRUE),
     _liveStatusLine(TRUE)
@@ -615,6 +616,14 @@ ProgramDefaults::projectAutoVerify(void)
 }
 
 
+// returns true if this is the first run (config file was just created)
+int
+ProgramDefaults::isFirstRun(void)
+{
+    return( _firstRun );
+}
+
+
 //-------------------------------------------------------------------------------------------------
 // ProgramDefaults::initSyntaxColorSet
 //
@@ -813,6 +822,9 @@ ProgramDefaults::writeDefaults(CxString path)
     if (!file.open(path, "w")) {
         return;
     }
+
+    // mark as first run since we are creating the config file
+    _firstRun = TRUE;
 
     // platform-specific default color values
 #if defined(_OSX_) || defined(_LINUX_)

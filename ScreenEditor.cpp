@@ -1126,10 +1126,16 @@ ScreenEditor::resetCommandInputState(void)
 void
 ScreenEditor::run(void)
 {
-    
+
     // starting mode is the editor
     programMode = ScreenEditor::EDIT;
-    
+
+    // show help on first run (when .cmrc was just created)
+    if (programDefaults->isFirstRun()) {
+        helpView->setFirstRun(1);
+        showHelpView();
+    }
+
     while(1) {
         
         //-----------------------------------------------------------------------------------------

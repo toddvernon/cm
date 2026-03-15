@@ -40,7 +40,8 @@ enum HelpViewItemType {
     HELPITEM_SECTION,    // ## header - selectable, expandable/collapsible
     HELPITEM_LINE,       // content line under a section - selectable
     HELPITEM_BLANK,      // empty line (visual spacing, non-selectable)
-    HELPITEM_SEPARATOR   // visual separator between sections (non-selectable)
+    HELPITEM_SEPARATOR,  // visual separator between sections (non-selectable)
+    HELPITEM_WELCOME     // welcome message for first run (non-selectable)
 };
 
 
@@ -113,6 +114,9 @@ class HelpView
     CxString getContextFooter( void );
     // build footer string based on currently selected item type
 
+    void setFirstRun( int firstRun );
+    // mark as first run to show welcome message
+
   private:
 
     int findHelpFile( CxString *outPath );
@@ -168,6 +172,7 @@ class HelpView
 
     int _visible;           // whether modal is currently displayed
     int _helpFileLoaded;    // whether help file was successfully loaded
+    int _isFirstRun;        // show welcome message on first run
 
     // pre-built strings for efficient redraw (built in recalcScreenPlacements)
     CxString _paddingSpaces;   // spaces for padding lines

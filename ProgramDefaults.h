@@ -125,6 +125,9 @@ public:
     int projectAutoVerify(void);
     // should the project view auto-verify files when displayed (modern platforms only)
 
+    int isFirstRun(void);
+    // returns true if this is the first run (config file was just created)
+
 private:
     
     int readFile( CxString fname );
@@ -176,6 +179,7 @@ private:
     int _colorizeSyntax;
     int _liveStatusLine;
     int _projectAutoVerify;
+    int _firstRun;
 
     CxJSONBase *_baseNode;
 };

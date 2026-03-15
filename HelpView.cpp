@@ -46,6 +46,7 @@ HelpView::HelpView( ProgramDefaults *pd, CxScreen *screenPtr )
     // initially not visible
     _visible = 0;
     _helpFileLoaded = 0;
+    _isFirstRun = 0;
     _cachedContentWidth = 0;
 
     // NOTE: No resize callback here - ScreenEditor owns all resize handling
@@ -254,6 +255,43 @@ HelpView::rebuildVisibleItems( void )
     int sectionCount = (int)_sections.entries();
     int contentWidth = _cachedContentWidth;
 
+    // Add welcome message if this is the first run
+    if (_isFirstRun && contentWidth > 0) {
+        const char *welcomeLines[] = {
+            "",
+            "Welcome to cm!",
+            "",
+            "It looks like this is the first time you have used cm.",
+            "A config file ~/.cmrc has been written to your home directory.",
+            "You can configure defaults using this file.",
+            "",
+            "You can always access help with Ctrl-H.",
+            "Explore the help sections below or press ESC to start editing.",
+            "",
+            NULL
+        };
+
+        for (int i = 0; welcomeLines[i] != NULL; i++) {
+            HelpViewItem *welcomeItem = new HelpViewItem();
+            welcomeItem->type = HELPITEM_WELCOME;
+            welcomeItem->sectionIndex = -1;
+            welcomeItem->lineIndex = -1;
+
+            // pre-compute formatted text
+            CxString text = welcomeLines[i];
+            int textLen = (int)text.length();
+            int padNeeded = contentWidth - textLen - 1;
+
+            welcomeItem->formattedText = " ";
+            welcomeItem->formattedText += text;
+            if (padNeeded > 0 && padNeeded <= (int)_paddingSpaces.length()) {
+                welcomeItem->formattedText += _paddingSpaces.subString(0, padNeeded);
+            }
+
+            _visibleItems.append(welcomeItem);
+        }
+    }
+
     for (int s = 0; s < sectionCount; s++) {
         HelpSection *sec = _sections.at(s);
 
@@ -447,7 +485,7 @@ HelpView::recalcScreenPlacements( void )
     int totalItems = (int)_visibleItems.entries();
     while (selectedListItemIndex < totalItems) {
         HelpViewItemType t = _visibleItems.at(selectedListItemIndex)->type;
-        if (t != HELPITEM_SEPARATOR) break;
+        if (t != HELPITEM_SEPARATOR && t != HELPITEM_WELCOME) break;
         selectedListItemIndex++;
     }
     if (selectedListItemIndex >= totalItems && totalItems > 0) {
@@ -542,16 +580,19 @@ HelpView::redraw( void )
             int isSelected = (selectedListItemIndex == logicalItem);
             int isSeparator = (item->type == HELPITEM_SEPARATOR);
             int isSection = (item->type == HELPITEM_SECTION);
+            int isWelcome = (item->type == HELPITEM_WELCOME);
 
-            if (isSelected && !isSeparator) {
+            if (isSelected && !isSeparator && !isWelcome) {
                 screen->setForegroundColor(programDefaults->statusBarTextColor());
                 screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+            } else if (isWelcome) {
+                // welcome message uses message line color for warm highlight
+                screen->setForegroundColor(programDefaults->commandLineMessageTextColor());
             } else if (isSection) {
                 // use markdown keyword color for section titles
                 screen->setForegroundColor(programDefaults->keywordTextColor(14));
-                screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
             } else {
-                programDefaults->applyModalContentColors(screen);
+                screen->setForegroundColor(programDefaults->modalContentTextColor());
             }
 
             // draw the pre-computed line (or separator)
@@ -571,9 +612,7 @@ HelpView::redraw( void )
         // draw empty line if beyond visible items
         //-----------------------------------------------------------------------------------------
         } else {
-            programDefaults->applyModalContentColors(screen);
             screen->writeText(_emptyLine);
-            screen->resetColors();
         }
     }
 
@@ -612,15 +651,17 @@ HelpView::redrawLine( int logicalIndex, int isSelected )
         HelpViewItem *item = _visibleItems.at(logicalIndex);
         int isSeparator = (item->type == HELPITEM_SEPARATOR);
         int isSection = (item->type == HELPITEM_SECTION);
+        int isWelcome = (item->type == HELPITEM_WELCOME);
 
-        if (isSelected && !isSeparator) {
+        if (isSelected && !isSeparator && !isWelcome) {
             screen->setForegroundColor(programDefaults->statusBarTextColor());
             screen->setBackgroundColor(programDefaults->statusBarBackgroundColor());
+        } else if (isWelcome) {
+            screen->setForegroundColor(programDefaults->commandLineMessageTextColor());
         } else if (isSection) {
             screen->setForegroundColor(programDefaults->keywordTextColor(14));
-            screen->setBackgroundColor(programDefaults->modalContentBackgroundColor());
         } else {
-            programDefaults->applyModalContentColors(screen);
+            screen->setForegroundColor(programDefaults->modalContentTextColor());
         }
 
         if (isSeparator) {
@@ -745,6 +786,20 @@ HelpView::setVisible( int visible )
 
 
 //-------------------------------------------------------------------------------------------------
+// HelpView::setFirstRun
+//
+// Mark as first run to show welcome message, then rebuild visible items.
+//
+//-------------------------------------------------------------------------------------------------
+void
+HelpView::setFirstRun( int firstRun )
+{
+    _isFirstRun = firstRun;
+    rebuildVisibleItems();
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // HelpView::routeKeyAction
 //
 // Handle keyboard actions for navigation.
@@ -829,10 +884,10 @@ HelpView::handleArrows( CxKeyAction keyAction )
 
         selectedListItemIndex++;
 
-        // skip non-selectable items (only SEPARATOR is non-selectable)
+        // skip non-selectable items (SEPARATOR and WELCOME are non-selectable)
         while (selectedListItemIndex < totalItems) {
             HelpViewItemType t = _visibleItems.at(selectedListItemIndex)->type;
-            if (t != HELPITEM_SEPARATOR) break;
+            if (t != HELPITEM_SEPARATOR && t != HELPITEM_WELCOME) break;
             selectedListItemIndex++;
         }
 
@@ -866,10 +921,10 @@ HelpView::handleArrows( CxKeyAction keyAction )
 
         selectedListItemIndex--;
 
-        // skip non-selectable items (only SEPARATOR is non-selectable)
+        // skip non-selectable items (SEPARATOR and WELCOME are non-selectable)
         while (selectedListItemIndex >= 0) {
             HelpViewItemType t = _visibleItems.at(selectedListItemIndex)->type;
-            if (t != HELPITEM_SEPARATOR) break;
+            if (t != HELPITEM_SEPARATOR && t != HELPITEM_WELCOME) break;
             selectedListItemIndex--;
         }
 
