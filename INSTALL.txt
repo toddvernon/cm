@@ -1,0 +1,25 @@
+cmacs - Terminal Editor
+=======================
+
+Install
+-------
+
+From a terminal, cd into this directory and run:
+
+    bash install.sh
+
+This installs:
+  - cm binary to /usr/local/bin/
+  - Help files to /usr/local/share/cm/
+
+Note: On macOS, double-clicking install.sh may not work due to
+quarantine restrictions on downloaded files. Use "bash install.sh"
+from the terminal instead.
+
+Try It
+------
+
+    cm myfile.txt
+
+Or just run "cm" to start with an empty buffer.
+Press Ctrl-H for built-in help.
