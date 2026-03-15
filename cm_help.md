@@ -1,100 +1,71 @@
 # cmacs Help
 
 ## Overview
-cmacs is a uEmacs-inspired terminal text editor written in C++.
-Unlike vim, cmacs is always in insert mode - just start typing.
-Use ESC to enter command mode, Ctrl keys for quick actions.
 
-  ┌─────────┬─────────────────────┬──────────────────────────────┬────────────────────────────────────────────┐
-  │ Binding │       cm does       │         VS Code does         │                 Collision?                 │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-b     │ Show build output   │ Toggle sidebar               │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-f     │ Find again          │ Open find                    │ Partial -- same domain, different behavior │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-h     │ Show help           │ Find and replace             │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-k     │ Cut to end of line  │ Chord prefix (C-k C-c, etc.) │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-l     │ Toggle line numbers │ Go to line                   │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-n     │ Next buffer         │ New file                     │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-o     │ Switch split view   │ Open file                    │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-p     │ Project list        │ Quick open / command palette │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-r     │ Replace again       │ Open recent                  │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-s     │ Split screen        │ Save                         │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-u     │ Unsplit screen      │ Undo cursor                  │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-v     │ Page down           │ Paste                        │ Yes -- dangerous                           │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-w     │ Cut mark to cursor  │ Close tab                    │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-y     │ Paste               │ Redo                         │ Yes                                        │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-z     │ Page up             │ Undo                         │ Yes -- dangerous                           │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-x C-s │ Save                │ C-s = Save                   │ Same intent, extra keystroke               │
-  ├─────────┼─────────────────────┼──────────────────────────────┼────────────────────────────────────────────┤
-  │ C-x C-c │ Quit                │ C-q = Quit                   │ Same intent, different key                 │
-  └─────────┴─────────────────────┴──────────────────────────────┴────────────────────────────────────────────┘
-
+cmacs is a terminal text editor. Unlike vim, cmacs is always in insert
+mode - just start typing. Use ESC to enter command mode, Ctrl keys for
+quick actions.
 
 ## ESC Commands
-Press ESC to enter command mode, then type a command name.
-Commands follow a category-action naming convention. Each category
-is unique at the first keystroke, so typing one letter narrows to
-that category. TAB completes, ENTER executes.
 
-### file-
+Press ESC to open the command prompt. Then just start typing.
+
+How it works:
+  1. Each keystroke narrows the matches. The shared prefix fills in automatically.
+  2. When your input uniquely identifies a command, it executes immediately.
+  3. Invalid keystrokes are rejected - you cannot type a wrong path.
+
+Example: to save a file, type ESC then f then s. After 'f', the prompt
+fills "file-". After 's', "file-save" matches, so press Enter to execute
+(or keep typing for file-save-as). Three keystrokes total.
+
+Commands are organized by category:
+
+file-
   file-load <filename>      Load file into new buffer
   file-new <filename>       Create new buffer
   file-quit                 Quit editor
   file-save [filename]      Save current buffer
   file-save-as <filename>   Save buffer to new file
 
-### edit-
+edit-
   edit-cut                  Cut from mark to cursor
   edit-mark                 Set mark at cursor position
   edit-paste                Paste from cut buffer
   edit-system-paste         Paste from system clipboard
 
-### search-
+search-
   search-text <pattern>     Search for text in buffer
   search-replace <text>     Replace next occurrence
   search-replace-all <text> Replace all occurrences
 
-### goto-
+goto-
   goto-error                Jump to file:line from error under cursor
   goto-line <line>          Go to specified line number
 
-### insert-
-  insert-box <symbol>       Insert box drawing symbol (TAB for completion)
+insert-
+  insert-box <symbol>       Insert box drawing symbol (TAB shows options)
   insert-comment-block <col> Insert comment block to column
-  insert-symbol <symbol>    Insert common symbol (TAB for completion)
+  insert-symbol <symbol>    Insert common symbol (TAB shows options)
 
-### text-
+text-
   text-count                Count lines and characters in buffer
   text-detab                Convert tabs to spaces
   text-entab                Convert leading spaces to tabs
   text-trim-trailing        Remove trailing whitespace from all lines
 
-### view-
+view-
   view-build                Show build output
   view-help                 Show help screen
   view-jump-scroll          Toggle jump scroll mode
   view-split                Split screen horizontally
   view-unsplit              Return to single view
 
-### project
-  project                   Open project dialog (same as Ctrl-P)
+project                     Open project dialog (same as Ctrl-P)
 
 
 ## Control Key Shortcuts
+
 These work directly without entering command mode:
 
   Ctrl-B        Show build output
@@ -115,6 +86,7 @@ These work directly without entering command mode:
 
 
 ## Control-X Commands
+
 Two-key sequences starting with Ctrl-X:
 
   Ctrl-X Ctrl-S   Save current buffer
@@ -122,6 +94,7 @@ Two-key sequences starting with Ctrl-X:
 
 
 ## Navigation
+
   Arrow keys      Move cursor
   Home / End      Beginning / end of line
   Page Up/Down    Scroll by page
@@ -129,71 +102,11 @@ Two-key sequences starting with Ctrl-X:
   Ctrl-E          End of line
 
 
-## Command Structure
+## Tips
 
-  CTRL Keys
-  ├── C-b ─────── Show build output
-  ├── C-f ─────── Find again (repeat last search)
-  ├── C-h ─────── Show help
-  ├── C-k ─────── Cut to end of line
-  ├── C-l ─────── Toggle line numbers
-  ├── C-n ─────── Next buffer
-  ├── C-o ─────── Switch split view
-  ├── C-p ─────── Project/buffer list
-  ├── C-r ─────── Replace again
-  ├── C-s ─────── Split screen
-  ├── C-u ─────── Unsplit screen
-  ├── C-v ─────── Page down
-  ├── C-w ─────── Cut mark to cursor (+ system clipboard)
-  ├── C-y ─────── Paste (internal buffer)
-  ├── C-z ─────── Page up
-  │
-  └── C-x (chord prefix)
-      ├── C-x C-s ── Save
-      └── C-x C-c ── Quit
-
-  ESC Commands (command> prompt, TAB completes, ENTER executes)
-  │
-  ├── f ── file-
-  │        ├── file-load <filename> ──── Load file into new buffer
-  │        ├── file-new <filename> ───── Create new buffer
-  │        ├── file-quit ────────────── Quit editor
-  │        ├── file-save [filename] ─── Save current buffer
-  │        └── file-save-as <filename>  Save buffer to new file
-  │
-  ├── e ── edit-
-  │        ├── edit-cut ────────────── Cut from mark to cursor
-  │        ├── edit-mark ───────────── Set mark at cursor
-  │        ├── edit-paste ──────────── Paste from cut buffer
-  │        └── edit-system-paste ───── Paste from system clipboard
-  │
-  ├── s ── search-
-  │        ├── search-text <pattern> ── Search for text
-  │        ├── search-replace <text> ── Replace next occurrence
-  │        └── search-replace-all ───── Replace all occurrences
-  │
-  ├── g ── goto-
-  │        ├── goto-error ──────────── Jump to error location
-  │        └── goto-line <line> ────── Go to line number
-  │
-  ├── i ── insert-
-  │        ├── insert-box <symbol> ──── Insert box drawing character
-  │        ├── insert-comment-block ─── Insert comment block
-  │        └── insert-symbol <symbol> ─ Insert common symbol
-  │
-  ├── t ── text-
-  │        ├── text-count ──────────── Count lines and characters
-  │        ├── text-detab ──────────── Convert tabs to spaces
-  │        ├── text-entab ──────────── Convert spaces to tabs
-  │        └── text-trim-trailing ──── Remove trailing whitespace
-  │
-  ├── v ── view-
-  │        ├── view-build ──────────── Show build output
-  │        ├── view-help ───────────── Show help screen
-  │        ├── view-jump-scroll ────── Toggle jump scroll mode
-  │        ├── view-split ──────────── Split screen
-  │        └── view-unsplit ────────── Unsplit screen
-  │
-  └── p ── project ─────────────────── Open project dialog
-
+- ESC commands auto-complete and auto-execute - most take 2-3 keystrokes
+- Ctrl-W copies to system clipboard, Ctrl-Y pastes from internal buffer
+- Use edit-system-paste for system clipboard paste
+- Split screen with Ctrl-S, switch views with Ctrl-O, unsplit with Ctrl-U
+- In project view, type to filter, Enter to open, Delete to close buffer
 
