@@ -38,3 +38,6 @@ if [ -f cm_help.txt ]; then
 fi
 
 echo "Done. Run 'cm' to start editing."
+echo ""
+echo "Press Enter to close..."
+read dummy
