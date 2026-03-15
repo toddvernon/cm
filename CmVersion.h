@@ -14,6 +14,6 @@
 #ifndef _CmVersion_h_
 #define _CmVersion_h_
 
-#define CM_VERSION "1.3"
+#define CM_VERSION "1.5"
 
 #endif
