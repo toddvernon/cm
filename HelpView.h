@@ -111,6 +111,9 @@ class HelpView
     void setVisible( int visible );
     // set visibility state for resize handling
 
+    int isInsideFrame( int row, int col );
+    // returns 1 if screen position is inside the dialog frame
+
     CxString getContextFooter( void );
     // build footer string based on currently selected item type
 
@@ -181,6 +184,9 @@ class HelpView
     int _cachedContentWidth;   // content width when strings were built
 
     CxString _lastFooter;      // cached footer for change detection
+
+    // frame bounds for mouse hit testing
+    int _frameTop, _frameLeft, _frameBottom, _frameRight;
 
 };
 

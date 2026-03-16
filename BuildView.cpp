@@ -97,6 +97,10 @@ BuildView::recalcScreenPlacements(void)
 
     // update the frame bounds
     frame->resize(frameTop, frameLeft, frameBottom, frameRight);
+    _frameTop = frameTop;
+    _frameLeft = frameLeft;
+    _frameBottom = frameBottom;
+    _frameRight = frameRight;
 
     // content starts after top border, title, and separator (row + 3)
     screenBuildTitleBarLine  = frameTop + 1;  // title is on row 1
@@ -565,5 +569,22 @@ BuildView::handleArrows( CxKeyAction keyAction )
         return 1;
     }
 
+    return 0;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// BuildView::isInsideFrame
+//
+// Returns 1 if the given screen position is inside the dialog frame.
+//
+//-------------------------------------------------------------------------------------------------
+int
+BuildView::isInsideFrame( int row, int col )
+{
+    if (row >= _frameTop && row <= _frameBottom &&
+        col >= _frameLeft && col <= _frameRight) {
+        return 1;
+    }
     return 0;
 }

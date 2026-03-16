@@ -78,6 +78,9 @@ class BuildView
     void setVisible( int visible );
     // set visibility state for resize handling
 
+    int isInsideFrame( int row, int col );
+    // returns 1 if screen position is inside the dialog frame
+
     void advanceSpinner( void );
     // advance the spinner animation (call periodically during build)
 
@@ -126,6 +129,9 @@ class BuildView
 
     // spinner animation
     int _spinnerIndex;
+
+    // frame bounds for mouse hit testing
+    int _frameTop, _frameLeft, _frameBottom, _frameRight;
 };
 
 #endif

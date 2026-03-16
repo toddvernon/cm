@@ -109,6 +109,9 @@ class ProjectView
     void setVisible( int visible );
     // set visibility state for resize handling
 
+    int isInsideFrame( int row, int col );
+    // returns 1 if screen position is inside the dialog frame
+
     void rebuildVisibleItems( void );
     // rebuild the flat list of visible items from project structure
 
@@ -191,6 +194,9 @@ class ProjectView
     int _cachedContentWidth;   // content width when strings were built
 
     CxString _lastFooter;      // cached footer for change detection
+
+    // frame bounds for mouse hit testing
+    int _frameTop, _frameLeft, _frameBottom, _frameRight;
 
     ScreenEditor *_screenEditor;  // for status bar updates during verify
 

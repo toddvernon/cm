@@ -2828,13 +2828,13 @@ ScreenEditor::handleMouseInProjectView(CxKeyAction keyAction)
         int button = keyAction.mouseButton();
         if (button == 4) {
             // wheel up - send arrow-up
-            CxKeyAction upAction("<arrow-up>");
+            CxKeyAction upAction("CURSOR:<arrow-up>");
             projectView->routeKeyAction(upAction);
             projectView->routeKeyAction(upAction);
             projectView->routeKeyAction(upAction);
         } else if (button == 5) {
             // wheel down - send arrow-down
-            CxKeyAction downAction("<arrow-down>");
+            CxKeyAction downAction("CURSOR:<arrow-down>");
             projectView->routeKeyAction(downAction);
             projectView->routeKeyAction(downAction);
             projectView->routeKeyAction(downAction);
@@ -2842,41 +2842,15 @@ ScreenEditor::handleMouseInProjectView(CxKeyAction keyAction)
         return;
     }
 
-    if (aType == CxKeyAction::MOUSE_PRESS) {
-        // check if click is inside the project view frame
-        // project view uses centered modal - check approximate bounds
-        int screenRows = screen->rows();
-        int screenCols = screen->cols();
-        int frameTop = screenRows / 6;
-        int frameBottom = screenRows - (screenRows / 6);
-        int frameLeft = screenCols / 8;
-        int frameRight = screenCols - (screenCols / 8);
+    if (aType == CxKeyAction::MOUSE_PRESS || aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
+        int mouseCol = keyAction.mouseCol();
 
-        if (mouseRow < frameTop || mouseRow > frameBottom ||
-            keyAction.mouseCol() < frameLeft || keyAction.mouseCol() > frameRight) {
-            // click outside - dismiss
+        if (!projectView->isInsideFrame(mouseRow, mouseCol)) {
+            // click outside dialog - dismiss
             projectView->setVisible(0);
             returnToEditMode();
-            return;
         }
-
-        // click inside the list area - convert to arrow key navigation
-        // calculate which item was clicked based on screen position
-        // The first list line is typically frameTop + 2 (title + frame border)
-        int listFirstRow = frameTop + 2;
-        int listRow = mouseRow - listFirstRow;
-        if (listRow >= 0) {
-            // send arrow-up/down to navigate to the clicked row
-            // This is simpler than directly manipulating internal state
-            // For now, just let clicks select via arrows
-        }
-    }
-
-    if (aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
-        // treat as click outside to dismiss - the project view handles Enter for open
-        // For now, dismiss and return to edit
-        projectView->setVisible(0);
-        returnToEditMode();
+        // click inside dialog - ignore (keyboard navigation only)
     }
 }
 
@@ -2895,12 +2869,12 @@ ScreenEditor::handleMouseInHelpView(CxKeyAction keyAction)
     if (aType == CxKeyAction::MOUSE_WHEEL) {
         int button = keyAction.mouseButton();
         if (button == 4) {
-            CxKeyAction upAction("<arrow-up>");
+            CxKeyAction upAction("CURSOR:<arrow-up>");
             helpView->routeKeyAction(upAction);
             helpView->routeKeyAction(upAction);
             helpView->routeKeyAction(upAction);
         } else if (button == 5) {
-            CxKeyAction downAction("<arrow-down>");
+            CxKeyAction downAction("CURSOR:<arrow-down>");
             helpView->routeKeyAction(downAction);
             helpView->routeKeyAction(downAction);
             helpView->routeKeyAction(downAction);
@@ -2909,9 +2883,15 @@ ScreenEditor::handleMouseInHelpView(CxKeyAction keyAction)
     }
 
     if (aType == CxKeyAction::MOUSE_PRESS || aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
-        // click dismisses help view
-        helpView->setVisible(0);
-        returnToEditMode();
+        int mouseRow = keyAction.mouseRow();
+        int mouseCol = keyAction.mouseCol();
+
+        if (!helpView->isInsideFrame(mouseRow, mouseCol)) {
+            // click outside dialog - dismiss
+            helpView->setVisible(0);
+            returnToEditMode();
+        }
+        // click inside dialog - ignore (keyboard navigation only)
     }
 }
 
@@ -2930,12 +2910,12 @@ ScreenEditor::handleMouseInBuildView(CxKeyAction keyAction)
     if (aType == CxKeyAction::MOUSE_WHEEL) {
         int button = keyAction.mouseButton();
         if (button == 4) {
-            CxKeyAction upAction("<arrow-up>");
+            CxKeyAction upAction("CURSOR:<arrow-up>");
             buildView->routeKeyAction(upAction);
             buildView->routeKeyAction(upAction);
             buildView->routeKeyAction(upAction);
         } else if (button == 5) {
-            CxKeyAction downAction("<arrow-down>");
+            CxKeyAction downAction("CURSOR:<arrow-down>");
             buildView->routeKeyAction(downAction);
             buildView->routeKeyAction(downAction);
             buildView->routeKeyAction(downAction);
@@ -2944,9 +2924,15 @@ ScreenEditor::handleMouseInBuildView(CxKeyAction keyAction)
     }
 
     if (aType == CxKeyAction::MOUSE_PRESS || aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
-        // click dismisses build view
-        buildView->setVisible(0);
-        returnToEditMode();
+        int mouseRow = keyAction.mouseRow();
+        int mouseCol = keyAction.mouseCol();
+
+        if (!buildView->isInsideFrame(mouseRow, mouseCol)) {
+            // click outside dialog - dismiss
+            buildView->setVisible(0);
+            returnToEditMode();
+        }
+        // click inside dialog - ignore (keyboard navigation only)
     }
 }
 
