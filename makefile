@@ -289,6 +289,8 @@ archive:
 	@echo "  (extracts to cx_apps/cm/ when untarred from parent directory)"
 	@test -d ../../ARCHIVE || mkdir ../../ARCHIVE
 	@cd ../.. && tar cvf ARCHIVE/cxapps_unix.tar \
+		--no-mac-metadata \
+		--exclude='._*' \
 		--exclude='*.o' \
 		--exclude='*.a' \
 		--exclude='.git' \
