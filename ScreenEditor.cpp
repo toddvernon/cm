@@ -1938,11 +1938,15 @@ ScreenEditor::selectCommand( CommandEntry *cmd )
         _argBuffer = "";
         updateArgumentDisplay();
     }
-    else {
-        // no-arg command or symbol command (handled by child completer transition)
-        // complete the name but wait for ENTER to execute
+    else if (takesSymbolArg) {
+        // symbol command - complete the name, child completer transition happens via Enter
         _cmdBuffer = cmd->name;
         updateCommandDisplay();
+    }
+    else {
+        // no-arg command - execute immediately on unique match (like ss)
+        _currentCommand = cmd;
+        executeCurrentCommand();
     }
 }
 
