@@ -1923,10 +1923,14 @@ ScreenEditor::updateCommandDisplayForSymbol( void )
     CxString symDisplay = _cmdBuffer;
 
     if (count > 0 && !isExactMatch) {
+        CxString common = Completer::findCommonPrefix( names, count );
+        int prefixLen = common.length();
+
         symDisplay += "  ";
         for (int i = 0; i < count && i < 6; i++) {
             symDisplay += "| ";
-            symDisplay += names[i];
+            symDisplay += names[i].subString( prefixLen,
+                              names[i].length() - prefixLen );
             symDisplay += " ";
         }
         if (count > 6) {
@@ -1993,10 +1997,18 @@ ScreenEditor::updateCommandDisplay( void )
         int isExactMatch = (count == 1 && _cmdBuffer == matches[0]->name);
 
         if (count > 0 && !isExactMatch) {
+            CxString names[16];
+            for (int i = 0; i < count; i++) {
+                names[i] = matches[i]->name;
+            }
+            CxString common = Completer::findCommonPrefix( names, count );
+            int prefixLen = common.length();
+
             display += "  ";
             for (int i = 0; i < count && i < 8; i++) {
                 display += "| ";
-                display += matches[i]->name;
+                display += matches[i]->name.subString( prefixLen,
+                               matches[i]->name.length() - prefixLen );
                 CommandEntry *entry = (CommandEntry *)matches[i]->userData;
                 if (entry != NULL && entry->argHint != NULL) {
                     display += " ";
