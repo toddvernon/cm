@@ -24,12 +24,13 @@ Commands are organized by category:
 file-
   file-load <filename>      Load file into new buffer
   file-new <filename>       Create new buffer
-  file-quit                 Quit editor
+  file-quit                 Quit (refuses if unsaved changes)
   file-save [filename]      Save current buffer
   file-save-as <filename>   Save buffer to new file
 
 edit-
-  edit-cut                  Cut from mark to cursor
+  edit-copy                 Copy from mark to cursor (+ clipboard)
+  edit-cut                  Cut from mark to cursor (+ clipboard)
   edit-mark                 Set mark at cursor position
   edit-paste                Paste from cut buffer
   edit-system-paste         Paste from system clipboard
@@ -63,6 +64,10 @@ view-
 
 project                     Open project dialog (same as Ctrl-P)
 
+quit-
+  quit-save                 Save modified files and quit
+  quit-nosave               Quit without saving
+
 
 ## Control Key Shortcuts
 
@@ -90,7 +95,23 @@ These work directly without entering command mode:
 Two-key sequences starting with Ctrl-X:
 
   Ctrl-X Ctrl-S   Save current buffer
-  Ctrl-X Ctrl-C   Quit editor
+  Ctrl-X Ctrl-C   Quit without saving
+
+
+## Mouse Support
+
+On macOS and Linux terminals with mouse support:
+
+  Click             Place cursor at click position
+  Click+Drag        Select text (highlighted in blue)
+  Shift+Click       Extend selection from mark
+  Double-click      Select word under cursor
+  Scroll wheel      Scroll up/down (3 lines)
+
+  Split screen:     Click activates the target view
+  ESC command:      Click hints to select commands
+  Project view:     Click selects item, double-click opens
+  Help/Build:       Scroll wheel navigates, click outside dismisses
 
 
 ## Navigation
@@ -107,6 +128,6 @@ Two-key sequences starting with Ctrl-X:
 - ESC commands auto-complete and auto-execute - most take 2-3 keystrokes
 - Ctrl-W copies to system clipboard, Ctrl-Y pastes from internal buffer
 - Use edit-system-paste for system clipboard paste
+- Mouse drag-select also copies to system clipboard (use edit-copy for keyboard)
 - Split screen with Ctrl-S, switch views with Ctrl-O, unsplit with Ctrl-U
-- In project view, type to filter, Enter to open, Delete to close buffer
-
+- In project view: S saves, A saves all, M builds, click or Enter to open
