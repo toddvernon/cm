@@ -433,6 +433,7 @@ EditView::formatEditorLine(unsigned long bufferRow )
     //
     //---------------------------------------------------------------------------------------------
     visibleText = applySearchHighlights(visibleText, bufferRow, (int)_visibleFirstEditBufferCol);
+    visibleText = applySelectionHighlight(visibleText, bufferRow, (int)_visibleFirstEditBufferCol);
 #endif
 
     //---------------------------------------------------------------------------------------------
@@ -676,6 +677,202 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
     screen->flush();
 
     return 1;  // Optimization was used
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::screenToBufferPosition
+//
+// Translates terminal screen coordinates to edit buffer coordinates.
+// Returns 1 if the screen position maps to a valid edit area position.
+// Returns 0 if the click is outside the edit area (status bar, line numbers, etc.).
+//
+//-------------------------------------------------------------------------------------------------
+int
+EditView::screenToBufferPosition(int screenRow, int screenCol,
+                                 unsigned long *bufferRow, unsigned long *bufferCol)
+{
+    if (editBuffer == NULL) return 0;
+
+    // check row is in edit area
+    if (screenRow < (int)_screenEditFirstRow) return 0;
+    if (screenRow > (int)_screenEditLastRow) return 0;
+
+    // check col is past line number offset
+    if (screenCol < (int)_lineNumberOffset) return 0;
+
+    // translate screen row to buffer row
+    unsigned long bRow = (unsigned long)screenRow - _screenEditFirstRow + _visibleFirstEditBufferRow;
+
+    // clamp to buffer bounds
+    unsigned long numLines = editBuffer->numberOfLines();
+    if (numLines == 0) {
+        *bufferRow = 0;
+        *bufferCol = 0;
+        return 1;
+    }
+    if (bRow >= numLines) {
+        bRow = numLines - 1;
+    }
+
+    // translate screen col to buffer col
+    unsigned long bCol = (unsigned long)(screenCol - (int)_lineNumberOffset) + _visibleFirstEditBufferCol;
+
+    // clamp col to line length
+#ifdef CM_UTF8_SUPPORT
+    CxUTFString *utfLine = editBuffer->line(bRow);
+    if (utfLine != NULL) {
+        // for UTF-8 we need display-column-aware clamping
+        int displayCol = (int)bCol;
+        int charIdx = 0;
+        int dc = 0;
+        while (charIdx < utfLine->charCount() && dc < displayCol) {
+            const CxUTFCharacter *ch = utfLine->at(charIdx);
+            dc += ch->displayWidth();
+            charIdx++;
+        }
+        // charIdx is the logical character position
+        if ((unsigned long)charIdx > (unsigned long)utfLine->charCount()) {
+            bCol = (unsigned long)utfLine->charCount();
+        } else {
+            bCol = (unsigned long)charIdx;
+        }
+    } else {
+        bCol = 0;
+    }
+#else
+    CxString *linePtr = editBuffer->line(bRow);
+    if (linePtr != NULL) {
+        if (bCol > linePtr->length()) {
+            bCol = linePtr->length();
+        }
+    } else {
+        bCol = 0;
+    }
+#endif
+
+    *bufferRow = bRow;
+    *bufferCol = bCol;
+    return 1;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::applySelectionHighlight
+//
+// Apply selection highlight (light blue background, dark text) for the range between
+// mark and cursor. Follows the same ANSI-escape-aware walk as applySearchHighlights.
+//
+//-------------------------------------------------------------------------------------------------
+CxString
+EditView::applySelectionHighlight(CxString text, int bufferRow, int visibleStartCol)
+{
+    if (editBuffer == NULL) return text;
+    if (!_mouseSelectionActive) return text;
+
+    // determine selection range: normalize mark and cursor into start/end
+    unsigned long markRow = _selectionMark.row;
+    unsigned long markCol = _selectionMark.col;
+    unsigned long curRow = editBuffer->cursor.row;
+    unsigned long curCol = editBuffer->cursor.col;
+
+    unsigned long startRow, startCol, endRow, endCol;
+    if (markRow < curRow || (markRow == curRow && markCol <= curCol)) {
+        startRow = markRow;  startCol = markCol;
+        endRow = curRow;     endCol = curCol;
+    } else {
+        startRow = curRow;   startCol = curCol;
+        endRow = markRow;    endCol = markCol;
+    }
+
+    // if this line is entirely outside the selection range, return unchanged
+    if ((unsigned long)bufferRow < startRow || (unsigned long)bufferRow > endRow) {
+        return text;
+    }
+
+    // determine which visible columns are selected on this line
+    int selStartCol, selEndCol;
+    int visibleEndCol = visibleStartCol + (int)_screenEditNumberOfCols;
+
+    if ((unsigned long)bufferRow == startRow && (unsigned long)bufferRow == endRow) {
+        // selection starts and ends on this line
+        selStartCol = (int)startCol - visibleStartCol;
+        selEndCol = (int)endCol - visibleStartCol;
+    } else if ((unsigned long)bufferRow == startRow) {
+        // selection starts on this line, continues to end
+        selStartCol = (int)startCol - visibleStartCol;
+        selEndCol = (int)_screenEditNumberOfCols;
+    } else if ((unsigned long)bufferRow == endRow) {
+        // selection ends on this line
+        selStartCol = 0;
+        selEndCol = (int)endCol - visibleStartCol;
+    } else {
+        // entire line is selected
+        selStartCol = 0;
+        selEndCol = (int)_screenEditNumberOfCols;
+    }
+
+    // clamp to visible area
+    if (selStartCol < 0) selStartCol = 0;
+    if (selEndCol > (int)_screenEditNumberOfCols) selEndCol = (int)_screenEditNumberOfCols;
+    if (selStartCol >= selEndCol) return text;
+
+    // selection color: light blue bg, dark text (matches ss)
+    const char *selOn  = "\033[38;2;40;40;60m\033[48;2;180;200;230m";
+    const char *selOff = "\033[0m";
+
+    // walk through colorized text, tracking display column, inject highlight
+    CxString result;
+    int displayCol = 0;
+    int inSelection = 0;
+    int textLen = (int)text.length();
+
+    for (int i = 0; i < textLen; i++) {
+        char c = text.charAt(i);
+
+        // skip ANSI escape sequences (preserve them as-is)
+        if (c == '\033' && i + 1 < textLen && text.charAt(i + 1) == '[') {
+            // if we're in selection, close it before the escape, reopen after
+            if (inSelection) {
+                result += selOff;
+            }
+            result += c;
+            i++;
+            while (i < textLen) {
+                c = text.charAt(i);
+                result += c;
+                if (c == 'm') break;
+                i++;
+            }
+            if (inSelection) {
+                result += selOn;
+            }
+            continue;
+        }
+
+        // check if entering selection
+        if (!inSelection && displayCol >= selStartCol && displayCol < selEndCol) {
+            result += selOn;
+            inSelection = 1;
+        }
+
+        // output the character
+        result += c;
+        displayCol++;
+
+        // check if leaving selection
+        if (inSelection && displayCol >= selEndCol) {
+            result += selOff;
+            inSelection = 0;
+        }
+    }
+
+    // close any open selection
+    if (inSelection) {
+        result += selOff;
+    }
+
+    return result;
 }
 #endif
 

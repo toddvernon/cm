@@ -581,6 +581,22 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 
     recalcLineNumberDigits(  );
 
+#if defined(_OSX_) || defined(_LINUX_)
+    // clear mouse selection on any editing keypress (typing, backspace, etc.)
+    // cursor keys don't clear - they just move through the selection
+    {
+        int aType = keyAction.actionType();
+        if (_mouseSelectionActive &&
+            aType != CxKeyAction::CURSOR &&
+            aType != CxKeyAction::COMMAND &&
+            aType != CxKeyAction::NOTHING)
+        {
+            _mouseSelectionActive = 0;
+            updateScreen();  // force full redraw to clear stale highlight on all lines
+        }
+    }
+#endif
+
 	//---------------------------------------------------------------------------------------------
 	// based on the kind of key
 	//
@@ -750,4 +766,215 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 
     return( EditView::OK );
 }
+
+
+#if defined(_OSX_) || defined(_LINUX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::mouseClickAt
+//
+// Move cursor to the buffer position corresponding to the given screen coordinates.
+// Clears the mark (no selection) and updates the display.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::mouseClickAt(int screenRow, int screenCol)
+{
+    if (editBuffer == NULL) return;
+
+    unsigned long bRow, bCol;
+    if (!screenToBufferPosition(screenRow, screenCol, &bRow, &bCol)) return;
+
+    editBuffer->cursorGotoRequest(bRow, bCol);
+    _mouseSelectionActive = 0;
+
+    reframe();
+    updateScreen();
+    placeCursor();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::mouseStartSelection
+//
+// Set the mark at the given screen position to begin a drag selection.
+// Moves cursor there and records mark as the drag anchor.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::mouseStartSelection(int screenRow, int screenCol)
+{
+    if (editBuffer == NULL) return;
+
+    unsigned long bRow, bCol;
+    if (!screenToBufferPosition(screenRow, screenCol, &bRow, &bCol)) return;
+
+    editBuffer->cursorGotoRequest(bRow, bCol);
+    editBuffer->setMark();  // set editBuffer mark too so cut-to-mark works
+    _selectionMark = CxEditBufferPosition(bRow, bCol);
+    _mouseSelectionActive = 1;
+
+    reframe();
+    placeCursor();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::mouseDragTo
+//
+// Update cursor during a drag operation. The selection mark stays fixed.
+// The selection is the range between _selectionMark and cursor.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::mouseDragTo(int screenRow, int screenCol)
+{
+    if (editBuffer == NULL) return;
+
+    unsigned long bRow, bCol;
+    if (!screenToBufferPosition(screenRow, screenCol, &bRow, &bCol)) return;
+
+    editBuffer->cursorGotoRequest(bRow, bCol);
+
+    reframe();
+    updateScreen();
+    placeCursor();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::clearMouseSelection
+//
+// Clear mouse selection state and redraw.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::clearMouseSelection(void)
+{
+    _mouseSelectionActive = 0;
+    updateScreen();
+    placeCursor();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::mouseScroll
+//
+// Scroll the view by N lines. Negative = up, positive = down.
+// Does not move the cursor - just shifts the viewport.
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::mouseScroll(int lines)
+{
+    if (editBuffer == NULL) return;
+
+    if (lines < 0) {
+        // scroll up
+        int amount = -lines;
+        if ((unsigned long)amount > _visibleFirstEditBufferRow) {
+            amount = (int)_visibleFirstEditBufferRow;
+        }
+        if (amount > 0) {
+            recalcVisibleBufferFromTopEditLine(_visibleFirstEditBufferRow - (unsigned long)amount);
+        }
+    } else if (lines > 0) {
+        // scroll down
+        unsigned long maxFirst = editBuffer->numberOfLines();
+        if (maxFirst > _screenEditNumberOfLines) {
+            maxFirst = maxFirst - _screenEditNumberOfLines;
+        } else {
+            maxFirst = 0;
+        }
+        unsigned long newFirst = _visibleFirstEditBufferRow + (unsigned long)lines;
+        if (newFirst > maxFirst) {
+            newFirst = maxFirst;
+        }
+        recalcVisibleBufferFromTopEditLine(newFirst);
+    }
+
+    updateScreen();
+    placeCursor();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
+    screen->flush();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::mouseDoubleClickAt
+//
+// Select the word at the given screen position. Sets mark at word start, cursor at word end.
+// Word characters: a-zA-Z0-9_
+//
+//-------------------------------------------------------------------------------------------------
+void
+EditView::mouseDoubleClickAt(int screenRow, int screenCol)
+{
+    if (editBuffer == NULL) return;
+
+    unsigned long bRow, bCol;
+    if (!screenToBufferPosition(screenRow, screenCol, &bRow, &bCol)) return;
+
+    // get the line text
+#ifdef CM_UTF8_SUPPORT
+    CxUTFString *utfLine = editBuffer->line(bRow);
+    if (utfLine == NULL) return;
+    CxString lineText = utfLine->toBytes();
+    int lineLen = (int)utfLine->charCount();
+#else
+    CxString *linePtr = editBuffer->line(bRow);
+    if (linePtr == NULL) return;
+    CxString lineText = *linePtr;
+    int lineLen = (int)lineText.length();
+#endif
+
+    if (lineLen == 0) return;
+    int col = (int)bCol;
+    if (col >= lineLen) col = lineLen - 1;
+    if (col < 0) return;
+
+    // check if character at position is a word character
+    char ch = lineText.charAt(col);
+    int isWord = ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                  (ch >= '0' && ch <= '9') || ch == '_');
+    if (!isWord) return;
+
+    // scan left for word start
+    int wordStart = col;
+    while (wordStart > 0) {
+        char c = lineText.charAt(wordStart - 1);
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '_')) break;
+        wordStart--;
+    }
+
+    // scan right for word end
+    int wordEnd = col + 1;
+    while (wordEnd < lineLen) {
+        char c = lineText.charAt(wordEnd);
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '_')) break;
+        wordEnd++;
+    }
+
+    // set selection mark at word start, cursor at word end
+    editBuffer->cursorGotoRequest(bRow, (unsigned long)wordStart);
+    editBuffer->setMark();  // set editBuffer mark too so cut-to-mark works
+    _selectionMark = CxEditBufferPosition(bRow, (unsigned long)wordStart);
+    _mouseSelectionActive = 1;
+    editBuffer->cursorGotoRequest(bRow, (unsigned long)wordEnd);
+
+    reframe();
+    updateScreen();
+    placeCursor();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
+    screen->flush();
+}
+#endif
 

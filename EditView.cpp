@@ -55,6 +55,9 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
     // block comment state tracking
     _blockCommentState = NULL;
     _blockCommentStateSize = 0;
+
+    // mouse selection state
+    _mouseSelectionActive = 0;
 #endif
 
     // there is not initial editbuffer, the next step creates it.

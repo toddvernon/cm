@@ -130,6 +130,7 @@ class ScreenEditor {
     void CMD_LoadFile( CxString commandLine );
     void CMD_SetMark( CxString commandLine );
     void CMD_GotoLine( CxString commandLine );
+    void CMD_CopyToMark( CxString commandLine );
     void CMD_CutToMark( CxString commandLine );
     void CMD_PasteText( CxString commandLine );
     void CMD_SystemPaste( CxString commandLine );
@@ -268,6 +269,28 @@ private:
     int _splitMode;                 // 0 = single view, 1 = horizontal split
     int _splitRow;                  // screen row where divider sits
     int _activeView;                // 0 = top/only, 1 = bottom
+
+#if defined(_OSX_) || defined(_LINUX_)
+    // mouse support state
+    int _autoScrollActive;          // 1 if auto-scrolling during drag
+    int _autoScrollDirection;       // -1 = up, +1 = down
+    int _mouseButtonDown;            // 1 if mouse button is held (press without release)
+    void mouseAutoScrollCallback(void);  // idle callback for drag auto-scroll
+
+    // clickable command menu hints
+    CxString _hintItems[16];        // text of each displayed hint
+    int _hintStartCol[16];          // screen column where each hint starts
+    int _hintCount;                 // number of hints displayed
+    int _hintStripLen;              // buffer prefix length to preserve on click
+
+    // mouse helper methods
+    void handleMouseInEditor(CxKeyAction keyAction);
+    void handleMouseInCommandPrompt(CxKeyAction keyAction);
+    void handleMouseInProjectView(CxKeyAction keyAction);
+    void handleMouseInHelpView(CxKeyAction keyAction);
+    void handleMouseInBuildView(CxKeyAction keyAction);
+    EditView* editViewAtRow(int screenRow);  // which EditView owns this row
+#endif
 
     // resize callback - coordinates all redrawing based on programMode
     void screenResizeCallback(void);

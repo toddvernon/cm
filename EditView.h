@@ -156,6 +156,37 @@ class EditView
 
     int isLineInsideBlockComment(int lineNum);
     // returns 1 if the given line starts inside a /* */ block comment
+
+    // mouse support
+    int screenToBufferPosition(int screenRow, int screenCol,
+                               unsigned long *bufferRow, unsigned long *bufferCol);
+    // returns 1 if screen position maps to valid edit area, 0 otherwise
+
+    void mouseClickAt(int screenRow, int screenCol);
+    // move cursor to buffer position at screen coords
+
+    void mouseStartSelection(int screenRow, int screenCol);
+    // set mark at given screen position (drag anchor)
+
+    void mouseDragTo(int screenRow, int screenCol);
+    // update cursor during drag, mark stays fixed
+
+    void mouseScroll(int lines);
+    // scroll view by N lines (negative=up, positive=down)
+
+    void mouseDoubleClickAt(int screenRow, int screenCol);
+    // select word at click position
+
+    // mouse selection state (tracked here because markSet is private in CxUTFEditBuffer)
+    int isMouseSelectionActive(void) { return _mouseSelectionActive; }
+    CxEditBufferPosition getSelectionMark(void) { return _selectionMark; }
+    void clearMouseSelection(void);
+
+    // screen bounds getters for ScreenEditor mouse routing
+    int getScreenEditFirstRow(void) { return (int)_screenEditFirstRow; }
+    int getScreenEditLastRow(void)  { return (int)_screenEditLastRow; }
+    int getScreenStatusRow(void)    { return (int)_screenStatusRow; }
+    int getScreenCommandRow(void)   { return (int)_screenCommandRow; }
 #endif
 
   private:
@@ -371,6 +402,12 @@ class EditView
 
     CxString applySearchHighlights(CxString text, int bufferRow, int visibleStartCol);
     // apply highlight coloring to any matches in the visible portion of the line
+
+    CxString applySelectionHighlight(CxString text, int bufferRow, int visibleStartCol);
+    // apply selection highlight (light blue bg) for mark-to-cursor range
+
+    int _mouseSelectionActive;          // 1 if mouse selection (mark) is active
+    CxEditBufferPosition _selectionMark;  // mark position for mouse selection
 
     //---------------------------------------------------------------------------------------------
     // Block comment state - modern platforms only

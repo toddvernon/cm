@@ -44,7 +44,7 @@ static void copyToSystemClipboard( CxString text )
 #ifdef _OSX_
     FILE *pipe = popen("pbcopy", "w");
 #else
-    FILE *pipe = popen("xclip -selection clipboard", "w");
+    FILE *pipe = popen("xclip -selection clipboard 2>/dev/null", "w");
 #endif
     if (pipe) {
         fwrite(text.data(), 1, text.length(), pipe);
@@ -72,7 +72,7 @@ static CxUTFString pasteFromSystemClipboard( void )
 #ifdef _OSX_
     FILE *pipe = popen("pbpaste", "r");
 #else
-    FILE *pipe = popen("xclip -selection clipboard -o", "r");
+    FILE *pipe = popen("xclip -selection clipboard -o 2>/dev/null", "r");
 #endif
     if (pipe) {
         char chunk[4096];
@@ -132,7 +132,7 @@ static CxString pasteFromSystemClipboard( void )
 #ifdef _OSX_
     FILE *pipe = popen("pbpaste", "r");
 #else
-    FILE *pipe = popen("xclip -selection clipboard -o", "r");
+    FILE *pipe = popen("xclip -selection clipboard -o 2>/dev/null", "r");
 #endif
     if (pipe) {
         char buffer[1024];
@@ -388,9 +388,40 @@ ScreenEditor::CMD_SystemPaste( CxString commandLine )
 
 
 //-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_CopyToMark:
+//
+// Copies text from the cursor position to the current mark (if there is one)
+// without deleting it. Also copies to the system clipboard.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_CopyToMark( CxString commandLine )
+{
+    CmEditBuffer *eb = activeEditView()->getEditBuffer();
+    if (eb == NULL) {
+        setMessage("(nothing to copy)");
+        return;
+    }
+
+    _cutBuffer = eb->copyText();
+    if (_cutBuffer.length() == 0) {
+        setMessage("(nothing to copy - set mark first)");
+        return;
+    }
+
+#if defined(_OSX_) || defined(_LINUX_)
+    copyToSystemClipboard(_cutBuffer);
+    activeEditView()->clearMouseSelection();
+#endif
+
+    setMessage("(text copied)");
+}
+
+
+//-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_CutToMark:
 //
-// Cuts text from the cursor position to the current mark (if there is one)
+// Cut text from cursor to mark
 //
 //-------------------------------------------------------------------------------------------------
 void
@@ -401,6 +432,7 @@ ScreenEditor::CMD_CutToMark( CxString commandLine )
     _cutBuffer = activeEditView()->cutToMark();
 #if defined(_OSX_) || defined(_LINUX_)
     copyToSystemClipboard(_cutBuffer);
+    activeEditView()->clearMouseSelection();
 #endif
 }
 

@@ -62,6 +62,13 @@ CommandEntry commandTable[] = {
       NULL },
 
     //--- edit- ---------------------------------------------------------------
+    { "edit-copy",
+      NULL,
+      "Copy from mark to cursor",
+      0,
+      &ScreenEditor::CMD_CopyToMark,
+      NULL },
+
     { "edit-cut",
       NULL,
       "Cut from mark to cursor",
