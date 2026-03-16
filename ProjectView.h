@@ -112,6 +112,9 @@ class ProjectView
     int isInsideFrame( int row, int col );
     // returns 1 if screen position is inside the dialog frame
 
+    int selectItemAtRow( int screenRow );
+    // select the item at the given screen row, returns 1 if an item was selected
+
     void rebuildVisibleItems( void );
     // rebuild the flat list of visible items from project structure
 

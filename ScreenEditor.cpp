@@ -2842,15 +2842,54 @@ ScreenEditor::handleMouseInProjectView(CxKeyAction keyAction)
         return;
     }
 
-    if (aType == CxKeyAction::MOUSE_PRESS || aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
+    if (aType == CxKeyAction::MOUSE_PRESS) {
         int mouseCol = keyAction.mouseCol();
 
         if (!projectView->isInsideFrame(mouseRow, mouseCol)) {
             // click outside dialog - dismiss
             projectView->setVisible(0);
             returnToEditMode();
+        } else {
+            // click inside - select the item at this row
+            projectView->selectItemAtRow(mouseRow);
         }
-        // click inside dialog - ignore (keyboard navigation only)
+    }
+
+    if (aType == CxKeyAction::MOUSE_DOUBLE_CLICK) {
+        int mouseCol = keyAction.mouseCol();
+
+        if (!projectView->isInsideFrame(mouseRow, mouseCol)) {
+            projectView->setVisible(0);
+            returnToEditMode();
+        } else {
+            // double-click: select item, then act like Enter
+            projectView->selectItemAtRow(mouseRow);
+
+            // same logic as NEWLINE handler in focusProjectView
+            ProjectViewItemType itemType = projectView->getSelectedItemType();
+
+            if (itemType == PVITEM_FILE || itemType == PVITEM_OPEN_FILE) {
+                CxString filePath = projectView->getSelectedItem();
+                if (filePath.length() > 0) {
+                    if (itemType == PVITEM_FILE) {
+                        CxFileAccess::status stat = CxFileAccess::checkStatus(filePath);
+                        if (stat == CxFileAccess::NOT_FOUND || stat == CxFileAccess::NOT_FOUND_W) {
+                            char buffer[256];
+                            sprintf(buffer, "(file not found: %s)", filePath.data());
+                            setMessage(buffer);
+                            return;
+                        }
+                    }
+                    projectView->setVisible(0);
+                    loadNewFile(filePath, TRUE);
+                    returnToEditMode();
+                }
+            } else if (itemType == PVITEM_SUBPROJECT || itemType == PVITEM_OPEN_HEADER) {
+                projectView->toggleSelectedSubproject();
+                projectView->redraw();
+            }
+            // PVITEM_ALL: no action (same as Enter)
+        }
     }
 }
 

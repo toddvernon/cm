@@ -1516,3 +1516,45 @@ ProjectView::isInsideFrame( int row, int col )
     }
     return 0;
 }
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::selectItemAtRow
+//
+// Select the item at the given screen row. Returns 1 if an item was selected.
+// Skips separator items (non-selectable). Does incremental redraw.
+//
+//-------------------------------------------------------------------------------------------------
+int
+ProjectView::selectItemAtRow( int screenRow )
+{
+    // check if row is in the list area
+    if (screenRow < screenProjectFirstListLine) return 0;
+    if (screenRow > screenProjectLastListLine) return 0;
+
+    int listIndex = firstVisibleListIndex + (screenRow - screenProjectFirstListLine);
+    int totalItems = (int)_visibleItems.entries();
+
+    if (listIndex < 0 || listIndex >= totalItems) return 0;
+
+    // skip non-selectable items
+    if (_visibleItems.at(listIndex)->type == PVITEM_SEPARATOR) return 0;
+
+    // already selected? no change needed
+    if (listIndex == selectedListItemIndex) return 1;
+
+    int prevIndex = selectedListItemIndex;
+    selectedListItemIndex = listIndex;
+
+    // incremental redraw
+    redrawLine(prevIndex, 0);
+    redrawLine(selectedListItemIndex, 1);
+    redrawFooter();
+
+    int contentLeft = frame->contentLeft();
+    int row = screenProjectFirstListLine + (selectedListItemIndex - firstVisibleListIndex);
+    screen->placeCursor(row, contentLeft);
+    screen->flush();
+
+    return 1;
+}
