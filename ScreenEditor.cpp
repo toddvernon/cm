@@ -2784,11 +2784,8 @@ ScreenEditor::handleMouseInCommandPrompt(CxKeyAction keyAction)
                             _activeCompleter = matches[0]->childCompleter;
                             _cmdBuffer = "";
                             updateCommandDisplay();
-                        } else if (_currentCommand->flags & (CMD_FLAG_NEEDS_ARG | CMD_FLAG_OPTIONAL_ARG)) {
-                            selectCommand(_currentCommand);
                         } else {
-                            _cmdBuffer = matches[0]->name;
-                            updateCommandDisplay();
+                            selectCommand(_currentCommand);
                         }
                     } else {
                         updateCommandDisplay();

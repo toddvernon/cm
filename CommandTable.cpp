@@ -233,6 +233,21 @@ CommandEntry commandTable[] = {
       &ScreenEditor::CMD_ProjectShow,
       NULL },
 
+    //--- quit- ---------------------------------------------------------------
+    { "quit-save",
+      NULL,
+      "Save and quit",
+      0,
+      &ScreenEditor::CMD_QuitSave,
+      NULL },
+
+    { "quit-nosave",
+      NULL,
+      "Quit without saving",
+      0,
+      &ScreenEditor::CMD_QuitNoSave,
+      NULL },
+
     //--- end -----------------------------------------------------------------
     { NULL, NULL, NULL, 0, NULL, NULL }
 };

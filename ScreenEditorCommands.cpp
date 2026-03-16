@@ -532,18 +532,108 @@ ScreenEditor::CMD_SaveFile(CxString commandLine)
 //-------------------------------------------------------------------------------------------------
 // ScreenEditor::CMD_Quit:
 //
-// Quit editor (ESC command wrapper)
+// Quit editor - refuses if any buffer has unsaved changes.
+// Directs user to quit-save or quit-nosave.
 //
 //-------------------------------------------------------------------------------------------------
 void
 ScreenEditor::CMD_Quit( CxString commandLine )
 {
-    setMessage("(quit)");
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
+    // check all buffers for unsaved changes
+    int dirtyCount = 0;
+    for (int i = 0; i < editBufferList->items(); i++) {
+        CmEditBuffer *buf = editBufferList->at(i);
+        if (buf != NULL && buf->isTouched()) {
+            dirtyCount++;
+        }
     }
 
-    // ensure screen is in clean state before exit
+    if (dirtyCount > 0) {
+        char msg[80];
+        sprintf(msg, "(%d unsaved file%s - use quit-save or quit-nosave)",
+                dirtyCount, dirtyCount == 1 ? "" : "s");
+        setMessage(msg);
+        return;
+    }
+
+    // all clean - quit
+    screen->resetColors();
+    screen->flush();
+    fflush(stdout);
+
+    _quitRequested = TRUE;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_QuitSave:
+//
+// Save modified buffers and quit.
+// - If autoSaveOnBufferChange is on: save all dirty buffers and quit.
+// - If one dirty buffer: save it and quit.
+// - If multiple dirty: show project view so user can review and save selectively.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_QuitSave( CxString commandLine )
+{
+    // count dirty buffers
+    int dirtyCount = 0;
+    for (int i = 0; i < editBufferList->items(); i++) {
+        CmEditBuffer *buf = editBufferList->at(i);
+        if (buf != NULL && buf->isTouched()) {
+            dirtyCount++;
+        }
+    }
+
+    // nothing to save - just quit
+    if (dirtyCount == 0) {
+        screen->resetColors();
+        screen->flush();
+        fflush(stdout);
+        _quitRequested = TRUE;
+        return;
+    }
+
+    // auto-save setting or single dirty file: save all and quit
+    if (programDefaults->autoSaveOnBufferChange() || dirtyCount == 1) {
+        int savedCount = 0;
+        for (int i = 0; i < editBufferList->items(); i++) {
+            CmEditBuffer *buf = editBufferList->at(i);
+            if (buf != NULL && buf->isTouched()) {
+                buf->saveText(buf->getFilePath());
+                savedCount++;
+            }
+        }
+
+        char msg[80];
+        sprintf(msg, "(saved %d file%s)", savedCount, savedCount == 1 ? "" : "s");
+        setMessage(msg);
+
+        screen->resetColors();
+        screen->flush();
+        fflush(stdout);
+        _quitRequested = TRUE;
+        return;
+    }
+
+    // multiple dirty files without auto-save: show project view for review
+    char msg[80];
+    sprintf(msg, "(%d unsaved files - save from project view, then quit)", dirtyCount);
+    setMessage(msg);
+    showProjectView();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ScreenEditor::CMD_QuitNoSave:
+//
+// Quit immediately without saving anything.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ScreenEditor::CMD_QuitNoSave( CxString commandLine )
+{
     screen->resetColors();
     screen->flush();
     fflush(stdout);
@@ -1041,10 +1131,11 @@ void ScreenEditor::CTRLX_Save(void)
 
 void ScreenEditor::CTRLX_Quit(void)
 {
-    setMessage("(quit)");
-    if (programDefaults->autoSaveOnBufferChange()) {
-        saveCurrentEditBufferOnSwitch();
-    }
+    // Ctrl-X Ctrl-C always quits without saving (historical behavior)
+    screen->resetColors();
+    screen->flush();
+    fflush(stdout);
+    _quitRequested = TRUE;
 }
 
 

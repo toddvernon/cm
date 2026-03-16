@@ -137,6 +137,8 @@ class ScreenEditor {
 	void CMD_CommentBlock( CxString commandLine );
     void CMD_NewBuffer( CxString commandLine );
     void CMD_Quit( CxString commandLine );
+    void CMD_QuitSave( CxString commandLine );
+    void CMD_QuitNoSave( CxString commandLine );
     void CMD_Help( CxString commandLine );
     void CMD_Count( CxString commandLine );
     void CMD_Entab( CxString commandLine );
