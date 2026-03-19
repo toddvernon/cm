@@ -12,8 +12,11 @@ This installs:
   - cm binary to /usr/local/bin/
   - Help files to /usr/local/share/cm/
 
-Note: On macOS, double-clicking install.sh may not work due to
-quarantine restrictions on downloaded files. Use "bash install.sh"
+macOS Note: Do not run cm directly until you run install.sh.
+Downloaded binaries are blocked by macOS Gatekeeper. The installer
+clears this restriction automatically.
+
+If double-clicking install.sh does not work, run "bash install.sh"
 from the terminal instead.
 
 Try It
