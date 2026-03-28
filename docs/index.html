@@ -833,7 +833,7 @@
             <div class="feature-card">
                 <div class="icon">&#x2692;</div>
                 <h3>Integrated Build</h3>
-                <p>Run your build command without leaving the editor. Compiler errors are parsed automatically — jump directly to the file and line with <code style="color:var(--accent-dim);">goto-error</code>.</p>
+                <p>Run your build command without leaving the editor. Compiler errors are parsed automatically — navigate directly to error locations from the build output.</p>
             </div>
             <div class="feature-card wide">
                 <div class="icon">&#x2533;</div>
@@ -912,7 +912,7 @@
             <div class="showcase-text">
                 <h3>Build, fix, rebuild — without leaving the editor</h3>
                 <p>Press <kbd style="background:#1d1d1f; color:#f5f5f7; padding:3px 8px; border-radius:4px; font-family:'SF Mono',Monaco,'Courier New',monospace; font-size:0.85rem;">Ctrl+B</kbd> to view build output. cmacs captures compiler errors and warnings, parsing file paths and line numbers automatically.</p>
-                <p>Navigate directly to errors with <code style="color:var(--accent-dim);">goto-error</code> — the editor opens the file and jumps to the exact line. No more copying paths from terminal output.</p>
+                <p>Navigate directly to errors from the build output — the editor opens the file and jumps to the exact line. No more copying paths from terminal output.</p>
             </div>
             <div class="showcase-img">
                 <img src="BuildDialog.png" alt="cmacs build output showing compiler errors with navigation">
@@ -1068,15 +1068,9 @@
                 },
                 {
                     typed: 'g',
-                    completed: 'oto-',
-                    candidates: '<span class="match">goto-line</span>    <span class="match">goto-error</span>',
-                    status: '<span class="keystroke-hint">g</span> <span class="action-desc">typed one letter \u2014 "goto-" auto-fills, 2 matches remain</span>'
-                },
-                {
-                    typed: '',
-                    completed: 'goto-line',
+                    completed: 'oto-line',
                     candidates: '<span style="color:#f5a0b0;">line&gt; _</span>',
-                    status: '<span class="keystroke-hint">l</span> <span class="action-desc">unique match \u2014 auto-completes, prompts for line number</span>'
+                    status: '<span class="keystroke-hint">g</span> <span class="action-desc">unique match \u2014 auto-completes to goto-line, prompts for line number</span>'
                 }
             ]
         }

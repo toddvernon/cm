@@ -41,7 +41,6 @@ search-
   search-replace-all <text> Replace all occurrences
 
 goto-
-  goto-error                Jump to file:line from error under cursor
   goto-line <line>          Go to specified line number
 
 insert-

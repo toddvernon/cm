@@ -144,7 +144,6 @@ class ScreenEditor {
     void CMD_Entab( CxString commandLine );
     void CMD_Detab( CxString commandLine );
     void CMD_TrimTrailing( CxString commandLine );
-    void CMD_GotoError( CxString commandLine );
     void CMD_ProjectShow( CxString commandLine );
     void CMD_ShowBuild( CxString commandLine );
     void CMD_Split( CxString commandLine );

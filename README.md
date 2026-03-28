@@ -209,7 +209,6 @@ Press ESC to enter command mode, then type a command name. Commands follow a cat
 #### goto-
 | Command | Description |
 |---------|-------------|
-| goto-error | Jump to file:line from error under cursor |
 | goto-line \<line\> | Go to specified line number |
 
 #### insert-

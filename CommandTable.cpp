@@ -120,13 +120,6 @@ CommandEntry commandTable[] = {
       NULL },
 
     //--- goto- ---------------------------------------------------------------
-    { "goto-error",
-      NULL,
-      "Jump to file:line from error message under cursor",
-      0,
-      &ScreenEditor::CMD_GotoError,
-      NULL },
-
     { "goto-line",
       "<line>",
       "Go to specified line number",
