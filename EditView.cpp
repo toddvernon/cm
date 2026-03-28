@@ -1156,6 +1156,18 @@ EditView::recomputeBlockCommentState(int fromLine)
 {
     if (editBuffer == NULL) return;
 
+    // Skip block comment scanning for languages that don't use /* */ comments.
+    // These languages either have no block comments or use different syntax.
+    LanguageMode lang = markUp->getLanguageMode();
+    if (lang == LANG_MARKDOWN || lang == LANG_SHELL || lang == LANG_MAKEFILE ||
+        lang == LANG_PYTHON || lang == LANG_NONE) {
+        // Clear any existing state to avoid stale data from previous file
+        for (int i = 0; i < _blockCommentStateSize; i++) {
+            _blockCommentState[i] = 0;
+        }
+        return;
+    }
+
     int lineCount = (int)editBuffer->numberOfLines();
     if (lineCount == 0) return;
 
