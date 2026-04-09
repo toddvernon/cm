@@ -150,8 +150,12 @@ private:
     // colorize makefile variables $(VAR) and targets
 
     CxString
-    colorizeMarkdown( CxString line, CxString headerColor, CxString emphasisColor, CxString codeColor, CxString resetColor );
+    colorizeMarkdown( CxString fullLine, CxString line, CxString headerColor, CxString emphasisColor, CxString codeColor, CxString resetColor );
     // colorize markdown headers, bold, italic, code spans
+
+    CxString
+    colorizeHugoShortcodes( CxString fullLine, CxString line, CxString colorStart, CxString colorEnd );
+    // colorize Hugo shortcodes {{< ... >}}
 
     CxString
     colorizePythonDecorators( CxString line, CxString colorStart, CxString colorEnd );

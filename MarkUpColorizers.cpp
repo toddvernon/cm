@@ -289,12 +289,21 @@ MarkUp::colorizeMakefileSpecial( CxString line, CxString varColor, CxString targ
 //
 //-------------------------------------------------------------------------------------------------
 CxString
-MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasisColor, CxString codeColor, CxString resetColor )
+MarkUp::colorizeMarkdown( CxString fullLine, CxString line, CxString headerColor, CxString emphasisColor, CxString codeColor, CxString resetColor )
 {
     char *data = line.data();
     int len = line.length();
+    char *fullData = fullLine.data();
+    int fullLen = fullLine.length();
 
     if (len == 0) return line;
+
+    // Colorize Hugo shortcodes {{< ... >}}
+    if (codeColor.length()) {
+        line = colorizeHugoShortcodes(fullLine, line, codeColor, resetColor);
+        data = line.data();
+        len = line.length();
+    }
 
     // Check for header (# at start of line)
     if (data[0] == '#' && headerColor.length()) {
@@ -325,6 +334,20 @@ MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasis
                     result = result + resetColor;
                     lastPos = endPos;
                     i = endPos;
+                } else {
+                    // Closing backtick not in visible text - check full line
+                    int j = startPos + 1;
+                    while (j < fullLen && fullData[j] != '`') j++;
+                    if (j < fullLen) {
+                        // Full line has closing backtick - colorize to end of visible
+                        if (startPos > lastPos) {
+                            result = result + line.subString(lastPos, startPos - lastPos);
+                        }
+                        result = result + codeColor;
+                        result = result + line.subString(startPos, len - startPos);
+                        result = result + resetColor;
+                        lastPos = len;
+                    }
                 }
             } else {
                 i++;
@@ -347,7 +370,7 @@ MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasis
         int lastPos = 0;
         int i = 0;
 
-        while (i < len - 3) {
+        while (i < len - 1) {
             if ((data[i] == '*' && data[i+1] == '*') ||
                 (data[i] == '_' && data[i+1] == '_')) {
                 char marker = data[i];
@@ -355,6 +378,7 @@ MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasis
                 i += 2;
 
                 // Find closing **
+                int foundClose = 0;
                 while (i < len - 1) {
                     if (data[i] == marker && data[i+1] == marker) {
                         int endPos = i + 2;
@@ -369,9 +393,29 @@ MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasis
                         result = result + resetColor;
                         lastPos = endPos;
                         i = endPos;
+                        foundClose = 1;
                         break;
                     }
                     i++;
+                }
+
+                // Closing not in visible text - check full line
+                if (!foundClose) {
+                    int j = startPos + 2;
+                    while (j < fullLen - 1) {
+                        if (fullData[j] == marker && fullData[j+1] == marker) {
+                            // Full line has closing - colorize to end of visible
+                            if (startPos > lastPos) {
+                                result = result + line.subString(lastPos, startPos - lastPos);
+                            }
+                            result = result + emphasisColor;
+                            result = result + line.subString(startPos, len - startPos);
+                            result = result + resetColor;
+                            lastPos = len;
+                            break;
+                        }
+                        j++;
+                    }
                 }
             } else {
                 i++;
@@ -386,6 +430,89 @@ MarkUp::colorizeMarkdown( CxString line, CxString headerColor, CxString emphasis
             data = line.data();
             len = line.length();
         }
+    }
+
+    return line;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// MarkUp::colorizeHugoShortcodes
+//
+// Colorize Hugo shortcodes {{< ... >}}.
+// Uses string concatenation to build result.
+// fullLine is needed to detect shortcodes that extend past the visible area.
+//
+//-------------------------------------------------------------------------------------------------
+CxString
+MarkUp::colorizeHugoShortcodes( CxString fullLine, CxString line, CxString colorStart, CxString colorEnd )
+{
+    if (colorStart.length() == 0) return line;
+
+    CxString result;
+    char *data = line.data();
+    int len = line.length();
+    char *fullData = fullLine.data();
+    int fullLen = fullLine.length();
+    int lastPos = 0;
+    int i = 0;
+
+    while (i < len - 2) {  // need at least {{<
+        // Look for {{<
+        if (data[i] == '{' && data[i+1] == '{' && data[i+2] == '<') {
+            int startPos = i;
+            i += 3;
+
+            // Find closing >}} in visible text
+            int foundClose = 0;
+            while (i < len - 2) {
+                if (data[i] == '>' && data[i+1] == '}' && data[i+2] == '}') {
+                    int endPos = i + 3;
+
+                    // Append text before the shortcode
+                    if (startPos > lastPos) {
+                        result = result + line.subString(lastPos, startPos - lastPos);
+                    }
+                    // Append colorized shortcode
+                    result = result + colorStart;
+                    result = result + line.subString(startPos, endPos - startPos);
+                    result = result + colorEnd;
+                    lastPos = endPos;
+                    i = endPos;
+                    foundClose = 1;
+                    break;
+                }
+                i++;
+            }
+
+            // If we didn't find >}} in visible text, check if full line has it
+            if (!foundClose) {
+                int j = startPos + 3;
+                while (j < fullLen - 2) {
+                    if (fullData[j] == '>' && fullData[j+1] == '}' && fullData[j+2] == '}') {
+                        // Full line has closing - colorize from {{< to end of visible
+                        if (startPos > lastPos) {
+                            result = result + line.subString(lastPos, startPos - lastPos);
+                        }
+                        result = result + colorStart;
+                        result = result + line.subString(startPos, len - startPos);
+                        result = result + colorEnd;
+                        return result;
+                    }
+                    j++;
+                }
+            }
+        } else {
+            i++;
+        }
+    }
+
+    // Append remaining text
+    if (lastPos > 0) {
+        if (lastPos < len) {
+            result = result + line.subString(lastPos, len - lastPos);
+        }
+        return result;
     }
 
     return line;

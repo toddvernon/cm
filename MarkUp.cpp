@@ -432,7 +432,7 @@ MarkUp::colorizeText( CxString fullText, CxString visibleText )
 
     // Markdown special handling
     if (_languageMode == LANG_MARKDOWN) {
-        visibleText = colorizeMarkdown(visibleText, keywordColor, typeColor, stringColor, resetColor);
+        visibleText = colorizeMarkdown(fullText, visibleText, keywordColor, typeColor, stringColor, resetColor);
         return visibleText;
     }
 
