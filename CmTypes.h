@@ -42,4 +42,30 @@ typedef CxEditBufferList    CmEditBufferList;
 
 #endif
 
+
+//-------------------------------------------------------------------------------------------------
+// cmCursorDisplayColumn
+//
+// Returns the cursor's *display* column (zero based) — i.e. its visual column on screen.
+//
+// On UTF-enabled platforms a single character can occupy 0 (combining), 1 (ASCII / most),
+// or 2 (CJK / emoji) display columns, so cursor.col (a character index) is NOT the same as
+// the cursor's visual column. The UTF buffer exposes cursorDisplayColumn() for this case.
+//
+// On non-UTF builds the buffer holds bytes and cursor.col is already the display column.
+//
+// All horizontal-window math (visible window first/last col, scroll thresholds, screen
+// position calculations) must use display columns to behave correctly when the line
+// contains double-width characters.
+//-------------------------------------------------------------------------------------------------
+inline unsigned long
+cmCursorDisplayColumn( CmEditBuffer *eb )
+{
+#ifdef CM_UTF8_SUPPORT
+    return (unsigned long)eb->cursorDisplayColumn();
+#else
+    return eb->cursor.col;
+#endif
+}
+
 #endif

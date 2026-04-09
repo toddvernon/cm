@@ -212,17 +212,17 @@ class EditView
     void recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow);
     // recalculates the visible window position based a new last visible last line
 
-    void recalcVisibleBufferFromLeft( unsigned long bufferCol );
-    // recalculates the visible window position based on a new left column
+    void recalcVisibleBufferFromLeft( unsigned long displayCol );
+    // recalculates the visible window position based on a new left display column
 
-    void recalcVisibleBufferFromRight( unsigned long bufferCol );
-    // recalculates the visible window position based on a new right column
+    void recalcVisibleBufferFromRight( unsigned long displayCol );
+    // recalculates the visible window position based on a new right display column
 
     int  rowVisible(unsigned long row);
     // returns true if a logical buffer line is currently visible
 
-    int colVisible( unsigned long bufferCol );
-    // returns true if a logical buffer col in currently visible
+    int colVisible( void );
+    // returns true if the cursor's display column is currently visible (with right margin)
     
     //---------------------------------------------------------------------------------------------
     // PRIVATE SCREEN DRAWING
@@ -321,8 +321,18 @@ class EditView
     unsigned long _visibleFirstEditBufferRow;  // index of the first visible edit row
     unsigned long _visibleLastEditBufferRow;   // index of the last visible edit row
 
+    // horizontal-window state. These are *display* columns (visual columns on screen),
+    // not character indices, so they handle CJK / emoji / combining characters correctly.
     unsigned long _visibleFirstEditBufferCol;
     unsigned long _visibleLastEditBufferCol;
+
+    // Right-edge scroll margin (display columns). Reserves room for:
+    //   1 column to avoid writing into the terminal's last column. Some terminals
+    //     (auto-margin / xenl behavior) wrap or scroll when content lands there.
+    //   1 column to guarantee a possible double-width (CJK / emoji) character can
+    //     be drawn at the cursor without splitting across the right edge.
+    // The cursor is considered "off the right edge" when displayCol + margin >= last.
+    static const int HORIZ_SCROLL_MARGIN = 2;
 
     unsigned long _lineNumberOffset;
     

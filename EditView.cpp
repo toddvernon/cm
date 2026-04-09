@@ -336,17 +336,17 @@ EditView::recalcScreenPlacements(void)
     _screenNumberOfLines = screen->rows();
     _screenNumberOfCols  = screen->cols();
 
-    // set the first visible edit column
-    _visibleFirstEditBufferCol = 0;         // TODO: I think this one needs to change
-
-	// set the last visible edit column
+    // set the visible edit columns. _visibleFirstEditBufferCol and _visibleLastEditBufferCol
+    // are *display* columns. The line-number gutter is already excluded by subtracting
+    // _lineNumberOffset from _screenEditNumberOfCols, so the visible window covers display
+    // columns [_visibleFirstEditBufferCol, _visibleFirstEditBufferCol + _screenEditNumberOfCols).
+    _visibleFirstEditBufferCol = 0;
     if (_showLineNumbers == TRUE) {
-		_screenEditNumberOfCols    = _screenNumberOfCols - _lineNumberOffset;
-	   	_visibleLastEditBufferCol  = _screenNumberOfCols - _lineNumberOffset -1;
+        _screenEditNumberOfCols = _screenNumberOfCols - _lineNumberOffset;
     } else {
-        _screenEditNumberOfCols    = _screenNumberOfCols;
-        _visibleLastEditBufferCol  = _screenNumberOfCols;
+        _screenEditNumberOfCols = _screenNumberOfCols;
     }
+    _visibleLastEditBufferCol = _visibleFirstEditBufferCol + _screenEditNumberOfCols;
 
     // Check if using region mode or full screen mode
     if (_regionStartRow == -1 && _regionEndRow == -1) {
@@ -376,6 +376,7 @@ EditView::recalcScreenPlacements(void)
         _screenCommandRow   = _screenNumberOfLines - 1;
 
     } else {
+
         //-------------------------------------------------------------------------------------
         // Region mode - use specified bounds for split screen
         //-------------------------------------------------------------------------------------
@@ -615,7 +616,7 @@ EditView::cursorGotoLine( unsigned long row )
 
     editBuffer->cursorGotoLine( row );
 
-    if ( rowVisible(editBuffer->cursor.row) && colVisible(editBuffer->cursor.col)) {
+    if ( rowVisible(editBuffer->cursor.row) && colVisible()) {
 
     } else {
         reframe();
@@ -641,7 +642,7 @@ EditView::cursorGotoPosition( CxEditBufferPosition loc )
 
     editBuffer->cursorGotoRequest( loc.row, loc.col );
 	
-    if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
+    if ( !rowVisible(editBuffer->cursor.row) || !colVisible()) {
         if (reframe()) {
             updateScreen();
         }
@@ -671,7 +672,7 @@ EditView::pageDown( void )
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
 
     // update the screen
-    if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
+    if ( !rowVisible(editBuffer->cursor.row) || !colVisible()) {
 		if (reframe()) {
 			updateScreen();
 		}
@@ -730,7 +731,7 @@ EditView::pageUp( void )
     editBuffer->cursorGotoLine( newBufferRowWithOffset );
 
     // update the screen
-    if ( !rowVisible(editBuffer->cursor.row) || !colVisible(editBuffer->cursor.col)) {
+    if ( !rowVisible(editBuffer->cursor.row) || !colVisible()) {
         if (reframe()) {
             updateScreen();
         }

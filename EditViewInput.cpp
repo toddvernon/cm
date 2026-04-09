@@ -51,14 +51,14 @@ EditView::recalcVisibleBufferFromBottomEditLine(unsigned long newLowerRow)
 //-------------------------------------------------------------------------------------------------
 // EditView::recalcVisibleBufferFromLeft
 //
-// calculate the visible area based on a left most buffer column
-//
+// Cursor crossed the left edge of the visible window: snap the visible window so the
+// cursor sits at the left edge. displayCol is a *display* column.
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromLeft( unsigned long bufferCol )
+EditView::recalcVisibleBufferFromLeft( unsigned long displayCol )
 {
-    _visibleFirstEditBufferCol = bufferCol; //todd
+    _visibleFirstEditBufferCol = displayCol;
     _visibleLastEditBufferCol  = _visibleFirstEditBufferCol + _screenEditNumberOfCols;
 }
 
@@ -66,15 +66,26 @@ EditView::recalcVisibleBufferFromLeft( unsigned long bufferCol )
 //-------------------------------------------------------------------------------------------------
 // EditView::recalcVisibleBufferFromRight
 //
-// calculate the visible area based on a right most buffer column
-//
+// Cursor crossed the right edge of the visible window: shift the visible window right
+// just enough that the cursor sits one slot inside the right scroll margin. displayCol
+// is a *display* column. Underflow-safe: if the cursor is too far left to need scrolling,
+// the window stays pinned to column 0.
 //
 //-------------------------------------------------------------------------------------------------
 void
-EditView::recalcVisibleBufferFromRight( unsigned long bufferCol )
+EditView::recalcVisibleBufferFromRight( unsigned long displayCol )
 {
-    _visibleLastEditBufferCol  = bufferCol;
-    _visibleFirstEditBufferCol = _visibleLastEditBufferCol - _screenEditNumberOfCols;
+    // We want: _visibleLastEditBufferCol >= displayCol + HORIZ_SCROLL_MARGIN + 1
+    // i.e. the cursor's column plus the right margin all sit inside the visible window.
+    unsigned long needed = displayCol + (unsigned long)HORIZ_SCROLL_MARGIN + 1;
+
+    if (needed <= _screenEditNumberOfCols) {
+        // cursor is close enough to col 0 that no scroll is needed; pin to the left
+        _visibleFirstEditBufferCol = 0;
+    } else {
+        _visibleFirstEditBufferCol = needed - _screenEditNumberOfCols;
+    }
+    _visibleLastEditBufferCol = _visibleFirstEditBufferCol + _screenEditNumberOfCols;
 }
 
 
@@ -87,14 +98,14 @@ EditView::recalcVisibleBufferFromRight( unsigned long bufferCol )
 int
 EditView::reframe( void )
 {
-    unsigned long bufferRow = editBuffer->cursor.row;
-    unsigned long bufferCol = editBuffer->cursor.col;
+    unsigned long bufferRow  = editBuffer->cursor.row;
+    unsigned long displayCol = cmCursorDisplayColumn( editBuffer );
 
     //---------------------------------------------------------------------------------------------
     // if cursor is visible on the screen, then bail out and don't calculate any
     // thing or redraw
     //---------------------------------------------------------------------------------------------
-    if (rowVisible(bufferRow) && (colVisible(bufferCol))) {
+    if (rowVisible(bufferRow) && colVisible()) {
         return( FALSE );
     }
 
@@ -115,16 +126,16 @@ EditView::reframe( void )
         recalcVisibleBufferFromBottomEditLine( bufferRow );
     }
 
-    // if the cursor col is to the left of the visible part
-    // scroll all the content right
-    if (bufferCol < _visibleFirstEditBufferCol) {
-        recalcVisibleBufferFromLeft( bufferCol );
+    // if the cursor display column is to the left of the visible part, scroll content right
+    if (displayCol < _visibleFirstEditBufferCol) {
+        recalcVisibleBufferFromLeft( displayCol );
     }
 
-    // if the cursor col is to the right of the visible part
-    // of the window, scroll the content to left
-    if (bufferCol > _visibleLastEditBufferCol) {
-        recalcVisibleBufferFromRight( bufferCol );
+    // if the cursor display column is at or past the right scroll margin, scroll content left.
+    // Note: the threshold matches colVisible() exactly so there is no dead zone.
+    if (displayCol + (unsigned long)HORIZ_SCROLL_MARGIN >=
+        _visibleFirstEditBufferCol + _screenEditNumberOfCols) {
+        recalcVisibleBufferFromRight( displayCol );
     }
 
     return( TRUE );
@@ -149,13 +160,13 @@ EditView::reframeWithScrollInfo( void )
     result.direction = 0;
     result.lines = 0;
 
-    unsigned long bufferRow = editBuffer->cursor.row;
-    unsigned long bufferCol = editBuffer->cursor.col;
+    unsigned long bufferRow  = editBuffer->cursor.row;
+    unsigned long displayCol = cmCursorDisplayColumn( editBuffer );
 
     //---------------------------------------------------------------------------------------------
     // if cursor is visible on the screen, no scrolling needed
     //---------------------------------------------------------------------------------------------
-    if (rowVisible(bufferRow) && colVisible(bufferCol)) {
+    if (rowVisible(bufferRow) && colVisible()) {
         return result;
     }
 
@@ -185,16 +196,19 @@ EditView::reframeWithScrollInfo( void )
     }
 
     //---------------------------------------------------------------------------------------------
-    // check horizontal scrolling - if horizontal scroll needed, disable terminal scroll
-    // optimization (full redraw is simpler for horizontal)
+    // check horizontal scrolling - terminal scroll regions only handle vertical, so any
+    // horizontal scroll forces a full redraw (direction = 0).
     //---------------------------------------------------------------------------------------------
-    if (bufferCol < _visibleFirstEditBufferCol) {
-        recalcVisibleBufferFromLeft( bufferCol );
+    if (displayCol < _visibleFirstEditBufferCol) {
+        recalcVisibleBufferFromLeft( displayCol );
+        result.scrolled = 1;
         result.direction = 0;  // force full redraw
     }
 
-    if (bufferCol > _visibleLastEditBufferCol) {
-        recalcVisibleBufferFromRight( bufferCol );
+    if (displayCol + (unsigned long)HORIZ_SCROLL_MARGIN >=
+        _visibleFirstEditBufferCol + _screenEditNumberOfCols) {
+        recalcVisibleBufferFromRight( displayCol );
+        result.scrolled = 1;
         result.direction = 0;  // force full redraw
     }
 
@@ -217,13 +231,13 @@ EditView::reframeJumpWithScrollInfo( void )
     result.direction = 0;
     result.lines = 0;
 
-    unsigned long bufferRow = editBuffer->cursor.row;
-    unsigned long bufferCol = editBuffer->cursor.col;
+    unsigned long bufferRow  = editBuffer->cursor.row;
+    unsigned long displayCol = cmCursorDisplayColumn( editBuffer );
 
     //---------------------------------------------------------------------------------------------
     // if cursor is visible on the screen, no scrolling needed
     //---------------------------------------------------------------------------------------------
-    if (rowVisible(bufferRow) && colVisible(bufferCol)) {
+    if (rowVisible(bufferRow) && colVisible()) {
         return result;
     }
 
@@ -266,15 +280,21 @@ EditView::reframeJumpWithScrollInfo( void )
     }
 
     //---------------------------------------------------------------------------------------------
-    // check horizontal scrolling - if horizontal scroll needed, disable terminal scroll
+    // check horizontal scrolling - jump style (mirrors vertical jump scroll). When the cursor
+    // crosses either edge, re-center it horizontally at half the visible width. Terminal scroll
+    // regions only handle vertical, so any horizontal scroll forces a full redraw.
     //---------------------------------------------------------------------------------------------
-    if (bufferCol < _visibleFirstEditBufferCol) {
-        recalcVisibleBufferFromLeft( bufferCol );
-        result.direction = 0;  // force full redraw
-    }
+    int needHorizJump = 0;
+    if (displayCol < _visibleFirstEditBufferCol) needHorizJump = 1;
+    if (displayCol + (unsigned long)HORIZ_SCROLL_MARGIN >=
+        _visibleFirstEditBufferCol + _screenEditNumberOfCols) needHorizJump = 1;
 
-    if (bufferCol > _visibleLastEditBufferCol) {
-        recalcVisibleBufferFromRight( bufferCol );
+    if (needHorizJump) {
+        unsigned long half = _screenEditNumberOfCols / 2;
+        unsigned long newFirst = (displayCol > half) ? (displayCol - half) : 0;
+        _visibleFirstEditBufferCol = newFirst;
+        _visibleLastEditBufferCol  = newFirst + _screenEditNumberOfCols;
+        result.scrolled = 1;
         result.direction = 0;  // force full redraw
     }
 
@@ -294,14 +314,14 @@ EditView::reframeJumpWithScrollInfo( void )
 int
 EditView::reframe_jump( void )
 {
-    unsigned long bufferRow = editBuffer->cursor.row;
-    unsigned long bufferCol = editBuffer->cursor.col;
+    unsigned long bufferRow  = editBuffer->cursor.row;
+    unsigned long displayCol = cmCursorDisplayColumn( editBuffer );
 
     //---------------------------------------------------------------------------------------------
-    // if cursor is visible on he screen, then bail out and don't calculate any
+    // if cursor is visible on the screen, then bail out and don't calculate any
     // thing or redraw
     //---------------------------------------------------------------------------------------------
-    if (rowVisible(bufferRow) && (colVisible(bufferCol))) {
+    if (rowVisible(bufferRow) && colVisible()) {
         return(FALSE);
     }
 
@@ -342,16 +362,20 @@ EditView::reframe_jump( void )
         recalcVisibleBufferFromBottomEditLine( newBufferRowTarget );
     }
 
-    // if the cursor col is to the left of the visible part
-    // scroll all the content right
-    if (bufferCol < _visibleFirstEditBufferCol) {
-        recalcVisibleBufferFromLeft( bufferCol );
-    }
+    //---------------------------------------------------------------------------------------------
+    // horizontal jump scroll - mirrors vertical jump scroll. When the cursor crosses either
+    // edge, re-center it horizontally at half the visible width.
+    //---------------------------------------------------------------------------------------------
+    int needHorizJump = 0;
+    if (displayCol < _visibleFirstEditBufferCol) needHorizJump = 1;
+    if (displayCol + (unsigned long)HORIZ_SCROLL_MARGIN >=
+        _visibleFirstEditBufferCol + _screenEditNumberOfCols) needHorizJump = 1;
 
-    // if the cursor col is to the right of the visible part
-    // of the window, scroll the content to left
-    if (bufferCol > _visibleLastEditBufferCol) {
-        recalcVisibleBufferFromRight( bufferCol );
+    if (needHorizJump) {
+        unsigned long half = _screenEditNumberOfCols / 2;
+        unsigned long newFirst = (displayCol > half) ? (displayCol - half) : 0;
+        _visibleFirstEditBufferCol = newFirst;
+        _visibleLastEditBufferCol  = newFirst + _screenEditNumberOfCols;
     }
 
     return( TRUE );
@@ -377,21 +401,29 @@ EditView::rowVisible( unsigned long bufferRow )
 
 
 //-------------------------------------------------------------------------------------------------
-// EditorCommandLineView::colVisible
+// EditView::colVisible
 //
-// return true if the the requested col is visible, false if it is not
+// Returns true if the cursor's *display* column is currently inside the visible window,
+// accounting for HORIZ_SCROLL_MARGIN reserved on the right edge. Uses display columns
+// (not character indices), so double-width characters are handled correctly.
 //
+// The threshold matches the one used by reframe()/reframe_jump() so there is no dead
+// zone where the cursor is "not visible" but no scroll happens.
 //
 //-------------------------------------------------------------------------------------------------
 int
-EditView::colVisible( unsigned long bufferCol )
+EditView::colVisible( void )
 {
-    if ((bufferCol >= _visibleFirstEditBufferCol) &&
-        (bufferCol < _visibleLastEditBufferCol-10)) {
-        return( true );
-    }
+    unsigned long dc = cmCursorDisplayColumn( editBuffer );
 
-    return( false );
+    if (dc < _visibleFirstEditBufferCol) {
+        return( false );
+    }
+    if (dc + (unsigned long)HORIZ_SCROLL_MARGIN >=
+        _visibleFirstEditBufferCol + _screenEditNumberOfCols) {
+        return( false );
+    }
+    return( true );
 }
 
 
