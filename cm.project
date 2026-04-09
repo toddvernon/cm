@@ -24,8 +24,6 @@
 				"ProjectView.h",
 				"BuildView.cpp",
 				"BuildView.h",
-				"HelpTextView.cpp",
-				"HelpTextView.h",
 				"Project.cpp",
 				"Project.h",
 				"ProgramDefaults.cpp",
