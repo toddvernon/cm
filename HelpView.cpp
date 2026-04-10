@@ -821,6 +821,18 @@ HelpView::routeKeyAction( CxKeyAction keyAction )
         }
         break;
 
+        case CxKeyAction::CONTROL:
+        {
+            // CTRL-V = page down, CTRL-Z = page up
+            if (keyAction.tag() == "V") {
+                handlePageDown();
+            }
+            if (keyAction.tag() == "Z") {
+                handlePageUp();
+            }
+        }
+        break;
+
         default:
             break;
     }
@@ -850,18 +862,28 @@ HelpView::reframe( void )
         selectedListItemIndex = 0;
     }
 
-    while (selectedListItemIndex < firstVisibleListIndex) {
+    if (selectedListItemIndex < firstVisibleListIndex) {
         changeMade = true;
-        firstVisibleListIndex--;
-        if (firstVisibleListIndex < 0) {
-            firstVisibleListIndex = 0;
-            break;
-        }
+#if defined(_OSX_) || defined(_LINUX_)
+        // modern: scroll by 1 for smooth movement
+        firstVisibleListIndex = selectedListItemIndex;
+#else
+        // vintage: jump scroll - center selection in visible area
+        firstVisibleListIndex = selectedListItemIndex - (screenHelpNumberOfLines / 2);
+#endif
+        if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
     }
 
-    while (selectedListItemIndex >= firstVisibleListIndex + screenHelpNumberOfLines) {
+    if (selectedListItemIndex >= firstVisibleListIndex + screenHelpNumberOfLines) {
         changeMade = true;
-        firstVisibleListIndex++;
+#if defined(_OSX_) || defined(_LINUX_)
+        // modern: scroll by 1 for smooth movement
+        firstVisibleListIndex = selectedListItemIndex - screenHelpNumberOfLines + 1;
+#else
+        // vintage: jump scroll - center selection in visible area
+        firstVisibleListIndex = selectedListItemIndex - (screenHelpNumberOfLines / 2);
+#endif
+        if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
     }
 
     if (changeMade) return(true);
@@ -959,6 +981,66 @@ HelpView::handleArrows( CxKeyAction keyAction )
     }
 
     return(false);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// HelpView::handlePageDown
+//
+// Page down through the help list. Moves selection by one page worth of lines,
+// skipping non-selectable items. Single redraw for the entire page jump.
+//
+//-------------------------------------------------------------------------------------------------
+void
+HelpView::handlePageDown( void )
+{
+    int totalItems = (int)_visibleItems.entries();
+    int target = selectedListItemIndex + screenHelpNumberOfLines;
+
+    if (target >= totalItems) target = totalItems - 1;
+
+    // find nearest selectable item at or before target
+    while (target > selectedListItemIndex) {
+        HelpViewItemType t = _visibleItems.at(target)->type;
+        if (t != HELPITEM_SEPARATOR && t != HELPITEM_WELCOME && t != HELPITEM_BLANK) break;
+        target--;
+    }
+
+    if (target <= selectedListItemIndex) return;
+
+    selectedListItemIndex = target;
+    reframe();
+    redraw();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// HelpView::handlePageUp
+//
+// Page up through the help list. Moves selection by one page worth of lines,
+// skipping non-selectable items. Single redraw for the entire page jump.
+//
+//-------------------------------------------------------------------------------------------------
+void
+HelpView::handlePageUp( void )
+{
+    int target = selectedListItemIndex - screenHelpNumberOfLines;
+
+    if (target < 0) target = 0;
+
+    // find nearest selectable item at or after target
+    int totalItems = (int)_visibleItems.entries();
+    while (target < selectedListItemIndex) {
+        HelpViewItemType t = _visibleItems.at(target)->type;
+        if (t != HELPITEM_SEPARATOR && t != HELPITEM_WELCOME && t != HELPITEM_BLANK) break;
+        target++;
+    }
+
+    if (target >= selectedListItemIndex) return;
+
+    selectedListItemIndex = target;
+    reframe();
+    redraw();
 }
 
 

@@ -87,8 +87,13 @@ EditView::updateStatusLine(void)
     int rightDisplayWidth = 0;
 
     // Add persistent help hint
+#if defined(_OSX_) || defined(_LINUX_)
     statusLineTextRight += " Ctrl+H: Help ";
     rightDisplayWidth += 15;
+#else
+    statusLineTextRight += " ESC: Help ";
+    rightDisplayWidth += 11;
+#endif
 
     if (programDefaults->liveStatusLine()) {
 

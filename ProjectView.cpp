@@ -1363,6 +1363,18 @@ ProjectView::routeKeyAction( CxKeyAction keyAction )
 			}
 			break;
 
+        case CxKeyAction::CONTROL:
+            {
+                // CTRL-V = page down, CTRL-Z = page up
+                if (keyAction.tag() == "V") {
+                    handlePageDown();
+                }
+                if (keyAction.tag() == "Z") {
+                    handlePageUp();
+                }
+            }
+            break;
+
       	default:
         	break;
 	}
@@ -1392,18 +1404,28 @@ ProjectView::reframe( )
         selectedListItemIndex = 0;
     }
 
-    while ( selectedListItemIndex < firstVisibleListIndex ) {
+    if (selectedListItemIndex < firstVisibleListIndex) {
         changeMade = true;
-        firstVisibleListIndex--;
-        if (firstVisibleListIndex < 0) {
-            firstVisibleListIndex = 0;
-            break;
-        }
+#if defined(_OSX_) || defined(_LINUX_)
+        // modern: scroll by 1 for smooth movement
+        firstVisibleListIndex = selectedListItemIndex;
+#else
+        // vintage: jump scroll - center selection in visible area
+        firstVisibleListIndex = selectedListItemIndex - (screenProjectNumberOfLines / 2);
+#endif
+        if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
     }
 
-    while (selectedListItemIndex >= firstVisibleListIndex + screenProjectNumberOfLines) {
+    if (selectedListItemIndex >= firstVisibleListIndex + screenProjectNumberOfLines) {
         changeMade = true;
-        firstVisibleListIndex++;
+#if defined(_OSX_) || defined(_LINUX_)
+        // modern: scroll by 1 for smooth movement
+        firstVisibleListIndex = selectedListItemIndex - screenProjectNumberOfLines + 1;
+#else
+        // vintage: jump scroll - center selection in visible area
+        firstVisibleListIndex = selectedListItemIndex - (screenProjectNumberOfLines / 2);
+#endif
+        if (firstVisibleListIndex < 0) firstVisibleListIndex = 0;
     }
 
     if (changeMade) return(true);
@@ -1498,6 +1520,64 @@ ProjectView::handleArrows( CxKeyAction keyAction )
     }
 
     return(false);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::handlePageDown
+//
+// Page down through the project list. Moves selection by one page worth of lines,
+// skipping non-selectable items. Single redraw for the entire page jump.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::handlePageDown( void )
+{
+    int totalItems = (int)_visibleItems.entries();
+    int target = selectedListItemIndex + screenProjectNumberOfLines;
+
+    if (target >= totalItems) target = totalItems - 1;
+
+    // find nearest selectable item at or before target
+    while (target > selectedListItemIndex) {
+        if (_visibleItems.at(target)->type != PVITEM_SEPARATOR) break;
+        target--;
+    }
+
+    if (target <= selectedListItemIndex) return;
+
+    selectedListItemIndex = target;
+    reframe();
+    redraw();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ProjectView::handlePageUp
+//
+// Page up through the project list. Moves selection by one page worth of lines,
+// skipping non-selectable items. Single redraw for the entire page jump.
+//
+//-------------------------------------------------------------------------------------------------
+void
+ProjectView::handlePageUp( void )
+{
+    int target = selectedListItemIndex - screenProjectNumberOfLines;
+
+    if (target < 0) target = 0;
+
+    // find nearest selectable item at or after target
+    int totalItems = (int)_visibleItems.entries();
+    while (target < selectedListItemIndex) {
+        if (_visibleItems.at(target)->type != PVITEM_SEPARATOR) break;
+        target++;
+    }
+
+    if (target >= selectedListItemIndex) return;
+
+    selectedListItemIndex = target;
+    reframe();
+    redraw();
 }
 
 

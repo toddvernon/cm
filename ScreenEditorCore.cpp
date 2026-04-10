@@ -39,7 +39,9 @@ ScreenEditor::ControlCmd ScreenEditor::_controlCommands[] = {
     { "P",    &ScreenEditor::CTRL_ProjectList,          "(Project List)" },
     { "S",    &ScreenEditor::CTRL_Split,                 NULL },
     { "U",    &ScreenEditor::CTRL_Unsplit,               NULL },
+#if defined(_OSX_) || defined(_LINUX_)
     { "H",    &ScreenEditor::CTRL_Help,                 "(Help)" },
+#endif
     { "O",    &ScreenEditor::CTRL_SwitchView,           NULL },
     { "B",    &ScreenEditor::CTRL_ShowBuild,            NULL },
     { NULL,   NULL,                                      NULL }

@@ -145,6 +145,12 @@ class ProjectView
     int reframe( void );
     // make sure selection is visible in list
 
+    void handlePageDown( void );
+    // page down through list (CTRL-V)
+
+    void handlePageUp( void );
+    // page up through list (CTRL-Z)
+
     void redrawLine( int logicalIndex, int isSelected );
     // redraw a single content line (incremental update for arrow navigation)
 
