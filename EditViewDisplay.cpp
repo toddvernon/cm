@@ -89,7 +89,7 @@ EditView::updateStatusLine(void)
     // Add persistent help hint
 #if defined(_OSX_) || defined(_LINUX_)
     statusLineTextRight += " Ctrl+H: Help ";
-    rightDisplayWidth += 15;
+    rightDisplayWidth += 14;
 #else
     statusLineTextRight += " ESC: Help ";
     rightDisplayWidth += 11;
@@ -141,7 +141,8 @@ EditView::updateStatusLine(void)
         for (int i = 0; i < 8; i++) {
             colPartString += STATUS_FILL;
         }
-        rightDisplayWidth = 8;
+        statusLineTextRight += colPartString;
+        rightDisplayWidth += 8;
     }
 
     //---------------------------------------------------------------------------------------------
