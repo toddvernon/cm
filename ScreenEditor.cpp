@@ -108,7 +108,19 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     if (configPath.length()) {
         programDefaults->loadDefaults(configPath);
     }
-    
+
+    //---------------------------------------------------------------------------------------------
+    // fix terminal size - on vintage platforms over telnet, the kernel often has wrong dimensions.
+    // Run /usr/openwin/bin/resize to query the real terminal size and update the kernel.
+    // This runs after the alt screen switch (in Cm.cpp) so resize output is not visible.
+    //---------------------------------------------------------------------------------------------
+    if (programDefaults->fixTerminalSize()) {
+        fflush(stdout);
+        system("/usr/openwin/bin/resize");
+        CxScreen::refreshWindowSize();
+        CxScreen::clearScreen();
+    }
+
     //---------------------------------------------------------------------------------------------
     // init the cut buffer and replace buffer
     //

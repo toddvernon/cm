@@ -125,6 +125,9 @@ public:
     int projectAutoVerify(void);
     // should the project view auto-verify files when displayed (modern platforms only)
 
+    int fixTerminalSize(void);
+    // should the app run resize to fix terminal dimensions on launch
+
     int isFirstRun(void);
     // returns true if this is the first run (config file was just created)
 
@@ -135,6 +138,7 @@ private:
     
 	int parseTabs( CxJSONObject *object );
     int parseBooleanField( CxJSONObject *obj, const char *fieldName, int *target );
+    int parseIntField( CxJSONObject *obj, const char *fieldName, int *target );
     int parseColorFromJSON( CxJSONObject *obj, const char *fieldName,
                             CxColor **target, int isBackground );
 
@@ -179,7 +183,13 @@ private:
     int _colorizeSyntax;
     int _liveStatusLine;
     int _projectAutoVerify;
+    int _fixTerminalSize;
     int _firstRun;
+
+    int _screenSubtractRows;
+    int _screenSubtractCols;
+    int _screenOverrideRows;
+    int _screenOverrideCols;
 
     CxJSONBase *_baseNode;
 };
