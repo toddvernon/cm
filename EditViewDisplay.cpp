@@ -50,113 +50,196 @@ EditView::updateStatusLine(void)
 
     percent = percent * 100;
 
+    int termWidth = screen->cols();
+
     screen->placeCursor( _screenStatusRow, 0);
 
 	// set the status bar foreground and background colors
     screen->setForegroundColor(programDefaults->statusBarTextColor() );
     screen->setBackgroundColor(programDefaults->statusBarBackgroundColor() );
 
+    //---------------------------------------------------------------------------------------------
+    // Build right-side pieces individually so we can drop them as the terminal narrows.
+    // Pieces are added in display order (left to right within the right side) but dropped
+    // in reverse priority: col first, then line, then claude, then git, then help hint.
+    //---------------------------------------------------------------------------------------------
+
+    char buffer[100];
+
+    // -- help hint --
+    CxString helpHintString;
+    int helpHintWidth = 0;
+#if defined(_OSX_) || defined(_LINUX_)
+    helpHintString = " Ctrl+H: Help ";
+    helpHintWidth = 14;
+#else
+    helpHintString = " ESC: Help ";
+    helpHintWidth = 11;
+#endif
+
+    // -- claude indicator --
+    CxString claudeString;
+    int claudeWidth = 0;
+#if defined(_LINUX_) || defined(_OSX_)
+    if (programDefaults->liveStatusLine() && _mcpConnected) {
+        claudeString = "[ Claude ] ";
+        claudeWidth = 11;
+    }
+#endif
+
+    // -- line part --
+    CxString linePartString;
+    int linePartWidth = 0;
+    if (programDefaults->liveStatusLine()) {
+        sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
+        linePartString = buffer;
+        linePartWidth = linePartString.length();
+
+        while (linePartWidth < 22) {
+            linePartString = CxString(STATUS_FILL) + linePartString;
+            linePartWidth++;
+        }
+    }
+
+    // -- col part --
+    CxString colPartString;
+    int colPartWidth = 0;
+    if (programDefaults->liveStatusLine()) {
+        sprintf(buffer, "col(%lu)", col);
+        colPartString = buffer;
+        colPartWidth = colPartString.length();
+
+        while (colPartWidth < 8) {
+            colPartString += STATUS_FILL;
+            colPartWidth++;
+        }
+    } else {
+        for (int i = 0; i < 8; i++) {
+            colPartString += STATUS_FILL;
+        }
+        colPartWidth = 8;
+    }
+
+    // -- git branch --
+    CxString gitString;
+    int gitWidth = 0;
+#if defined(_LINUX_) || defined(_OSX_)
+    if (_gitBranch.length() > 0) {
+        gitString = "(git:";
+        gitString += _gitBranch;
+        gitString += ") ";
+        gitWidth = 5 + _gitBranch.length() + 2;
+    }
+#endif
+
+    //---------------------------------------------------------------------------------------------
+    // Build left side: "── cm: Editing [ <filepath> ] "
+    //---------------------------------------------------------------------------------------------
+    CxString filePath = editBuffer->getFilePath();
+    // prefix: 2 fill + " cm: Editing [ " = 3 + 14 = 17,  suffix: " ] " = 3
+    int leftFixedWidth = 17 + 3;
+
+    //---------------------------------------------------------------------------------------------
+    // Calculate total right-side width, then drop pieces that don't fit.
+    // Drop order (least important first): col, line, claude, git, help hint
+    //---------------------------------------------------------------------------------------------
+    int rightDisplayWidth = helpHintWidth + claudeWidth + linePartWidth
+                          + (linePartWidth > 0 && colPartWidth > 0 ? 1 : 0)
+                          + colPartWidth;
+
+    int totalWidth = leftFixedWidth + (int) filePath.length() + gitWidth + rightDisplayWidth;
+
+    // drop col part
+    if (totalWidth > termWidth && colPartWidth > 0) {
+        totalWidth -= colPartWidth;
+        if (linePartWidth > 0) totalWidth -= 1;  // the space between line and col
+        colPartString = "";
+        colPartWidth = 0;
+    }
+
+    // drop line part
+    if (totalWidth > termWidth && linePartWidth > 0) {
+        totalWidth -= linePartWidth;
+        linePartString = "";
+        linePartWidth = 0;
+    }
+
+    // drop claude indicator
+    if (totalWidth > termWidth && claudeWidth > 0) {
+        totalWidth -= claudeWidth;
+        claudeString = "";
+        claudeWidth = 0;
+    }
+
+    // drop git branch
+    if (totalWidth > termWidth && gitWidth > 0) {
+        totalWidth -= gitWidth;
+        gitString = "";
+        gitWidth = 0;
+    }
+
+    // drop help hint
+    if (totalWidth > termWidth && helpHintWidth > 0) {
+        totalWidth -= helpHintWidth;
+        helpHintString = "";
+        helpHintWidth = 0;
+    }
+
+    // truncate filepath as last resort
+    if (totalWidth > termWidth) {
+        int maxPathLen = termWidth - leftFixedWidth;
+        if (maxPathLen < 1) maxPathLen = 1;
+        filePath = filePath.subString(0, maxPathLen);
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // Assemble left side
+    //---------------------------------------------------------------------------------------------
     CxString statusLineTextLeft;
     statusLineTextLeft  = STATUS_FILL;
     statusLineTextLeft += STATUS_FILL;
     statusLineTextLeft += " cm: Editing [ ";
-    statusLineTextLeft += editBuffer->getFilePath();
+    statusLineTextLeft += filePath;
     statusLineTextLeft += " ] ";
+    int leftDisplayWidth = leftFixedWidth + filePath.length();
 
-    // Track display width separately from byte length for UTF-8 compatibility
-    // The prefix is 2 fill chars + space + text = 3 display columns for "── " or "== "
-    int leftDisplayWidth = 3 + 14 + editBuffer->getFilePath().length() + 3;
-
-#if defined(_LINUX_) || defined(_OSX_)
-    // Add git branch name if available
-    if (_gitBranch.length() > 0) {
-        statusLineTextLeft += "(git:";
-        statusLineTextLeft += _gitBranch;
-        statusLineTextLeft += ") ";
-        leftDisplayWidth += 5 + _gitBranch.length() + 2;  // "(git:" + branch + ") "
+    if (gitWidth > 0) {
+        statusLineTextLeft += gitString;
+        leftDisplayWidth += gitWidth;
     }
-#endif
 
     //---------------------------------------------------------------------------------------------
-    // do the line part of the status line
-    //
+    // Assemble right side
     //---------------------------------------------------------------------------------------------
-
-    CxString colPartString;
     CxString statusLineTextRight;
-    int rightDisplayWidth = 0;
+    rightDisplayWidth = 0;
 
-    // Add persistent help hint
-#if defined(_OSX_) || defined(_LINUX_)
-    statusLineTextRight += " Ctrl+H: Help ";
-    rightDisplayWidth += 14;
-#else
-    statusLineTextRight += " ESC: Help ";
-    rightDisplayWidth += 11;
-#endif
-
-    if (programDefaults->liveStatusLine()) {
-
-        char buffer[100];
-
-#if defined(_LINUX_) || defined(_OSX_)
-        // Add Claude connection indicator on the right side
-        if (_mcpConnected) {
-            statusLineTextRight += "[ Claude ] ";
-            rightDisplayWidth += 11;
+    if (helpHintWidth > 0) {
+        statusLineTextRight += helpHintString;
+        rightDisplayWidth += helpHintWidth;
+    }
+    if (claudeWidth > 0) {
+        statusLineTextRight += claudeString;
+        rightDisplayWidth += claudeWidth;
+    }
+    if (linePartWidth > 0) {
+        statusLineTextRight += linePartString;
+        rightDisplayWidth += linePartWidth;
+        if (colPartWidth > 0) {
+            statusLineTextRight += " ";
+            rightDisplayWidth += 1;
         }
-#endif
-
-        sprintf(buffer, "line(%lu,%lu,%.0lf%%)", row + 1, numberOfLines, percent);
-        CxString linePartString = buffer;
-        int linePartDisplayWidth = linePartString.length();
-
-        // Pad linePartString to fixed width (22 chars for max "line(10000,10000,100%)")
-        // so [ Claude ] indicator stays in a fixed position
-        while (linePartDisplayWidth < 22) {
-            linePartString = CxString(STATUS_FILL) + linePartString;
-            linePartDisplayWidth++;
-        }
-
-        //---------------------------------------------------------------------------------------------
-        // do the col part of the status line, we pad the col part so the line of text doesn't
-        // jump around between lines with where the cursor is in a different stop
-        //
-        //---------------------------------------------------------------------------------------------
-
-        sprintf(buffer, "col(%lu)", col);
-        colPartString = buffer;
-        int colPartDisplayWidth = colPartString.length();
-
-        while (colPartDisplayWidth < 8) {
-            colPartString += STATUS_FILL;
-            colPartDisplayWidth++;
-        }
-
-        statusLineTextRight += linePartString + CxString(" ") + colPartString;
-        rightDisplayWidth += 22 + 1 + 8;  // linePartString + space + colPartString
-
-    } else {
-        // Default 8-column padding when live status line is disabled
-        for (int i = 0; i < 8; i++) {
-            colPartString += STATUS_FILL;
-        }
+    }
+    if (colPartWidth > 0) {
         statusLineTextRight += colPartString;
-        rightDisplayWidth += 8;
+        rightDisplayWidth += colPartWidth;
     }
 
     //---------------------------------------------------------------------------------------------
-    // Calculate the number of fill characters needed between left and right
-    // Use display width (column count) instead of byte length for UTF-8 compatibility
-    //
+    // Fill between left and right
     //---------------------------------------------------------------------------------------------
-    int statusLineDisplayWidth = leftDisplayWidth + rightDisplayWidth;
-    int positionsLeft = screen->cols() - statusLineDisplayWidth;
+    int positionsLeft = termWidth - leftDisplayWidth - rightDisplayWidth;
 
-    //---------------------------------------------------------------------------------------------
-    // Build the full status line with fill characters between left and right parts
-    //
-    //---------------------------------------------------------------------------------------------
     CxString theText = statusLineTextLeft;
     for (int c = 0; c < positionsLeft; c++) {
         theText.append(STATUS_FILL);
@@ -168,7 +251,9 @@ EditView::updateStatusLine(void)
     // finally write out the status line
     //
     //---------------------------------------------------------------------------------------------
-    screen->writeTextAt( _screenStatusRow, 0, theText, true );
+    screen->writeTextAt( _screenStatusRow, 0, theText, false );
+    screen->resetColors();
+    screen->clearScreenFromCursorToEndOfLine();
 
     // put cursor back
     screen->placeCursor(
@@ -176,7 +261,6 @@ EditView::updateStatusLine(void)
         bufferColToScreenCol(editBuffer->cursor.col)
         );
 
-    screen->resetColors();
     screen->flush();
 }
 
