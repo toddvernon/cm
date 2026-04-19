@@ -350,9 +350,8 @@ class EditView
     int _regionEndRow;
 
 
-#if defined(_LINUX_) || defined(_OSX_)
     //---------------------------------------------------------------------------------------------
-    // Terminal scroll support - modern platforms only
+    // Terminal scroll support - all platforms
     //
     // Uses ANSI escape sequences (DECSTBM, CSI S/T) for efficient scrolling.
     // Instead of redrawing all visible lines, we scroll the terminal content
@@ -373,6 +372,7 @@ class EditView
     void terminalScrollAndDraw(int direction, int lines);
     // use terminal scroll sequences to shift content, then draw only new line(s)
 
+#if defined(_LINUX_) || defined(_OSX_)
     int terminalInsertLineAndDraw(unsigned long originalRow);
     // use terminal insert line to efficiently handle Enter key
     // originalRow is where the line was split (hint.startRow from addReturn)

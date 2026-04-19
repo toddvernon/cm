@@ -39,7 +39,11 @@
 ProgramDefaults::ProgramDefaults(void)
 :   _baseNode( NULL ),
     _tabSize(4),
+#if defined(_OSX_) || defined(_LINUX_)
+    _jumpscroll(TRUE),
+#else
     _jumpscroll(FALSE),
+#endif
 	_showLineNumbers(TRUE),
 	_autoSaveOnBufferChange(FALSE),
     _colorizeSyntax(FALSE),
@@ -894,6 +898,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *liveStatus = "true";
     const char *projectVerify = "true";
     const char *fixTermSize = "false";
+    const char *jumpScroll = "true";
 #elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
     const char *hdr  = "# Uses XTERM 256 color palette for broad terminal compatibility";
     const char *statusFg  = "XTERM256:White";
@@ -917,6 +922,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *liveStatus = "false";
     const char *projectVerify = "false";
     const char *fixTermSize = "true";
+    const char *jumpScroll = "false";
 #else
     const char *hdr  = "# Uses ANSI 16-color palette for maximum terminal compatibility";
     const char *statusFg  = "ANSI:BRIGHT_WHITE";
@@ -940,6 +946,7 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *liveStatus = "false";
     const char *projectVerify = "false";
     const char *fixTermSize = "true";
+    const char *jumpScroll = "false";
 #endif
 
     file.printf("# .cmrc defaults file\n");
@@ -960,7 +967,7 @@ ProgramDefaults::writeDefaults(CxString path)
     file.printf("\n");
     file.printf("{\n");
     file.printf("    \"tabs\": 4,\n");
-    file.printf("    \"jumpscroll\": true,\n");
+    file.printf("    \"jumpscroll\": %s,\n", jumpScroll);
     file.printf("    \"showLineNumbers\": true,\n");
     file.printf("    \"colorizeSyntax\": true,\n");
     file.printf("    \"liveStatusLines\": %s,\n", liveStatus);

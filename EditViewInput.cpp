@@ -143,7 +143,6 @@ EditView::reframe( void )
 }
 
 
-#if defined(_LINUX_) || defined(_OSX_)
 //-------------------------------------------------------------------------------------------------
 // EditView::reframeWithScrollInfo
 //
@@ -300,7 +299,6 @@ EditView::reframeJumpWithScrollInfo( void )
 
     return result;
 }
-#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -508,8 +506,7 @@ EditView::handleArrows( CxKeyAction keyAction )
 
         CxEditHint hint = editBuffer->cursorDownRequest();
 
-#if defined(_LINUX_) || defined(_OSX_)
-        // Use terminal scrolling for efficient scroll on modern platforms
+        // Use terminal scrolling for efficient scroll on all platforms
         if (_jumpScroll) {
             ScrollResult sr = reframeJumpWithScrollInfo();
             if (sr.scrolled) {
@@ -533,18 +530,6 @@ EditView::handleArrows( CxKeyAction keyAction )
                 }
             }
         }
-#else
-        // Vintage platforms: use simple full redraw
-        if (_jumpScroll) {
-            if (reframe_jump()) {
-                updateScreen();
-            }
-        } else {
-            if (reframe()) {
-                updateScreen();
-            }
-        }
-#endif
 
         placeCursor();
 	}
@@ -553,8 +538,7 @@ EditView::handleArrows( CxKeyAction keyAction )
 
 		CxEditHint hint = editBuffer->cursorUpRequest();
 
-#if defined(_LINUX_) || defined(_OSX_)
-        // Use terminal scrolling for efficient scroll on modern platforms
+        // Use terminal scrolling for efficient scroll on all platforms
         if (_jumpScroll) {
             ScrollResult sr = reframeJumpWithScrollInfo();
             if (sr.scrolled) {
@@ -578,18 +562,6 @@ EditView::handleArrows( CxKeyAction keyAction )
                 }
             }
         }
-#else
-        // Vintage platforms: use simple full redraw
-        if (_jumpScroll) {
-            if (reframe_jump()) {
-                updateScreen();
-            }
-        } else {
-            if (reframe()) {
-                updateScreen();
-            }
-        }
-#endif
 
         placeCursor();
 	}

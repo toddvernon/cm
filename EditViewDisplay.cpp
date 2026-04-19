@@ -570,7 +570,6 @@ EditView::updateRemainderOfWindowLine(unsigned long bufferRow, unsigned long buf
 }
 
 
-#if defined(_LINUX_) || defined(_OSX_)
 //-------------------------------------------------------------------------------------------------
 // EditView::terminalScrollAndDraw
 //
@@ -647,14 +646,15 @@ EditView::terminalScrollAndDraw(int direction, int lines)
     fputs(newContent.data(), stdout);
 
     //---------------------------------------------------------------------------------------------
-    // Update status line and flush
+    // Update status line (gated the same way as cursor-move status refresh) and flush
     //---------------------------------------------------------------------------------------------
-    updateStatusLine();
+    if (programDefaults->liveStatusLine()) updateStatusLine();
     CxScreen::endSyncUpdate();
     screen->flush();
 }
 
 
+#if defined(_LINUX_) || defined(_OSX_)
 //-------------------------------------------------------------------------------------------------
 // EditView::terminalInsertLineAndDraw
 //
