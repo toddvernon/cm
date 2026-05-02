@@ -488,33 +488,65 @@ EditView::formatEditorLine(unsigned long bufferRow )
 #endif
 
     //---------------------------------------------------------------------------------------------
-    // now colorize the text
-    //
+    // now colorize the text, consulting the per-line colorization cache first.
+    // cache stores the post-colorize visibleText (pre-highlight) keyed by
+    // (startCol, visCols, blockState, endsState, generation).
     //---------------------------------------------------------------------------------------------
     if (programDefaults->colorizeSyntax() ) {
+
+        // compute block-comment start/end state for this row (0 on vintage)
 #if defined(_LINUX_) || defined(_OSX_)
-        // check if line is inside a block comment (modern platforms only)
-        // line is part of block comment if:
-        //   - it STARTS inside a block comment (previous line ended inside), OR
-        //   - it ENDS inside a block comment (this line contains /* that opens one)
         int startsInside = isLineInsideBlockComment((int)bufferRow);
         int endsInside = ((int)bufferRow < _blockCommentStateSize) ? _blockCommentState[bufferRow] : 0;
-
-        if (startsInside || endsInside) {
-            // entire line is part of /* */ block comment - apply comment color
-            int lang = (int)markUp->getLanguageMode();
-            CxString commentColor = programDefaults->commentTextColor(lang)->terminalString();
-            if (commentColor.length() == 0) {
-                commentColor = programDefaults->commentTextColor()->terminalString();
-            }
-            CxString resetColor = "\033[0m";
-            visibleText = commentColor + visibleText + resetColor;
-        } else {
-            visibleText = markUp->colorizeText( fullText, visibleText );
-        }
 #else
-        visibleText = markUp->colorizeText( fullText, visibleText );
+        int startsInside = 0;
+        int endsInside = 0;
 #endif
+
+        // grow cache to cover this row, then look up
+        ensureColorCacheSize((int)bufferRow + 1);
+        int startColNow = (int)_visibleFirstEditBufferCol;
+        int visColsNow  = (int)_screenEditNumberOfCols;
+        int hit = 0;
+        if (_colorCache != NULL && (int)bufferRow < _colorCacheSize) {
+            ColorCacheEntry *e = &_colorCache[bufferRow];
+            if (e->valid &&
+                e->startCol == startColNow &&
+                e->visCols == visColsNow &&
+                e->blockState == startsInside &&
+                e->endsState == endsInside &&
+                e->generation == _colorCacheGeneration) {
+                visibleText = e->bytes;
+                hit = 1;
+            }
+        }
+
+        if (!hit) {
+            if (startsInside || endsInside) {
+                // entire line is part of /* */ block comment - apply comment color
+                int lang = (int)markUp->getLanguageMode();
+                CxString commentColor = programDefaults->commentTextColor(lang)->terminalString();
+                if (commentColor.length() == 0) {
+                    commentColor = programDefaults->commentTextColor()->terminalString();
+                }
+                CxString resetColor = "\033[0m";
+                visibleText = commentColor + visibleText + resetColor;
+            } else {
+                visibleText = markUp->colorizeText( fullText, visibleText );
+            }
+
+            // store into cache
+            if (_colorCache != NULL && (int)bufferRow < _colorCacheSize) {
+                ColorCacheEntry *e = &_colorCache[bufferRow];
+                e->bytes      = visibleText;
+                e->startCol   = startColNow;
+                e->visCols    = visColsNow;
+                e->blockState = startsInside;
+                e->endsState  = endsInside;
+                e->generation = _colorCacheGeneration;
+                e->valid      = 1;
+            }
+        }
     }
 
 #if defined(_LINUX_) || defined(_OSX_)
@@ -654,7 +686,40 @@ EditView::terminalScrollAndDraw(int direction, int lines)
 }
 
 
-#if defined(_LINUX_) || defined(_OSX_)
+//-------------------------------------------------------------------------------------------------
+// EditView::lineNumberPrefix
+//
+// Build a cursor-position + colored line-number column for the given buffer row.
+// Returns an empty string if line numbers are disabled, or just clear-to-EOL if the
+// row is past the end of the buffer.
+//-------------------------------------------------------------------------------------------------
+CxString
+EditView::lineNumberPrefix(unsigned long bufferRow)
+{
+    CxString out = CxCursor::locateTerminalString(bufferRowToScreenRow(bufferRow), 0);
+
+    if (!_showLineNumbers) return out;
+
+    if (bufferRow >= editBuffer->numberOfLines()) {
+        // past end of buffer: emit only clear-to-EOL so stale digits get wiped
+        out += CxCursor::clearToEndOfLineTerminalString();
+        return out;
+    }
+
+    CxString num( bufferRow + 1 );
+    num = num + "| ";
+    while (num.length() < _lineNumberOffset) {
+        num = CxString(" ") + num;
+    }
+
+    out += programDefaults->lineNumberTextColor()->terminalString();
+    out += num;
+    out += programDefaults->lineNumberTextColor()->resetTerminalString();
+
+    return out;
+}
+
+
 //-------------------------------------------------------------------------------------------------
 // EditView::terminalInsertLineAndDraw
 //
@@ -706,8 +771,23 @@ EditView::terminalInsertLineAndDraw(unsigned long originalRow)
     content = CxStringUtils::replaceTabExtensionsWithSpaces(content);
     fputs(content.data(), stdout);
 
-    // Update status line and flush
-    updateStatusLine();
+    // Refresh line-number column for every row the terminal shifted down by one.
+    // Their content bytes are still correct (moved by CSI L) but their printed
+    // line numbers are now off-by-one until we overwrite the prefix.
+    if (_showLineNumbers) {
+        CxString numRefresh;
+        unsigned long numLines = editBuffer->numberOfLines();
+        for (unsigned long r = newRow + 1; r <= _visibleLastEditBufferRow; r++) {
+            if (r >= numLines) break;
+            numRefresh += lineNumberPrefix(r);
+        }
+        if (numRefresh.length() > 0) {
+            fputs(numRefresh.data(), stdout);
+        }
+    }
+
+    // Update status line (gated — vintage suppresses unless liveStatusLine) and flush
+    if (programDefaults->liveStatusLine()) updateStatusLine();
     CxScreen::endSyncUpdate();
     screen->flush();
 
@@ -761,8 +841,23 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
     content = CxStringUtils::replaceTabExtensionsWithSpaces(content);
     fputs(content.data(), stdout);
 
-    // Update status line and flush
-    updateStatusLine();
+    // Refresh line-number column for every row the terminal shifted up by one.
+    // Their content bytes are still correct (moved by CSI M) but their printed
+    // line numbers are now off-by-one (too high) until we overwrite the prefix.
+    if (_showLineNumbers) {
+        CxString numRefresh;
+        unsigned long numLines = editBuffer->numberOfLines();
+        for (unsigned long r = joinedRow + 1; r <= _visibleLastEditBufferRow; r++) {
+            numRefresh += lineNumberPrefix(r);  // past-end handled inside helper
+            if (r >= numLines) break;
+        }
+        if (numRefresh.length() > 0) {
+            fputs(numRefresh.data(), stdout);
+        }
+    }
+
+    // Update status line (gated — vintage suppresses unless liveStatusLine) and flush
+    if (programDefaults->liveStatusLine()) updateStatusLine();
     CxScreen::endSyncUpdate();
     screen->flush();
 
@@ -770,6 +865,7 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
 }
 
 
+#if defined(_LINUX_) || defined(_OSX_)  // resume modern-only block
 //-------------------------------------------------------------------------------------------------
 // EditView::screenToBufferPosition
 //

@@ -439,9 +439,24 @@ EditView::updateAfterEdit( CxEditHint& hint, CxString& lineText )
     // clear search highlights on any edit - matches may be invalid now
     clearSearchMatches();
 
-    // recompute block comment state from start - line insertions/deletions shift everything
-    recomputeBlockCommentState(0);
+    // recompute block comment state from the edit anchor — incremental rescan
+    // stops as soon as the running state matches the stored state (see EditView.cpp).
+    recomputeBlockCommentState((int)hint.startRow());
 #endif
+
+    // invalidate colorization cache based on the hint's scope
+    switch (hint.updateHint()) {
+        case CxEditHint::UPDATE_HINT_LINE:
+        case CxEditHint::UPDATE_HINT_LINE_PAST_POINT:
+            invalidateColorCache((int)hint.startRow());
+            break;
+        case CxEditHint::UPDATE_HINT_SCREEN_PAST_POINT:
+        case CxEditHint::UPDATE_HINT_SCREEN:
+            bumpColorCacheGeneration();
+            break;
+        default:
+            break;
+    }
 
     if (reframe()) {
         // Horizontal or vertical scroll happened - need full redraw
@@ -477,7 +492,7 @@ EditView::updateAfterEdit( CxEditHint& hint, CxString& lineText )
 EditView::EditStatus
 EditView::handleArrows( CxKeyAction keyAction )
 {
-	if (keyAction.tag() == "<arrow-left>") {
+	if (keyAction.tag() == "<arrow-left>" || keyAction.tag() == "<shift-arrow-left>") {
 
         CxEditHint hint = editBuffer->cursorLeftRequest();
 
@@ -491,7 +506,7 @@ EditView::handleArrows( CxKeyAction keyAction )
             );
 	}
 
-	if (keyAction.tag() == "<arrow-right>") {
+	if (keyAction.tag() == "<arrow-right>" || keyAction.tag() == "<shift-arrow-right>") {
 
 		CxEditHint hint = editBuffer->cursorRightRequest();
 
@@ -502,7 +517,7 @@ EditView::handleArrows( CxKeyAction keyAction )
         placeCursor();
 	}
 
-	if (keyAction.tag() == "<arrow-down>") {
+	if (keyAction.tag() == "<arrow-down>" || keyAction.tag() == "<shift-arrow-down>") {
 
         CxEditHint hint = editBuffer->cursorDownRequest();
 
@@ -534,7 +549,7 @@ EditView::handleArrows( CxKeyAction keyAction )
         placeCursor();
 	}
 
-	if (keyAction.tag() == "<arrow-up>") {
+	if (keyAction.tag() == "<arrow-up>" || keyAction.tag() == "<shift-arrow-up>") {
 
 		CxEditHint hint = editBuffer->cursorUpRequest();
 
@@ -586,17 +601,48 @@ EditView::routeKeyAction( CxKeyAction keyAction )
     recalcLineNumberDigits(  );
 
 #if defined(_OSX_) || defined(_LINUX_)
-    // clear mouse selection on any editing keypress (typing, backspace, etc.)
-    // cursor keys don't clear - they just move through the selection
+    // an editing keypress with an active selection replaces the selected text:
+    //   - insertion keys (alpha/number/symbol/newline/tab) delete the selection,
+    //     then fall through so the new character is inserted in its place
+    //   - deletion keys (backspace, option-delete, CTRL-H) delete the selection
+    //     and consume the keypress — the selection deletion is the user's intent
+    //   - other non-cursor keys just clear the highlight, no buffer change
+    // cursor / shift-cursor keys don't clear — they move through / extend the selection
     {
         int aType = keyAction.actionType();
         if (_mouseSelectionActive &&
             aType != CxKeyAction::CURSOR &&
+            aType != CxKeyAction::SHIFT_CURSOR &&
             aType != CxKeyAction::COMMAND &&
             aType != CxKeyAction::NOTHING)
         {
+            int isInsertion =
+                (aType == CxKeyAction::LOWERCASE_ALPHA) ||
+                (aType == CxKeyAction::UPPERCASE_ALPHA) ||
+                (aType == CxKeyAction::NUMBER) ||
+                (aType == CxKeyAction::SYMBOL) ||
+                (aType == CxKeyAction::NEWLINE) ||
+                (aType == CxKeyAction::TAB);
+            int isDeletion =
+                (aType == CxKeyAction::BACKSPACE) ||
+                ((aType == CxKeyAction::OPTION) && (keyAction.tag() == "<option-delete>")) ||
+                ((aType == CxKeyAction::CONTROL) && (keyAction.tag() == "H"));
+
+            if ((isInsertion || isDeletion) && editBuffer != NULL) {
+                // cut may span multiple lines — invalidate color cache
+                bumpColorCacheGeneration();
+                editBuffer->cutToMark();
+            }
+            // clear flag BEFORE redraw — _selectionMark is now stale after cut
             _mouseSelectionActive = 0;
-            updateScreen();  // force full redraw to clear stale highlight on all lines
+            updateScreen();
+
+            if (isDeletion) {
+                placeCursor();
+                if (programDefaults->liveStatusLine()) updateStatusLine();
+                screen->flush();
+                return( OK );  // selection deletion satisfies the keypress
+            }
         }
     }
 #endif
@@ -631,6 +677,32 @@ EditView::routeKeyAction( CxKeyAction keyAction )
                 screen->flush();
 			}
 			break;
+
+#if defined(_OSX_) || defined(_LINUX_)
+		//-----------------------------------------------------------------------------------------
+		// shift+arrow extends a selection (modern platforms only). first shift+arrow of a
+		// gesture drops the mark at the current cursor; subsequent shift+arrows extend it.
+		// reuses the same _selectionMark / _mouseSelectionActive path that mouse drag uses,
+		// so the existing highlight renderer paints it and edit-copy / edit-cut work as-is.
+		//-----------------------------------------------------------------------------------------
+		case CxKeyAction::SHIFT_CURSOR:
+			{
+                if (editBuffer != NULL) {
+                    if (!_mouseSelectionActive) {
+                        editBuffer->setMark();
+                        _selectionMark = CxEditBufferPosition(
+                            editBuffer->cursor.row, editBuffer->cursor.col);
+                        _mouseSelectionActive = 1;
+                    }
+                    handleArrows( keyAction );
+                    updateScreen();   // refresh selection highlight as range grows/shrinks
+                    placeCursor();
+                    if (programDefaults->liveStatusLine()) updateStatusLine();
+                    screen->flush();
+                }
+			}
+			break;
+#endif
 
 		//-----------------------------------------------------------------------------------------
 		// handle a small set of control functions, specifically backspace on some machines
@@ -678,27 +750,32 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 		//-----------------------------------------------------------------------------------------
       	case CxKeyAction::NEWLINE:
 			{
+                int oldOffset = (int)_lineNumberOffset;
 				CxEditHint hint = editBuffer->addReturn();
+                recalcLineNumberDigits();
 #if defined(_LINUX_) || defined(_OSX_)
                 clearSearchMatches();
-                recomputeBlockCommentState(0);
+                recomputeBlockCommentState((int)hint.startRow());
+#endif
 
-                // Try efficient terminal insert line if cursor stays visible
-                if (!reframe()) {
+                // line inserted — rows from startRow onward shift; invalidate cache
+                bumpColorCacheGeneration();
+
+                if (oldOffset != (int)_lineNumberOffset) {
+                    // line-number column width changed (crossed a power-of-10 boundary);
+                    // every line's content column shifts — full repaint is required
+                    reframe();
+                    updateScreen();
+                } else if (!reframe()) {
                     // No scrolling needed - try terminal insert optimization
                     if (!terminalInsertLineAndDraw(hint.startRow())) {
-                        // Optimization failed, fall back to full redraw
+                        // Optimization failed (row not visible) - full redraw
                         updateScreen();
                     }
                 } else {
                     // Scrolling was needed - full redraw
                     updateScreen();
                 }
-#else
-                // Vintage platforms: simple full redraw
-                reframe();
-                updateScreen();
-#endif
 			}
 			break;
 
@@ -708,22 +785,31 @@ EditView::routeKeyAction( CxKeyAction keyAction )
 		//-----------------------------------------------------------------------------------------
      	case CxKeyAction::BACKSPACE:
 			{
-#if defined(_LINUX_) || defined(_OSX_)
                 // Check if this will be a line join (cursor at col 0, not at row 0)
                 int isLineJoin = (editBuffer->cursor.col == 0 && editBuffer->cursor.row > 0);
                 unsigned long joinedRow = editBuffer->cursor.row - 1;
+                int oldOffset = (int)_lineNumberOffset;
 
                 CxEditHint editHint = editBuffer->addBackspace();
 
                 if (isLineJoin) {
+                    recalcLineNumberDigits();
+#if defined(_LINUX_) || defined(_OSX_)
                     clearSearchMatches();
-                    recomputeBlockCommentState(0);
+                    recomputeBlockCommentState((int)joinedRow);
+#endif
 
-                    // Try efficient terminal delete line if row stays visible
-                    if (!reframe()) {
+                    // line removed — rows from joinedRow onward shift; invalidate cache
+                    bumpColorCacheGeneration();
+
+                    if (oldOffset != (int)_lineNumberOffset) {
+                        // line-number column width changed; full repaint required
+                        reframe();
+                        updateScreen();
+                    } else if (!reframe()) {
                         // No scrolling needed - try terminal delete optimization
                         if (!terminalDeleteLineAndDraw(joinedRow)) {
-                            // Optimization failed, fall back to normal update
+                            // Optimization failed (row not visible) - fall back
                             updateAfterEdit(editHint, lineText);
                         }
                     } else {
@@ -734,11 +820,6 @@ EditView::routeKeyAction( CxKeyAction keyAction )
                     // Normal character delete - use standard update
                     updateAfterEdit(editHint, lineText);
                 }
-#else
-                // Vintage platforms: standard behavior
-                CxEditHint editHint = editBuffer->addBackspace();
-				updateAfterEdit(editHint, lineText);
-#endif
 			}
 			break;
 

@@ -688,6 +688,7 @@ ScreenEditor::CMD_Entab( CxString commandLine )
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     if (editBuffer == NULL) { setMessage("(entab complete)"); return; }
     editBuffer->entab();
+    activeEditView()->bumpColorCacheGeneration();
     activeEditView()->reframeAndUpdateScreen();
     setMessage("(entab complete)");
 }
@@ -705,6 +706,7 @@ ScreenEditor::CMD_Detab( CxString commandLine )
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     if (editBuffer == NULL) { setMessage("(detab complete)"); return; }
     editBuffer->detab();
+    activeEditView()->bumpColorCacheGeneration();
     activeEditView()->reframeAndUpdateScreen();
     setMessage("(detab complete)");
 }
@@ -722,6 +724,7 @@ ScreenEditor::CMD_TrimTrailing( CxString commandLine )
     CmEditBuffer *editBuffer = activeEditView()->getEditBuffer();
     if (editBuffer == NULL) { setMessage("(0 trailing characters removed)"); return; }
     int removed = editBuffer->trimTrailing();
+    activeEditView()->bumpColorCacheGeneration();
     activeEditView()->reframeAndUpdateScreen();
 
     char msg[80];
@@ -839,6 +842,7 @@ ScreenEditor::insertUTFSymbolHelper( CxString commandLine, const char *symbolTyp
     }
     editBuffer->addCharacter( CxString(symbol->utf8) );
 
+    activeEditView()->invalidateColorCache((int)editBuffer->cursor.row);
     activeEditView()->reframeAndUpdateScreen();
 
     char buffer[200];
@@ -948,6 +952,9 @@ ScreenEditor::CMD_ReplaceAll(CxString commandLine)
     // clear search highlights before refresh - matches are now invalid
     activeEditView()->clearSearchMatches();
 #endif
+
+    // replace-all may have changed many lines; invalidate colorization cache globally
+    activeEditView()->bumpColorCacheGeneration();
 
     // single screen refresh after all replacements
     activeEditView()->reframeAndUpdateScreen();

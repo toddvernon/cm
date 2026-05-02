@@ -189,6 +189,10 @@ class EditView
     int getScreenCommandRow(void)   { return (int)_screenCommandRow; }
 #endif
 
+    // colorization cache invalidation (callable from command handlers)
+    void invalidateColorCache(int row);           // one row, O(1)
+    void bumpColorCacheGeneration(void);          // everything, O(1) — used for structural changes too
+
   private:
 
     void recalcScreenPlacements(void);
@@ -372,7 +376,6 @@ class EditView
     void terminalScrollAndDraw(int direction, int lines);
     // use terminal scroll sequences to shift content, then draw only new line(s)
 
-#if defined(_LINUX_) || defined(_OSX_)
     int terminalInsertLineAndDraw(unsigned long originalRow);
     // use terminal insert line to efficiently handle Enter key
     // originalRow is where the line was split (hint.startRow from addReturn)
@@ -383,6 +386,12 @@ class EditView
     // joinedRow is where lines were merged
     // returns 1 if optimization was used, 0 if caller should do full redraw
 
+    CxString lineNumberPrefix(unsigned long bufferRow);
+    // build cursor-position + colored line-number column for the given row.
+    // used by terminalInsertLineAndDraw / terminalDeleteLineAndDraw to refresh
+    // stale line numbers on rows the terminal shifted via CSI L / CSI M.
+
+#if defined(_LINUX_) || defined(_OSX_)
     int _mcpConnected;
     // is MCP bridge connected
 
@@ -434,6 +443,35 @@ class EditView
     void ensureBlockCommentStateSize(int lineCount);
     // ensure state array is large enough for the buffer
 #endif
+
+    //---------------------------------------------------------------------------------------------
+    // Colorization cache - per-line cache of colorized visible-text bytes
+    //
+    // Caches the post-colorizeText() visibleText (pre-highlight) for each buffer row.
+    // On a cache hit, formatEditorLine() skips the colorize pass entirely and uses the
+    // cached bytes. Search / selection highlights are applied as overlays after the
+    // cache read, so they are never cached — pattern changes don't invalidate.
+    //
+    // Cache entry is valid only when (startCol, visCols, blockState, endsState, generation)
+    // all match the current frame's key. Generation is bumped when language / palette /
+    // colorize-syntax setting changes.
+    //---------------------------------------------------------------------------------------------
+    struct ColorCacheEntry {
+        CxString bytes;       // colorized visibleText bytes (pre-highlight)
+        int      startCol;    // _visibleFirstEditBufferCol at cache time
+        int      visCols;     // _screenEditNumberOfCols at cache time
+        int      blockState;  // starts-inside-block-comment at cache time
+        int      endsState;   // ends-inside-block-comment at cache time
+        int      generation;  // generation counter at cache time
+        int      valid;       // 0 = cold / invalidated, 1 = usable
+    };
+
+    ColorCacheEntry *_colorCache;
+    int              _colorCacheSize;
+    int              _colorCacheGeneration;
+
+    void ensureColorCacheSize(int lineCount);
+    // grow cache array to cover buffer
 
 };
 

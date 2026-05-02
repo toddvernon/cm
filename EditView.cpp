@@ -60,6 +60,11 @@ EditView::EditView( ProgramDefaults *pd, CxScreen *screenPtr )
     _mouseSelectionActive = 0;
 #endif
 
+    // colorization cache (all platforms)
+    _colorCache = NULL;
+    _colorCacheSize = 0;
+    _colorCacheGeneration = 1;
+
     // there is not initial editbuffer, the next step creates it.
     editBuffer = NULL;
 
@@ -121,6 +126,14 @@ EditView::setEditBuffer( CmEditBuffer *eb)
     // recompute block comment state for entire buffer
     recomputeBlockCommentState(0);
 #endif
+
+    // new buffer content: any previously cached colorization is wrong now
+    bumpColorCacheGeneration();
+
+    // pre-size the colorization cache to avoid a mid-session reallocation when
+    // the buffer first grows past the current cache bound. One-time cost at
+    // buffer load instead of a random future Enter hitting the 256-boundary.
+    ensureColorCacheSize((int)editBuffer->numberOfLines() + 256);
 }
 
 
@@ -500,6 +513,13 @@ EditView::replaceString( CxString findString, CxString replaceString )
     // call replace
     int result = editBuffer->replaceString( findString, replaceString );
 
+    // invalidate cache: multi-line replaces shift rows, single-line changes one row
+    if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
+        bumpColorCacheGeneration();
+    } else {
+        invalidateColorCache((int)loc.row);
+    }
+
   	// update the screen after replacement
     if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
         reframe();
@@ -550,6 +570,13 @@ EditView::replaceAgain( CxString findString, CxString replaceString )
 
     // replace the string again, if its at the cursor
     int result = editBuffer->replaceAgain( findString, replaceString );
+
+    // invalidate cache: multi-line replaces shift rows, single-line changes one row
+    if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
+        bumpColorCacheGeneration();
+    } else {
+        invalidateColorCache((int)loc.row);
+    }
 
 	// update the screen after replacement
     if (findString.firstChar('\n') != -1 || replaceString.firstChar('\n') != -1) {
@@ -692,6 +719,7 @@ EditView::pageDown( void )
 void
 EditView::insertCommentBlock( unsigned long lastCol )
 {
+    bumpColorCacheGeneration();
 	editBuffer->insertCommentBlock( lastCol ) ;
 }
 
@@ -752,6 +780,7 @@ EditView::pageUp( void )
 CxString
 EditView::cutTextCursorToEndOfLine( void )
 {
+    invalidateColorCache((int)editBuffer->cursor.row);
     CxString cutText = editBuffer->cutTextToEndOfLine();
     updateScreen();
     return( cutText );
@@ -767,6 +796,14 @@ EditView::cutTextCursorToEndOfLine( void )
 void
 EditView::pasteText( CxString text)
 {
+    bumpColorCacheGeneration();
+#if defined(_OSX_) || defined(_LINUX_)
+    // if a selection is active, paste replaces it
+    if (_mouseSelectionActive && editBuffer != NULL) {
+        editBuffer->cutToMark();
+        _mouseSelectionActive = 0;
+    }
+#endif
     editBuffer->pasteFromCutBuffer( text );
     updateScreen();
 }
@@ -782,6 +819,14 @@ EditView::pasteText( CxString text)
 void
 EditView::pasteText( CxUTFString &text )
 {
+    bumpColorCacheGeneration();
+#if defined(_OSX_) || defined(_LINUX_)
+    // if a selection is active, paste replaces it
+    if (_mouseSelectionActive && editBuffer != NULL) {
+        editBuffer->cutToMark();
+        _mouseSelectionActive = 0;
+    }
+#endif
     editBuffer->pasteFromCutBuffer( text );
     updateScreen();
 }
@@ -810,9 +855,11 @@ EditView::setMark( void )
 CxString
 EditView::cutToMark( void )
 {
+    // cut may span multiple lines — bump generation invalidates in O(1)
+    bumpColorCacheGeneration();
     CxString text = editBuffer->cutToMark();
     updateScreen();
-    
+
     return(text);
 }
 
@@ -826,9 +873,45 @@ EditView::cutToMark( void )
 CxString
 EditView::cutTextToEndOfLine(void)
 {
+    // when cursor is at end-of-line, this call cuts the virtual CR — joining the
+    // next line up. that's a multi-line edit: every row from cursor+1 down shifts
+    // up by one. detect by comparing line count before/after.
+    unsigned long beforeLines = editBuffer->numberOfLines();
+    unsigned long joinedRow   = editBuffer->cursor.row;
+    int oldOffset             = (int)_lineNumberOffset;
+
     CxString text = editBuffer->cutTextToEndOfLine();
-    updateScreen();
-    
+
+    int isLineJoin = (editBuffer->numberOfLines() < beforeLines);
+
+    if (isLineJoin) {
+        recalcLineNumberDigits();
+#if defined(_LINUX_) || defined(_OSX_)
+        clearSearchMatches();
+        recomputeBlockCommentState((int)joinedRow);
+#endif
+        // line removed — every row from joinedRow+1 down shifts; cache invalid
+        bumpColorCacheGeneration();
+
+        if (oldOffset != (int)_lineNumberOffset) {
+            // line-number column width changed; full repaint required
+            reframe();
+            updateScreen();
+        } else if (!reframe()) {
+            // no scrolling needed - try terminal delete-line optimization
+            if (!terminalDeleteLineAndDraw(joinedRow)) {
+                updateScreen();   // optimization unavailable - fall back
+            }
+        } else {
+            // scrolling was needed - normal full update
+            updateScreen();
+        }
+    } else {
+        // single-line cut — only the cursor row's color cache is stale
+        invalidateColorCache((int)joinedRow);
+        updateScreen();
+    }
+
     return( text );
 }
 
@@ -1213,10 +1296,92 @@ EditView::recomputeBlockCommentState(int fromLine)
             }
         }
 
+        // Early exit for incremental rescans (fromLine > 0): if the recomputed
+        // state equals what was already stored, no later line's state can
+        // have changed, so we can stop. Full scans (fromLine == 0) always run
+        // to the end because the array is zero-initialized and "matches" the
+        // freshly-computed state spuriously on the first pass.
+        int previousState = _blockCommentState[lineNum];
+        if (previousState != inComment) {
+            // block-comment boundary moved on this line — colorization of this
+            // line (and the continuation of the walk) depends on the new state
+            invalidateColorCache(lineNum);
+        }
         _blockCommentState[lineNum] = inComment;
+        if (fromLine > 0 && lineNum > fromLine && previousState == inComment) {
+            break;
+        }
     }
 }
 
+
+#endif  // close the modern-only block — the colorization cache helpers below
+        // are built on all platforms
+
+//-------------------------------------------------------------------------------------------------
+// EditView::ensureColorCacheSize
+//
+// Grow the per-line colorization cache array to cover at least lineCount rows.
+//-------------------------------------------------------------------------------------------------
+void
+EditView::ensureColorCacheSize(int lineCount)
+{
+    if (lineCount <= _colorCacheSize) return;
+
+    int newSize = lineCount + 256;
+    ColorCacheEntry *newCache = new ColorCacheEntry[newSize];
+
+    // copy existing entries
+    if (_colorCache != NULL) {
+        for (int i = 0; i < _colorCacheSize; i++) {
+            newCache[i] = _colorCache[i];
+        }
+        delete[] _colorCache;
+    }
+
+    // initialize new entries
+    for (int i = _colorCacheSize; i < newSize; i++) {
+        newCache[i].startCol = 0;
+        newCache[i].visCols = 0;
+        newCache[i].blockState = 0;
+        newCache[i].endsState = 0;
+        newCache[i].generation = 0;
+        newCache[i].valid = 0;
+    }
+
+    _colorCache = newCache;
+    _colorCacheSize = newSize;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::invalidateColorCache
+//
+// Mark a single row's cached colorization invalid.
+//-------------------------------------------------------------------------------------------------
+void
+EditView::invalidateColorCache(int row)
+{
+    if (_colorCache == NULL) return;
+    if (row < 0 || row >= _colorCacheSize) return;
+    _colorCache[row].valid = 0;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// EditView::bumpColorCacheGeneration
+//
+// Invalidate every cached entry in one step by advancing the generation counter.
+// Used on language-mode change, palette change, or colorize-syntax toggle.
+//-------------------------------------------------------------------------------------------------
+void
+EditView::bumpColorCacheGeneration(void)
+{
+    _colorCacheGeneration++;
+}
+
+
+#if defined(_LINUX_) || defined(_OSX_)  // resume modern-only block
 
 //-------------------------------------------------------------------------------------------------
 // EditView::isLineInsideBlockComment
