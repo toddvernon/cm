@@ -847,13 +847,25 @@ EditView::terminalDeleteLineAndDraw(unsigned long joinedRow)
     if (_showLineNumbers) {
         CxString numRefresh;
         unsigned long numLines = editBuffer->numberOfLines();
-        for (unsigned long r = joinedRow + 1; r <= _visibleLastEditBufferRow; r++) {
-            numRefresh += lineNumberPrefix(r);  // past-end handled inside helper
+        for (unsigned long r = joinedRow + 1; r < _visibleLastEditBufferRow; r++) {
             if (r >= numLines) break;
+            numRefresh += lineNumberPrefix(r);
         }
         if (numRefresh.length() > 0) {
             fputs(numRefresh.data(), stdout);
         }
+    }
+
+    // CSI M blanked the cells at the bottom row of the scroll region. If a
+    // buffer row scrolled into view from below, redraw it fully (line number
+    // AND text). Without this, repeated joins leave a growing band of
+    // blank-but-occupied rows at the bottom: the buffer holds the text but
+    // those cells were never repainted. Skip when joinedRow IS the bottom
+    // row — we already redrew it above and CSI M was a no-op there.
+    if (joinedRow < _visibleLastEditBufferRow) {
+        CxString bottomLine = formatEditorLine(_visibleLastEditBufferRow);
+        bottomLine = CxStringUtils::replaceTabExtensionsWithSpaces(bottomLine);
+        fputs(bottomLine.data(), stdout);
     }
 
     // Update status line (gated — vintage suppresses unless liveStatusLine) and flush
