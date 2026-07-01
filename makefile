@@ -180,6 +180,15 @@ ifeq ($(UNAME_S), sunos)
 	chmod 644 /usr/local/share/cm/cm_help.md
 	chmod 644 /usr/local/share/cm/cm_help.txt
 endif
+ifeq ($(UNAME_S), netbsd)
+	cp $(APP_OBJECT_DIR)/cm /usr/local/bin/cm
+	chmod 755 /usr/local/bin/cm
+	mkdir -p /usr/local/share/cm
+	cp cm_help.md /usr/local/share/cm/cm_help.md
+	cp cm_help.txt /usr/local/share/cm/cm_help.txt
+	chmod 644 /usr/local/share/cm/cm_help.md
+	chmod 644 /usr/local/share/cm/cm_help.txt
+endif
 
 
 $(APP_OBJECT_DIR)/cm: $(ALL_OBJECTS)
