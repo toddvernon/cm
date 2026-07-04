@@ -50,20 +50,11 @@ ProgramDefaults::ProgramDefaults(void)
     _firstRun(FALSE),
 #if defined(_OSX_) || defined(_LINUX_)
     _projectAutoVerify(TRUE),
-    _liveStatusLine(TRUE),
+    _liveStatusLine(TRUE)
 #else
     _projectAutoVerify(FALSE),
-    _liveStatusLine(FALSE),
+    _liveStatusLine(FALSE)
 #endif
-#if defined(_OSX_) || defined(_LINUX_)
-    _fixTerminalSize(FALSE),
-#else
-    _fixTerminalSize(TRUE),
-#endif
-    _screenSubtractRows(0),
-    _screenSubtractCols(0),
-    _screenOverrideRows(0),
-    _screenOverrideCols(0)
 {
     _statusBarTextColor          = new CxAnsiForegroundColor( CxAnsiForegroundColor::NONE );
     _statusBarBackgroundColor    = new CxAnsiBackgroundColor( CxAnsiForegroundColor::NONE );
@@ -222,15 +213,10 @@ ProgramDefaults::loadDefaults( CxString fname )
             parseBooleanField( object, "colorizeSyntax", &_colorizeSyntax );
             parseBooleanField( object, "liveStatusLines", &_liveStatusLine );
             parseBooleanField( object, "projectAutoVerify", &_projectAutoVerify );
-            parseBooleanField( object, "fixTerminalSize", &_fixTerminalSize );
 
-            parseIntField( object, "screenSubtractRows", &_screenSubtractRows );
-            parseIntField( object, "screenSubtractCols", &_screenSubtractCols );
-            parseIntField( object, "screenOverrideRows", &_screenOverrideRows );
-            parseIntField( object, "screenOverrideCols", &_screenOverrideCols );
-
-            CxScreen::setScreenAdjustments(_screenSubtractRows, _screenSubtractCols,
-                                           _screenOverrideRows, _screenOverrideCols);
+            // fixTerminalSize / screenSubtract* / screenOverride* were size
+            // hacks from before CxScreen::syncTerminalSize(); old .cmrc files
+            // that still carry them are silently ignored.
 
             //-------------------------------------------------------------------------------------
             // get the colors member
@@ -656,14 +642,6 @@ ProgramDefaults::projectAutoVerify(void)
 }
 
 
-// should the app run resize to fix terminal dimensions on launch
-int
-ProgramDefaults::fixTerminalSize(void)
-{
-    return( _fixTerminalSize );
-}
-
-
 // returns true if this is the first run (config file was just created)
 int
 ProgramDefaults::isFirstRun(void)
@@ -897,7 +875,6 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *modalSelectBg   = "RGB:180,200,255";
     const char *liveStatus = "true";
     const char *projectVerify = "true";
-    const char *fixTermSize = "false";
     const char *jumpScroll = "true";
 #elif defined(_SOLARIS6_) || defined(_SOLARIS10_) || defined(_IRIX6_)
     const char *hdr  = "# Uses XTERM 256 color palette for broad terminal compatibility";
@@ -921,7 +898,6 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *modalSelectBg   = "XTERM256:LightSteelBlue1";
     const char *liveStatus = "false";
     const char *projectVerify = "false";
-    const char *fixTermSize = "true";
     const char *jumpScroll = "false";
 #else
     const char *hdr  = "# Uses ANSI 16-color palette for maximum terminal compatibility";
@@ -945,24 +921,12 @@ ProgramDefaults::writeDefaults(CxString path)
     const char *modalSelectBg   = "ANSI:WHITE";
     const char *liveStatus = "false";
     const char *projectVerify = "false";
-    const char *fixTermSize = "true";
     const char *jumpScroll = "false";
 #endif
 
     file.printf("# .cmrc defaults file\n");
     file.printf("%s\n", hdr);
     file.printf("# color syntax is ANSI:<name>, XTERM256:<name>, RGB:<R>,<G>,<B>\n");
-    file.printf("#\n");
-    file.printf("# fixTerminalSize: run /usr/openwin/bin/resize at launch to detect the real\n");
-    file.printf("#   terminal dimensions. Useful when telnetting from a modern terminal to an\n");
-    file.printf("#   older system where TIOCGWINSZ reports incorrect values.\n");
-    file.printf("#\n");
-    file.printf("# screen size adjustments (vintage platforms only, ignored on macOS/Linux)\n");
-    file.printf("#   Older systems (SunOS, Solaris, IRIX) may report incorrect terminal\n");
-    file.printf("#   dimensions via TIOCGWINSZ, especially over telnet or CDE dtterm.\n");
-    file.printf("#   screenSubtractRows/Cols: subtract from the reported terminal size (0=off)\n");
-    file.printf("#   screenOverrideRows/Cols: use this exact size, ignoring terminal (0=off)\n");
-    file.printf("#   override takes precedence over subtract when both are set\n");
     file.printf("# --------------------------------------------------------------------------------\n");
     file.printf("\n");
     file.printf("{\n");
@@ -973,11 +937,6 @@ ProgramDefaults::writeDefaults(CxString path)
     file.printf("    \"liveStatusLines\": %s,\n", liveStatus);
     file.printf("    \"autoSaveOnBufferChange\": false,\n");
     file.printf("    \"projectAutoVerify\": %s,\n", projectVerify);
-    file.printf("    \"fixTerminalSize\": %s,\n", fixTermSize);
-    file.printf("    \"screenSubtractRows\": 0,\n");
-    file.printf("    \"screenSubtractCols\": 0,\n");
-    file.printf("    \"screenOverrideRows\": 0,\n");
-    file.printf("    \"screenOverrideCols\": 0,\n");
     file.printf("\n");
 
     // UI colors

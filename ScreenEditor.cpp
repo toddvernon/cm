@@ -110,16 +110,13 @@ ScreenEditor::ScreenEditor( CxScreen *scr, CxKeyboard *key, CxString filePath )
     }
 
     //---------------------------------------------------------------------------------------------
-    // fix terminal size - on vintage platforms over telnet, the kernel often has wrong dimensions.
-    // Run /usr/openwin/bin/resize to query the real terminal size and update the kernel.
-    // This runs after the alt screen switch (in Cm.cpp) so resize output is not visible.
+    // terminal size - the kernel winsize is 0x0 on serial consoles and often wrong on vintage
+    // telnet, so sync it from the terminal itself (DSR probe + TIOCSWINSZ; the in-process
+    // equivalent of resize(1), with a timeout and a 24x80 fallback so a mute terminal can't
+    // wedge us). Runs after the alt screen switch (in Cm.cpp) so the cursor probe is invisible.
     //---------------------------------------------------------------------------------------------
-    if (programDefaults->fixTerminalSize()) {
-        fflush(stdout);
-        system("/usr/openwin/bin/resize");
-        CxScreen::refreshWindowSize();
-        CxScreen::clearScreen();
-    }
+    CxScreen::syncTerminalSize();
+    CxScreen::clearScreen();
 
     //---------------------------------------------------------------------------------------------
     // init the cut buffer and replace buffer
